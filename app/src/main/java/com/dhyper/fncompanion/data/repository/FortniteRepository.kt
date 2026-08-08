@@ -1,0 +1,190 @@
+package com.dhyper.fncompanion.data.repository
+
+import com.dhyper.fncompanion.BuildConfig
+import com.dhyper.fncompanion.data.api.ApiClient
+import com.dhyper.fncompanion.data.models.CosmeticItem
+import com.dhyper.fncompanion.data.models.MapData
+import com.dhyper.fncompanion.data.models.NewsData
+import com.dhyper.fncompanion.data.models.PlayerStatsData
+import com.dhyper.fncompanion.data.models.ShopData
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
+import retrofit2.HttpException
+import java.io.IOException
+
+class FortniteRepository {
+    private val api = ApiClient.publicApi
+
+    companion object {
+        private var cachedFullCosmetics: List<CosmeticItem>? = null
+    }
+
+    fun clearCache() {
+        cachedFullCosmetics = null
+    }
+
+    suspend fun fetchItemShop(): Result<ShopData> {
+        return try {
+            val response = api.getShop()
+            if (response.status == 200 && response.data != null) {
+                Result.success(response.data)
+            } else {
+                Result.failure(Exception("Item Shop returned status code: ${response.status}"))
+            }
+        } catch (e: HttpException) {
+            Result.failure(Exception("HTTP ${e.code()}: ${e.message()} while loading Item Shop"))
+        } catch (e: IOException) {
+            Result.failure(Exception("Network error while connecting to Fortnite API: ${e.localizedMessage}"))
+        } catch (e: Exception) {
+            Result.failure(Exception("Error loading Item Shop: ${e.localizedMessage}"))
+        }
+    }
+
+    suspend fun fetchNews(): Result<NewsData> {
+        return try {
+            val response = api.getNews()
+            if (response.status == 200 && response.data != null) {
+                Result.success(response.data)
+            } else {
+                Result.failure(Exception("News feed returned status code: ${response.status}"))
+            }
+        } catch (e: HttpException) {
+            Result.failure(Exception("HTTP ${e.code()}: ${e.message()} while loading News"))
+        } catch (e: IOException) {
+            Result.failure(Exception("Network error while loading News: ${e.localizedMessage}"))
+        } catch (e: Exception) {
+            Result.failure(Exception("Error loading News: ${e.localizedMessage}"))
+        }
+    }
+
+    suspend fun fetchMap(): Result<MapData> {
+        return try {
+            val response = api.getMap()
+            if (response.status == 200 && response.data != null) {
+                Result.success(response.data)
+            } else {
+                Result.failure(Exception("Map service returned status code: ${response.status}"))
+            }
+        } catch (e: HttpException) {
+            Result.failure(Exception("HTTP ${e.code()}: ${e.message()} while loading Map"))
+        } catch (e: IOException) {
+            Result.failure(Exception("Network error while loading Map: ${e.localizedMessage}"))
+        } catch (e: Exception) {
+            Result.failure(Exception("Error loading Map: ${e.localizedMessage}"))
+        }
+    }
+
+    suspend fun searchPlayerStats(accountName: String, accountType: String = "epic", apiKey: String? = null): Result<PlayerStatsData> {
+        return try {
+            val keyToUse = apiKey?.ifBlank { null } ?: BuildConfig.FORTNITE_API_KEY
+            val response = api.getPlayerStats(apiKey = keyToUse, name = accountName.trim(), accountType = accountType)
+            if (response.status == 200 && response.data != null) {
+                Result.success(response.data)
+            } else {
+                val errorMsg = response.error ?: "Player '$accountName' not found or stats are set to private."
+                Result.failure(Exception(errorMsg))
+            }
+        } catch (e: HttpException) {
+            if (e.code() == 401) {
+                Result.failure(Exception("HTTP 401: Free API Key Required. fortnite-api.com requires a free API key to look up player stats. You can get a free key in 10s at https://dash.fortnite-api.com."))
+            } else if (e.code() == 404) {
+                Result.failure(Exception("Player '$accountName' was not found on Epic Games servers."))
+            } else if (e.code() == 403) {
+                Result.failure(Exception("Stats for '$accountName' are private or disabled by user."))
+            } else {
+                Result.failure(Exception("HTTP ${e.code()}: ${e.message()} while fetching player stats"))
+            }
+        } catch (e: IOException) {
+            Result.failure(Exception("Network error during stats search: ${e.localizedMessage}"))
+        } catch (e: Exception) {
+            Result.failure(Exception("Error fetching stats for '$accountName': ${e.localizedMessage}"))
+        }
+    }
+
+    suspend fun fetchAllCosmetics(): Result<List<CosmeticItem>> = coroutineScope {
+        cachedFullCosmetics?.let { return@coroutineScope Result.success(it) }
+        
+        return@coroutineScope try {
+            val deferredBr = async { api.getAllCosmetics().data ?: emptyList() }
+            val deferredTracks = async { 
+                try {
+                    api.getJamTracks().data?.map { t ->
+                        val trackMap = t.track as? Map<*, *>
+                        val imageMap = t.images as? Map<*, *>
+
+                        val title = trackMap?.get("title")?.toString() ?: t.title ?: t.name ?: "Unknown Song"
+                        val artist = trackMap?.get("artist")?.toString() ?: t.artist ?: "Unknown Artist"
+                        val album = trackMap?.get("album")?.toString() ?: t.album
+                        val albumArt = imageMap?.get("albumArt")?.toString() ?: t.albumArt
+                        
+                        val bpm = (trackMap?.get("bpm") as? Number)?.toInt() ?: t.bpm
+                        val duration = (trackMap?.get("duration") as? Number)?.toInt() ?: t.duration
+                        val previewUrl = trackMap?.get("previewUrl")?.toString() ?: t.previewUrl
+
+                        val albumDesc = if (album.isNullOrBlank() || album.contains("unknown", ignoreCase = true)) "" else " from $album"
+                        
+                        CosmeticItem(
+                            id = t.id,
+                            name = title,
+                            description = "Song by $artist$albumDesc",
+                            type = com.dhyper.fncompanion.data.models.CosmeticType("Track", "Jam Track"),
+                            rarity = com.dhyper.fncompanion.data.models.CosmeticRarity("Festival", "Festival"),
+                            series = null,
+                            images = com.dhyper.fncompanion.data.models.CosmeticImages(albumArt, albumArt, albumArt, null, null, albumArt),
+                            introduction = null,
+                            set = null,
+                            added = null,
+                            previewUrl = previewUrl,
+                            artist = artist,
+                            album = album,
+                            bpm = bpm,
+                            duration = duration
+                        )
+                    } ?: emptyList()
+                } catch (e: Exception) { emptyList() }
+            }
+            val deferredCars = async { try { api.getCars().data ?: emptyList() } catch (e: Exception) { emptyList() } }
+            val deferredInstruments = async { try { api.getInstruments().data ?: emptyList() } catch (e: Exception) { emptyList() } }
+            val deferredLego = async { try { api.getLegoKits().data ?: emptyList() } catch (e: Exception) { emptyList() } }
+            val deferredBanners = async {
+                try {
+                    api.getBanners().data?.map { b ->
+                        CosmeticItem(
+                            id = b.id,
+                            name = b.name ?: b.devName ?: "Banner",
+                            description = b.description ?: "Profile Banner",
+                            type = com.dhyper.fncompanion.data.models.CosmeticType("Banner", "Banner"),
+                            rarity = com.dhyper.fncompanion.data.models.CosmeticRarity("Common", "Common"),
+                            series = null,
+                            images = b.images,
+                            introduction = null,
+                            set = null,
+                            added = null
+                        )
+                    } ?: emptyList()
+                } catch (e: Exception) { emptyList() }
+            }
+
+            val results = awaitAll(deferredBr, deferredTracks, deferredCars, deferredInstruments, deferredLego, deferredBanners)
+            val combined = results.flatten()
+            cachedFullCosmetics = combined
+            Result.success(combined)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun fetchPlaylists(): Result<List<com.dhyper.fncompanion.data.models.PlaylistData>> {
+        return try {
+            val response = api.getPlaylists()
+            if (response.status == 200 && response.data != null) {
+                Result.success(response.data)
+            } else {
+                Result.failure(Exception("Failed to fetch playlists: ${response.status}"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+}

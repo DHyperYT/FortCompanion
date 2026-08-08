@@ -1,0 +1,814 @@
+package com.dhyper.fncompanion.ui.screens
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
+import com.dhyper.fncompanion.data.db.AuthEntity
+import com.dhyper.fncompanion.data.models.CosmeticItem
+import com.dhyper.fncompanion.data.models.CosmeticSet
+import com.dhyper.fncompanion.data.models.LockerCategory
+import com.dhyper.fncompanion.data.models.ParsedLockerItem
+import com.dhyper.fncompanion.ui.components.JamTrackPlayer
+import com.dhyper.fncompanion.ui.components.YouTubeButton
+import com.dhyper.fncompanion.ui.components.getRarityColor
+import com.dhyper.fncompanion.ui.theme.*
+import com.dhyper.fncompanion.ui.utils.SeasonUtils
+import com.dhyper.fncompanion.ui.viewmodels.LockerSortOption
+import com.dhyper.fncompanion.ui.viewmodels.LockerUiState
+import com.dhyper.fncompanion.ui.viewmodels.PersonalLockerViewModel
+import com.dhyper.fncompanion.ui.viewmodels.CosmeticsViewModel
+import androidx.lifecycle.viewmodel.compose.viewModel
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun PersonalLockerScreen(
+    session: AuthEntity?,
+    viewModel: PersonalLockerViewModel,
+    cosmeticsViewModel: CosmeticsViewModel, // Added parameter
+    onNavigateToAuth: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val uiState by viewModel.uiState.collectAsState()
+    var selectedItemForDetail by remember { mutableStateOf<ParsedLockerItem?>(null) }
+    var selectedSet by remember { mutableStateOf<CosmeticSet?>(null) }
+
+    LaunchedEffect(session) {
+        viewModel.loadLocker(session)
+    }
+
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .background(SleekBackground)
+            .padding(12.dp)
+    ) {
+        if (session == null) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp)
+                        .border(1.dp, SleekSurfaceBorder, RoundedCornerShape(16.dp)),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = SleekSurfaceVariant)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(24.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(64.dp)
+                                .background(SleekPrimary, CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(Icons.Default.Lock, contentDescription = null, tint = Color.White, modifier = Modifier.size(36.dp))
+                        }
+
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        Text(
+                            text = "Epic Games Account Required",
+                            style = MaterialTheme.typography.titleLarge,
+                            color = SleekTextPrimary,
+                            fontWeight = FontWeight.Bold
+                        )
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        Text(
+                            text = "To browse and filter your personal Fortnite Athena Locker cosmetics directly from Epic Games servers, connect your account.",
+                            color = SleekTextSecondary,
+                            textAlign = TextAlign.Center,
+                            fontSize = 13.sp
+                        )
+
+                        Spacer(modifier = Modifier.height(20.dp))
+
+                        Button(
+                            onClick = onNavigateToAuth,
+                            colors = ButtonDefaults.buttonColors(containerColor = SleekPrimary),
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.testTag("locker_login_button")
+                        ) {
+                            Text("Connect Epic Games Account", color = Color.White, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+            }
+        } else {
+            when (val state = uiState) {
+                is LockerUiState.Loading -> {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            CircularProgressIndicator(color = SleekCyan)
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Text("Loading Athena Locker for ${session.displayName}...", color = SleekTextSecondary)
+                        }
+                    }
+                }
+                is LockerUiState.Error -> {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            modifier = Modifier.padding(24.dp)
+                        ) {
+                            Text(
+                                text = "Locker Load Error",
+                                style = MaterialTheme.typography.titleLarge,
+                                color = MaterialTheme.colorScheme.error,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(text = state.message, color = SleekTextSecondary, textAlign = TextAlign.Center)
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Button(
+                                onClick = { viewModel.loadLocker(session) },
+                                colors = ButtonDefaults.buttonColors(containerColor = SleekPrimary),
+                                shape = RoundedCornerShape(10.dp),
+                                modifier = Modifier.testTag("locker_retry_button")
+                            ) {
+                                Icon(Icons.Default.Refresh, contentDescription = null, tint = Color.White)
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Retry", color = Color.White, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+                }
+                is LockerUiState.Success -> {
+                    // Header Bar with V-Bucks Balance
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .border(1.dp, SleekSurfaceBorder, RoundedCornerShape(12.dp)),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = CardDefaults.cardColors(containerColor = SleekSurfaceVariant)
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(12.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column {
+                                Text(
+                                    text = session.displayName,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = SleekTextPrimary,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    text = "Total Locker Items: ${state.allItems.size}",
+                                    fontSize = 12.sp,
+                                    color = SleekTextSecondary
+                                )
+                            }
+
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(22.dp)
+                                        .background(FortniteGold, CircleShape),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text("V", color = Color.Black, fontSize = 12.sp, fontWeight = FontWeight.Black)
+                                }
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = "${state.vbucksBalance}",
+                                    style = MaterialTheme.typography.titleLarge,
+                                    color = FortniteGold,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    // Search and Sorting bar
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        OutlinedTextField(
+                            value = state.searchQuery,
+                            onValueChange = { viewModel.setSearchQuery(it) },
+                            modifier = Modifier
+                                .weight(1f)
+                                .testTag("locker_search_input"),
+                            placeholder = { Text("Search Locker Items...", color = SleekTextMuted, fontSize = 13.sp) },
+                            leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = SleekCyan) },
+                            trailingIcon = if (state.searchQuery.isNotEmpty()) {
+                                {
+                                    IconButton(onClick = { viewModel.setSearchQuery("") }) {
+                                        Icon(Icons.Default.Close, contentDescription = null, tint = SleekTextMuted)
+                                    }
+                                }
+                            } else null,
+                            singleLine = true,
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = SleekPrimary,
+                                unfocusedBorderColor = SleekSurfaceBorder,
+                                focusedContainerColor = SleekSurface,
+                                unfocusedContainerColor = SleekSurface,
+                                focusedTextColor = SleekTextPrimary,
+                                unfocusedTextColor = SleekTextPrimary
+                            ),
+                            shape = RoundedCornerShape(12.dp)
+                        )
+
+                        Spacer(modifier = Modifier.width(8.dp))
+
+                        // Sort dropdown button
+                        SortDropdownButton(
+                            currentSort = state.sortOption,
+                            onSelectSort = { viewModel.setSortOption(it) }
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    // Category Chips
+                    val categories = listOf(
+                        null to "All",
+                        LockerCategory.OUTFIT to "Outfits",
+                        LockerCategory.BACK_BLING to "Back Blings",
+                        LockerCategory.PICKAXE to "Pickaxes",
+                        LockerCategory.GLIDER to "Gliders",
+                        LockerCategory.CONTRAIL to "Contrails",
+                        LockerCategory.EMOTE to "Emotes",
+                        LockerCategory.EMOTICON to "Emoticons",
+                        LockerCategory.SPRAY to "Sprays",
+                        LockerCategory.WRAP to "Wraps",
+                        LockerCategory.MUSIC to "Music",
+                        LockerCategory.LOADING_SCREEN to "Screens",
+                        LockerCategory.SIDEKICK to "Sidekicks",
+                        LockerCategory.AURA to "Auras",
+                        LockerCategory.JAM_TRACK to "Jam Tracks",
+                        LockerCategory.BANNER to "Banners",
+                        LockerCategory.KICKS to "Kicks",
+                        LockerCategory.CAR to "Cars",
+                        LockerCategory.CAR_DECAL to "Decals",
+                        LockerCategory.WHEELS to "Wheels",
+                        LockerCategory.CAR_TRAIL to "Trails",
+                        LockerCategory.CAR_BOOST to "Boosts",
+                        LockerCategory.GUITAR to "Guitars",
+                        LockerCategory.BASS to "Basses",
+                        LockerCategory.DRUMS to "Drums",
+                        LockerCategory.KEYTAR to "Keytars",
+                        LockerCategory.MIC to "Mics",
+                        LockerCategory.LEGO_BUILD to "Lego Builds",
+                        LockerCategory.LEGO_DECOR to "Lego Decors"
+                    )
+
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        contentPadding = PaddingValues(bottom = 4.dp)
+                    ) {
+                        items(categories) { (cat, label) ->
+                            val isSelected = state.selectedCategory == cat
+                            FilterChip(
+                                selected = isSelected,
+                                onClick = { viewModel.setCategory(cat) },
+                                label = { Text(label, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium) },
+                                colors = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = SleekPrimary,
+                                    selectedLabelColor = Color.White,
+                                    containerColor = SleekSurface,
+                                    labelColor = SleekTextSecondary
+                                ),
+                                border = FilterChipDefaults.filterChipBorder(
+                                    enabled = true,
+                                    selected = isSelected,
+                                    borderColor = SleekSurfaceBorder,
+                                    selectedBorderColor = SleekPrimary
+                                ),
+                                modifier = Modifier.testTag("locker_cat_${label}")
+                            )
+                        }
+                    }
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Showing ${state.filteredItems.size} items (${state.sortOption.displayName})",
+                            fontSize = 12.sp,
+                            color = SleekTextMuted
+                        )
+
+                        FilterChip(
+                            selected = state.favoritesOnly,
+                            onClick = { viewModel.toggleFavoritesOnly() },
+                            label = { Text("Favorites Only") },
+                            leadingIcon = {
+                                Icon(
+                                    Icons.Default.Star,
+                                    contentDescription = null,
+                                    tint = if (state.favoritesOnly) Color.Black else FortniteGold
+                                )
+                            },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = FortniteGold,
+                                selectedLabelColor = Color.Black,
+                                containerColor = SleekSurface,
+                                labelColor = FortniteGold
+                            ),
+                            border = FilterChipDefaults.filterChipBorder(
+                                enabled = true,
+                                selected = state.favoritesOnly,
+                                borderColor = SleekSurfaceBorder,
+                                selectedBorderColor = FortniteGold
+                            ),
+                            modifier = Modifier.testTag("locker_fav_chip")
+                        )
+                    }
+
+                    if (state.filteredItems.isEmpty()) {
+                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            Text("No locker cosmetics match your criteria.", color = SleekTextMuted)
+                        }
+                    } else {
+                        LazyVerticalGrid(
+                            columns = GridCells.Fixed(3),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                            contentPadding = PaddingValues(bottom = 16.dp),
+                            modifier = Modifier.fillMaxSize()
+                        ) {
+                            items(state.filteredItems) { item ->
+                                LockerItemCard(
+                                    item = item,
+                                    onClick = {
+                                        selectedItemForDetail = item
+                                    }
+                                )
+                            }
+                        }
+                    }
+
+                    // Item Detail Bottom Sheet
+                    selectedItemForDetail?.let { item ->
+                        val videoId by cosmeticsViewModel.selectedVideoId.collectAsState()
+                        val isSearchingVideo by cosmeticsViewModel.isSearchingVideo.collectAsState()
+
+                        LaunchedEffect(item.cosmeticId) {
+                            val isTrack = item.category == LockerCategory.JAM_TRACK || item.templateId.contains("sid_", ignoreCase = true)
+                            val isMusicPack = item.category == LockerCategory.MUSIC || item.templateId.contains("MusicPack_", ignoreCase = true)
+                            if (isTrack || isMusicPack) {
+                                // Convert locker item to cosmetic item for search
+                                val dummy = CosmeticItem(
+                                    id = item.cosmeticId,
+                                    name = item.name,
+                                    description = item.description,
+                                    artist = item.artist,
+                                    type = if (isMusicPack) com.dhyper.fncompanion.data.models.CosmeticType("Music", "Music Pack") else null,
+                                    rarity = null, series = null, images = null, introduction = null, set = null, added = null
+                                )
+                                cosmeticsViewModel.searchYouTubeForItem(dummy)
+                            }
+                        }
+
+                        ModalBottomSheet(
+                            onDismissRequest = { selectedItemForDetail = null },
+                            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+                            containerColor = SleekSurface
+                        ) {
+                            LockerDetailSheet(
+                                item = item,
+                                videoId = videoId,
+                                isSearchingVideo = isSearchingVideo,
+                                onSetClick = { setId ->
+                                    selectedSet = item.set
+                                    selectedItemForDetail = null
+                                },
+                                onDismiss = { selectedItemForDetail = null }
+                            )
+                        }
+                    }
+
+                    // Set Detail Popup
+                    selectedSet?.let { cosmeticSet ->
+                        val setItemResult = remember(cosmeticSet) { cosmeticsViewModel.getItemsInSet(cosmeticSet.value ?: "") }
+
+                        ModalBottomSheet(
+                            onDismissRequest = { selectedSet = null },
+                            sheetState = rememberModalBottomSheetState(),
+                            containerColor = SleekBackground
+                        ) {
+                            Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+                                Text(
+                                    text = cosmeticSet.text?.uppercase() ?: "COLLECTION",
+                                    style = MaterialTheme.typography.titleLarge,
+                                    color = SleekCyan,
+                                    fontWeight = FontWeight.Black
+                                )
+                                
+                                Spacer(modifier = Modifier.height(16.dp))
+
+                                LazyVerticalGrid(
+                                    columns = GridCells.Adaptive(100.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                                    modifier = Modifier.heightIn(max = 500.dp)
+                                ) {
+                                    items(setItemResult) { item ->
+                                        CosmeticBrowserCard(
+                                            item = item,
+                                            isWishlisted = false,
+                                            isOwned = state.allItems.any { it.cosmeticId.equals(item.id, ignoreCase = true) },
+                                            onWishlistToggle = { },
+                                            onClick = { 
+                                                // Link back to a detail if needed
+                                            }
+                                        )
+                                    }
+                                }
+                                
+                                Spacer(modifier = Modifier.height(16.dp))
+                                Button(
+                                    onClick = { selectedSet = null },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    colors = ButtonDefaults.buttonColors(containerColor = SleekPrimary)
+                                ) {
+                                    Text("Back to Locker")
+                                }
+                            }
+                        }
+                    }
+                }
+                else -> {}
+            }
+        }
+    }
+}
+
+@Composable
+fun SortDropdownButton(
+    currentSort: LockerSortOption,
+    onSelectSort: (LockerSortOption) -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+
+    Box {
+        OutlinedButton(
+            onClick = { expanded = true },
+            shape = RoundedCornerShape(12.dp),
+            colors = ButtonDefaults.outlinedButtonColors(
+                containerColor = SleekSurface,
+                contentColor = SleekTextPrimary
+            ),
+            border = ButtonDefaults.outlinedButtonBorder.copy(brush = Brush.horizontalGradient(listOf(SleekSurfaceBorder, SleekSurfaceBorder))),
+            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 12.dp)
+        ) {
+            Icon(Icons.Default.Sort, contentDescription = null, tint = SleekCyan, modifier = Modifier.size(18.dp))
+            Spacer(modifier = Modifier.width(4.dp))
+            Text("Sort", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+        }
+
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+            modifier = Modifier.background(SleekSurfaceVariant)
+        ) {
+            LockerSortOption.entries.forEach { option ->
+                DropdownMenuItem(
+                    text = {
+                        Text(
+                            text = option.displayName,
+                            color = if (option == currentSort) SleekCyan else SleekTextPrimary,
+                            fontWeight = if (option == currentSort) FontWeight.Bold else FontWeight.Normal
+                        )
+                    },
+                    onClick = {
+                        onSelectSort(option)
+                        expanded = false
+                    }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun LockerItemCard(
+    item: ParsedLockerItem,
+    onClick: () -> Unit
+) {
+    val rarityColor = getRarityColor(item.rarity)
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onClick() }
+            .border(1.dp, rarityColor.copy(alpha = 0.6f), RoundedCornerShape(10.dp))
+            .testTag("locker_item_card"),
+        shape = RoundedCornerShape(10.dp),
+        colors = CardDefaults.cardColors(containerColor = SleekSurfaceVariant)
+    ) {
+        Column {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(1f)
+                    .background(
+                        Brush.verticalGradient(
+                            colors = listOf(rarityColor.copy(alpha = 0.4f), Color.Transparent)
+                        )
+                    )
+            ) {
+                val iconToLoad = item.iconUrl ?: "" 
+                
+                AsyncImage(
+                    model = iconToLoad,
+                    contentDescription = item.name,
+                    modifier = Modifier.fillMaxSize().padding(if (item.category == LockerCategory.OUTFIT) 0.dp else 4.dp),
+                    contentScale = ContentScale.Fit
+                )
+
+                if (item.isFavorite) {
+                    Icon(
+                        Icons.Default.Star,
+                        contentDescription = "Favorite",
+                        tint = FortniteGold,
+                        modifier = Modifier
+                            .padding(4.dp)
+                            .size(16.dp)
+                            .align(Alignment.TopEnd)
+                    )
+                }
+
+                if (item.quantity > 1) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .padding(4.dp)
+                            .background(Color.Black.copy(alpha = 0.7f), RoundedCornerShape(4.dp))
+                            .padding(horizontal = 4.dp, vertical = 2.dp)
+                    ) {
+                        Text(
+                            text = "x${item.quantity}",
+                            color = Color.White,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
+
+            Column(modifier = Modifier.padding(6.dp)) {
+                Text(
+                    text = item.name,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = SleekTextPrimary,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = item.rarity,
+                    fontSize = 10.sp,
+                    color = rarityColor,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun LockerDetailSheet(
+    item: ParsedLockerItem,
+    videoId: String?,
+    isSearchingVideo: Boolean,
+    onSetClick: (String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val rarityColor = getRarityColor(item.rarity)
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(20.dp)
+            .verticalScroll(rememberScrollState()),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Box(
+            modifier = Modifier
+                .size(180.dp)
+                .border(2.dp, rarityColor, RoundedCornerShape(16.dp))
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(rarityColor.copy(alpha = 0.4f), SleekSurface)
+                    ),
+                    shape = RoundedCornerShape(16.dp)
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            if (!item.iconUrl.isNullOrEmpty()) {
+                AsyncImage(
+                    model = item.iconUrl,
+                    contentDescription = item.name,
+                    modifier = Modifier.fillMaxSize().padding(8.dp),
+                    contentScale = ContentScale.Fit
+                )
+            } else {
+                Icon(Icons.Default.Checkroom, contentDescription = null, tint = rarityColor, modifier = Modifier.size(64.dp))
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Text(
+            text = item.name,
+            style = MaterialTheme.typography.headlineSmall,
+            color = SleekTextPrimary,
+            fontWeight = FontWeight.Bold,
+            textAlign = TextAlign.Center
+        )
+
+        Spacer(modifier = Modifier.height(4.dp))
+
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                modifier = Modifier
+                    .background(rarityColor, RoundedCornerShape(6.dp))
+                    .padding(horizontal = 8.dp, vertical = 2.dp)
+            ) {
+                Text(
+                    text = item.rarity.uppercase(),
+                    color = Color.Black,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Black
+                )
+            }
+
+            Spacer(modifier = Modifier.width(8.dp))
+
+            Text(
+                text = item.category.name.replace("_", " "),
+                color = SleekCyan,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold
+            )
+        }
+
+        if (item.quantity > 1) {
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.ContentCopy, contentDescription = null, tint = SleekCyan, modifier = Modifier.size(16.dp))
+                Spacer(modifier = Modifier.width(6.dp))
+                Text("Quantity: ${item.quantity}", color = SleekTextPrimary, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+            }
+        }
+
+        if (item.description != null) {
+            Text(
+                text = item.description,
+                style = MaterialTheme.typography.bodyLarge,
+                color = SleekTextSecondary,
+                modifier = Modifier.padding(top = 12.dp),
+                textAlign = TextAlign.Center
+            )
+        }
+
+        // --- AUDIO/VIDEO ---
+        val isTrack = item.category == LockerCategory.JAM_TRACK || item.templateId.contains("sid_", ignoreCase = true)
+        val isMusicPack = item.category == LockerCategory.MUSIC || item.templateId.contains("MusicPack_", ignoreCase = true)
+        
+        if (isTrack || isMusicPack) {
+            // 1. Prioritize 30s Official Preview (for tracks)
+            if (isTrack) {
+                item.previewUrl?.let { url ->
+                    Spacer(modifier = Modifier.height(12.dp))
+                    JamTrackPlayer(previewUrl = url)
+                    Spacer(modifier = Modifier.height(12.dp))
+                }
+            }
+            
+            // 2. Direct Link to YouTube
+            val artist = item.artist ?: ""
+            val query = when {
+                isTrack && artist.contains("Epic Games", ignoreCase = true) -> 
+                    "Fortnite ${item.name} Jam Track -emote"
+                isTrack -> 
+                    "$artist ${item.name} official audio"
+                else -> "Fortnite ${item.name} Music Pack"
+            }
+            
+            if (isSearchingVideo) {
+                Box(modifier = Modifier.fillMaxWidth().height(48.dp), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(color = SleekCyan, modifier = Modifier.size(24.dp))
+                }
+            } else {
+                YouTubeButton(query = query, videoId = videoId)
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(12.dp),
+            colors = CardDefaults.cardColors(containerColor = SleekSurfaceVariant)
+        ) {
+            Column(modifier = Modifier.padding(12.dp)) {
+                LockerDetailRow("Item ID", item.cosmeticId)
+                
+                // Track metadata for locker too
+                if (item.category == LockerCategory.JAM_TRACK || item.templateId.contains("sid_", ignoreCase = true)) {
+                    // Note: We'd need to extend ParsedLockerItem to store BPM/Duration
+                    // for full native support, but for now we rely on the preview player
+                    // being present if the URL was mapped.
+                }
+
+                item.introduction?.let {
+                    LockerDetailRow("Introduced", SeasonUtils.getFormattedIntroduction(it.chapter, it.season))
+                }
+                
+                item.set?.let { set ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp).clickable { onSetClick(set.value ?: "") },
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("Set", modifier = Modifier.width(120.dp), color = SleekTextMuted, fontSize = 13.sp)
+                        Text(set.text ?: "None", color = SleekCyan, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                        Spacer(modifier = Modifier.weight(1f))
+                        Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null, tint = SleekCyan, modifier = Modifier.size(16.dp))
+                    }
+                }
+                
+                item.added?.let {
+                    LockerDetailRow("Added", it.substringBefore("T"))
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(20.dp))
+
+        Button(
+            onClick = onDismiss,
+            modifier = Modifier.fillMaxWidth(),
+            colors = ButtonDefaults.buttonColors(containerColor = SleekPrimary),
+            shape = RoundedCornerShape(10.dp)
+        ) {
+            Text("Close", color = Color.White, fontWeight = FontWeight.Bold)
+        }
+    }
+}
+
+@Composable
+fun LockerDetailRow(label: String, value: String) {
+    Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+        Text(label, modifier = Modifier.width(120.dp), color = SleekTextMuted, fontSize = 13.sp)
+        Text(value, color = SleekTextPrimary, fontSize = 13.sp)
+    }
+}
