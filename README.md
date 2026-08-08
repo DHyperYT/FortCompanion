@@ -10,3 +10,6 @@ Companion app for Fortnite, including features like cosmetic viewing, item shop,
 2. Select **Open** and choose the directory containing this project
 3. Allow Android Studio to fix any incompatibilities as it imports the project.
 4. Run the app.
+
+
+(AI Assisted Code)
