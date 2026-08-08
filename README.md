@@ -12,4 +12,4 @@ Companion app for Fortnite, including features like cosmetic viewing, item shop,
 4. Run the app.
 
 
-(AI Assisted Code)
+(AI Assisted Code, i will revamp this fully when i manage to code shit like that completely on my own)
