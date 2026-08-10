@@ -7,6 +7,10 @@ import com.dhyper.fncompanion.data.models.LockerCategory
 import com.dhyper.fncompanion.data.models.ParsedLockerItem
 import com.dhyper.fncompanion.data.repository.AuthRepository
 import com.dhyper.fncompanion.data.repository.EpicAccountRepository
+import com.dhyper.fncompanion.ui.components.getRarityRank
+import com.dhyper.fncompanion.ui.utils.LockerImageGenerator
+import android.content.Context
+import android.graphics.Bitmap
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -29,7 +33,7 @@ sealed class LockerUiState {
         val selectedCategory: LockerCategory? = null,
         val favoritesOnly: Boolean = false,
         val searchQuery: String = "",
-        val sortOption: LockerSortOption = LockerSortOption.FAVORITES_FIRST
+        val sortOption: LockerSortOption = LockerSortOption.RARITY_DESC
     ) : LockerUiState()
     data class Error(val message: String) : LockerUiState()
 }
@@ -41,6 +45,15 @@ class PersonalLockerViewModel(
 
     private val _uiState = MutableStateFlow<LockerUiState>(LockerUiState.Unauthenticated)
     val uiState: StateFlow<LockerUiState> = _uiState.asStateFlow()
+
+    private val _isExporting = MutableStateFlow(false)
+    val isExporting: StateFlow<Boolean> = _isExporting.asStateFlow()
+
+    private val _exportProgress = MutableStateFlow(0f)
+    val exportProgress: StateFlow<Float> = _exportProgress.asStateFlow()
+
+    private val _exportedBitmap = MutableStateFlow<Bitmap?>(null)
+    val exportedBitmap: StateFlow<Bitmap?> = _exportedBitmap.asStateFlow()
 
     fun loadLocker(currentSession: AuthEntity?) {
         viewModelScope.launch {
@@ -62,7 +75,7 @@ class PersonalLockerViewModel(
 
             lockerResult.fold(
                 onSuccess = { items ->
-                    val defaultSort = LockerSortOption.FAVORITES_FIRST
+                    val defaultSort = LockerSortOption.RARITY_DESC
                     _uiState.value = LockerUiState.Success(
                         allItems = items,
                         filteredItems = filterAndSort(items, null, false, "", defaultSort),
@@ -145,6 +158,44 @@ class PersonalLockerViewModel(
         }
     }
 
+    fun exportLockerImage(context: Context, title: String) {
+        val state = _uiState.value
+        if (state !is LockerUiState.Success) return
+
+        viewModelScope.launch {
+            _isExporting.value = true
+            _exportProgress.value = 0f
+            // First, generate a fast downscaled preview
+            val previewBitmap = LockerImageGenerator.generateLockerImage(
+                context = context,
+                items = state.filteredItems,
+                title = title,
+                isPreview = true,
+                onProgress = { _exportProgress.value = it }
+            )
+            _exportedBitmap.value = previewBitmap
+            _isExporting.value = false
+        }
+    }
+
+    suspend fun generateFullExport(context: Context, title: String): Bitmap? {
+        val state = _uiState.value
+        if (state !is LockerUiState.Success) return null
+        
+        _exportProgress.value = 0f
+        return LockerImageGenerator.generateLockerImage(
+            context = context,
+            items = state.filteredItems,
+            title = title,
+            isPreview = false,
+            onProgress = { _exportProgress.value = it }
+        )
+    }
+
+    fun clearExportedImage() {
+        _exportedBitmap.value = null
+    }
+
     private fun filterAndSort(
         list: List<ParsedLockerItem>,
         category: LockerCategory?,
@@ -166,20 +217,13 @@ class PersonalLockerViewModel(
                 compareByDescending<ParsedLockerItem> { it.isFavorite }.thenBy { it.name }
             )
             LockerSortOption.NAME_ASC -> filtered.sortedBy { it.name }
-            LockerSortOption.RARITY_DESC -> filtered.sortedByDescending { getRarityRank(it.rarity) }
+            LockerSortOption.RARITY_DESC -> filtered.sortedWith(
+                compareByDescending<com.dhyper.fncompanion.data.models.ParsedLockerItem> { getRarityRank(it.rarity) }
+                .thenBy { it.rarity }
+                .thenBy { it.name }
+            )
             LockerSortOption.CATEGORY -> filtered.sortedBy { it.category.name }
         }
     }
 
-    private fun getRarityRank(rarity: String): Int {
-        return when (rarity.lowercase()) {
-            "mythic", "transcendent" -> 6
-            "legendary" -> 5
-            "epic" -> 4
-            "rare" -> 3
-            "uncommon" -> 2
-            "common" -> 1
-            else -> 0
-        }
-    }
 }

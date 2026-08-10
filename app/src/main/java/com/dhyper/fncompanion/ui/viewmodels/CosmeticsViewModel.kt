@@ -7,6 +7,7 @@ import com.dhyper.fncompanion.data.db.WishlistEntity
 import com.dhyper.fncompanion.data.models.AuthState
 import com.dhyper.fncompanion.data.models.CosmeticItem
 import com.dhyper.fncompanion.data.repository.*
+import com.dhyper.fncompanion.ui.components.getRarityRank
 import com.dhyper.fncompanion.ui.utils.SeasonUtils
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -27,7 +28,7 @@ sealed class CosmeticsUiState {
         val wishlistIds: Set<String> = emptySet(),
         val ownedIds: Set<String> = emptySet(),
         val wishlistOnly: Boolean = false,
-        val sortOption: CosmeticSortOption = CosmeticSortOption.NAME_ASC,
+        val sortOption: CosmeticSortOption = CosmeticSortOption.ADDED_DESC,
         val currentPage: Int = 1,
         val totalPages: Int = 1,
         val shopItemIds: Set<String> = emptySet()
@@ -50,7 +51,7 @@ class CosmeticsViewModel(
     private val _searchQuery = MutableStateFlow("")
     private val _selectedCategory = MutableStateFlow("All")
     private val _wishlistOnly = MutableStateFlow(false)
-    private val _sortOption = MutableStateFlow(CosmeticSortOption.NAME_ASC)
+    private val _sortOption = MutableStateFlow(CosmeticSortOption.ADDED_DESC)
     private val _currentPage = MutableStateFlow(1)
     private val _setFilter = MutableStateFlow<String?>(null)
     
@@ -111,10 +112,10 @@ class CosmeticsViewModel(
                              item.id.startsWith("Pickaxe_", ignoreCase = true)
                 "Glider" -> item.type?.displayValue?.contains("Glider", ignoreCase = true) == true || 
                             item.id.startsWith("Glider_", ignoreCase = true)
-                "Emote" -> item.type?.displayValue?.contains("Emote", ignoreCase = true) == true || 
-                           item.id.startsWith("EID_", ignoreCase = true) || item.id.startsWith("Dance_", ignoreCase = true)
                 "Emoticon" -> item.id.contains("Emoji_", ignoreCase = true) || item.id.contains("Emoticon_", ignoreCase = true)
                 "Spray" -> item.id.contains("SPID_", ignoreCase = true) || item.id.contains("Spray_", ignoreCase = true)
+                "Emote" -> item.type?.displayValue?.contains("Emote", ignoreCase = true) == true || 
+                           item.id.startsWith("EID_", ignoreCase = true) || item.id.startsWith("Dance_", ignoreCase = true)
                 "Wrap" -> item.id.startsWith("Wrap_", ignoreCase = true)
                 "Contrail" -> item.id.startsWith("Contrail_", ignoreCase = true)
                 "Music" -> item.id.startsWith("MusicPack_", ignoreCase = true)
@@ -177,7 +178,11 @@ class CosmeticsViewModel(
                         a.name.compareTo(b.name)
                     }
                 }
-                CosmeticSortOption.RARITY_DESC -> list.sortedByDescending { getRarityRank(it.rarity?.value ?: "") }
+                CosmeticSortOption.RARITY_DESC -> list.sortedWith(
+                    compareByDescending<CosmeticItem> { getRarityRank(it.series?.value ?: it.rarity?.value) }
+                    .thenBy { it.series?.value ?: it.rarity?.value }
+                    .thenBy { it.name }
+                )
                 CosmeticSortOption.TYPE -> list.sortedBy { it.type?.displayValue ?: "" }
             }
         }
@@ -310,17 +315,6 @@ class CosmeticsViewModel(
         }
     }
 
-    private fun getRarityRank(rarity: String): Int {
-        return when (rarity.lowercase()) {
-            "mythic" -> 6
-            "legendary" -> 5
-            "epic" -> 4
-            "rare" -> 3
-            "uncommon" -> 2
-            "common" -> 1
-            else -> 0
-        }
-    }
 
     fun updateSearch(query: String) {
         _searchQuery.value = query

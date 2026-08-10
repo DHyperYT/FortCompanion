@@ -32,6 +32,7 @@ import com.dhyper.fncompanion.data.models.CosmeticSet
 import com.dhyper.fncompanion.ui.components.JamTrackPlayer
 import com.dhyper.fncompanion.ui.components.YouTubeButton
 import com.dhyper.fncompanion.ui.components.getRarityColor
+import com.dhyper.fncompanion.ui.components.getRarityTextColor
 import com.dhyper.fncompanion.ui.theme.*
 import com.dhyper.fncompanion.ui.utils.SeasonUtils
 import com.dhyper.fncompanion.ui.viewmodels.CosmeticSortOption
@@ -365,7 +366,11 @@ fun CosmeticDetailSheet(
         )
 
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 4.dp)) {
-            Text(item.rarity?.displayValue?.uppercase() ?: "COMMON", color = rarityColor, fontWeight = FontWeight.Bold)
+            Text(
+                text = item.rarity?.displayValue?.uppercase() ?: "COMMON",
+                color = if (getRarityTextColor(rarityColor) == Color.White) Color.White else rarityColor,
+                fontWeight = FontWeight.Bold
+            )
             Text(" • ", color = SleekTextMuted)
             Text(item.type?.displayValue ?: "Other", color = SleekTextSecondary)
         }
@@ -523,7 +528,7 @@ fun CosmeticBrowserCard(
     onWishlistToggle: () -> Unit,
     onClick: () -> Unit
 ) {
-    val rarityColor = getRarityColor(item.rarity?.value ?: "")
+    val rarityColor = getRarityColor(item.series?.value ?: item.rarity?.value ?: "")
     
     val grayScaleMatrix = ColorMatrix().apply { setToSaturation(0f) }
     val colorFilter = if (isOwned) ColorFilter.colorMatrix(grayScaleMatrix) else null
@@ -532,9 +537,15 @@ fun CosmeticBrowserCard(
         modifier = Modifier
             .fillMaxWidth()
             .clickable { onClick() }
-            .border(1.dp, if(isOwned) Color.Gray.copy(alpha = 0.3f) else if(inShop) FortniteGold else SleekSurfaceBorder, RoundedCornerShape(12.dp)),
+            .border(
+                1.dp, 
+                if(isOwned) Color.Gray.copy(alpha = 0.3f) 
+                else if(inShop) FortniteGold 
+                else rarityColor.copy(alpha = 0.6f), 
+                RoundedCornerShape(12.dp)
+            ),
         shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = if (isOwned) SleekSurface.copy(alpha = 0.5f) else SleekSurface)
+        colors = CardDefaults.cardColors(containerColor = if (isOwned) SleekSurfaceVariant.copy(alpha = 0.5f) else SleekSurfaceVariant)
     ) {
         Box {
             Column {
@@ -542,7 +553,10 @@ fun CosmeticBrowserCard(
                     modifier = Modifier
                         .fillMaxWidth()
                         .aspectRatio(1f)
-                        .background(if(isOwned) Color.Gray.copy(alpha = 0.1f) else rarityColor.copy(alpha = 0.15f))
+                        .background(
+                            if(isOwned) Brush.verticalGradient(listOf(Color.Gray.copy(alpha = 0.2f), Color.Transparent))
+                            else Brush.verticalGradient(listOf(rarityColor.copy(alpha = 0.4f), Color.Transparent))
+                        )
                 ) {
                     val iconToLoad = item.images?.icon 
                         ?: item.images?.largeIcon

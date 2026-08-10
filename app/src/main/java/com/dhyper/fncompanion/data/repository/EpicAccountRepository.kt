@@ -135,7 +135,11 @@ class EpicAccountRepository {
 
                         val name = apiDetails?.name ?: cleanCosmeticName(itemData.templateId)
                         val description = apiDetails?.description
-                        val rarity = apiDetails?.rarity?.value ?: determineRarity(itemData.templateId, itemData.attributes)
+                        
+                        // Normalize Rarity for grouped sorting
+                        val rawRarity = apiDetails?.series?.value ?: apiDetails?.rarity?.value ?: determineRarity(itemData.templateId, itemData.attributes)
+                        val rarity = normalizeRarity(rawRarity)
+
                     val iconUrl = apiDetails?.images?.icon
                         ?: apiDetails?.images?.smallIcon
                         ?: apiDetails?.images?.featured
@@ -877,6 +881,12 @@ class EpicAccountRepository {
             idPart.startsWith("JBSID_", ignoreCase = true) -> LockerCategory.LEGO_BUILD
             idPart.startsWith("JBPID_", ignoreCase = true) -> LockerCategory.LEGO_DECOR
 
+            // Emoticons - Check before Emotes to avoid catch-all overlap
+            idPart.startsWith("Emoji_", ignoreCase = true) || idPart.startsWith("Emoticon_", ignoreCase = true) -> LockerCategory.EMOTICON
+            
+            // Sprays - Check before Emotes
+            idPart.startsWith("SPID_", ignoreCase = true) || idPart.startsWith("Spray_", ignoreCase = true) -> LockerCategory.SPRAY
+
             // Back Blings (Including Pets and Carriers)
             idPart.startsWith("BID_", ignoreCase = true) || idPart.startsWith("Backpack_", ignoreCase = true) || 
             idPart.startsWith("PetID_", ignoreCase = true) || idPart.startsWith("PetCarrier_", ignoreCase = true) || 
@@ -890,12 +900,6 @@ class EpicAccountRepository {
             
             // Emotes
             idPart.startsWith("EID_", ignoreCase = true) || idPart.startsWith("Dance_", ignoreCase = true) || templateId.contains("AthenaDance", ignoreCase = true) -> LockerCategory.EMOTE
-            
-            // Emoticons
-            idPart.startsWith("Emoji_", ignoreCase = true) || idPart.startsWith("Emoticon_", ignoreCase = true) -> LockerCategory.EMOTICON
-            
-            // Sprays
-            idPart.startsWith("SPID_", ignoreCase = true) || idPart.startsWith("Spray_", ignoreCase = true) -> LockerCategory.SPRAY
             
             // Wraps
             idPart.startsWith("Wrap_", ignoreCase = true) || templateId.contains("AthenaItemWrap", ignoreCase = true) -> LockerCategory.WRAP
@@ -924,9 +928,37 @@ class EpicAccountRepository {
         return templateId
     }
 
-    private fun determineRarity(templateId: String, attributes: Map<String, Any?>?): String {
+    private fun normalizeRarity(rarity: String): String {
+        val r = rarity.lowercase()
+        return when {
+            r.contains("marvel") -> "Marvel Series"
+            r.contains("dc") -> "DC Series"
+            r.contains("icon") -> "Icon Series"
+            r.contains("star wars") || r.contains("starwars") -> "Star Wars Series"
+            r.contains("gaming") || r.contains("platform") -> "Gaming Legends Series"
+            r.contains("lava") -> "Lava Series"
+            r.contains("frozen") -> "Frozen Series"
+            r.contains("shadow") -> "Shadow Series"
+            r.contains("slurp") -> "Slurp Series"
+            else -> rarity.split(" ").joinToString(" ") { it.replaceFirstChar { c -> c.uppercase() } }
+        }
+    }
+
+    private fun determineRarity(templateId: String, @Suppress("UNUSED_PARAMETER") attributes: Map<String, Any?>?): String {
         val lower = templateId.lowercase()
         return when {
+            // Special Series Prefixes/Keywords in IDs
+            lower.contains("marvel") -> "Marvel Series"
+            lower.contains("dcseries") || lower.contains("dc_") -> "DC Series"
+            lower.contains("icon") -> "Icon Series"
+            lower.contains("starwars") -> "Star Wars Series"
+            lower.contains("platform") || lower.contains("gaming") -> "Gaming Legends Series"
+            lower.contains("lava") -> "Lava Series"
+            lower.contains("frozen") -> "Frozen Series"
+            lower.contains("shadow") -> "Shadow Series"
+            lower.contains("slurp") -> "Slurp Series"
+            
+            // Standard
             lower.contains("_legendary") || lower.contains("_sr") -> "Legendary"
             lower.contains("_epic") || lower.contains("_vr") -> "Epic"
             lower.contains("_rare") || lower.contains("_r") -> "Rare"

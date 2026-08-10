@@ -78,6 +78,7 @@ import com.dhyper.fncompanion.data.models.ShopEntry
 import com.dhyper.fncompanion.ui.components.JamTrackPlayer
 import com.dhyper.fncompanion.ui.components.YouTubeButton
 import com.dhyper.fncompanion.ui.components.getRarityColor
+import com.dhyper.fncompanion.ui.components.getRarityTextColor
 import com.dhyper.fncompanion.ui.theme.FortniteBlue
 import com.dhyper.fncompanion.ui.theme.FortniteGold
 import com.dhyper.fncompanion.ui.theme.SleekBackground
@@ -119,12 +120,12 @@ fun ShopScreen(
         "All", "Bundles", 
         // Battle Royale (Primary)
         "Outfit", "Back Bling", "Pickaxe", "Glider", "Emote", "Wrap", "Contrail", "Music", "Aura",
-        // Vehicles (Rocket Racing) - Grouped Together
-        "Vehicles", "Car", "Car Decal", "Wheels", "Car Trail", "Car Boost",
+        // LEGO & Misc
+        "Lego Build", "Lego Decor", "Loading Screen", "Emoticon", "Spray", "Sidekick", "Banner", "Kicks",
         // Festival
         "Jam Track", "Guitar", "Bass", "Drums", "Keytar", "Mic",
-        // LEGO & Misc
-        "Lego Build", "Lego Decor", "Loading Screen", "Emoticon", "Spray", "Sidekick", "Banner", "Kicks"
+        // Vehicles (Rocket Racing)
+        "Vehicles", "Car", "Car Decal", "Wheels", "Car Trail", "Car Boost"
     )
 
     Column(
@@ -704,7 +705,7 @@ fun ShopItemCard(
                         // Rarity pill
                         Text(
                             text = rarityName.uppercase(),
-                            color = if(isFullyOwned) SleekTextMuted else rarityColor,
+                            color = if(isFullyOwned) SleekTextMuted else if (getRarityTextColor(rarityColor) == Color.White) Color.White else rarityColor,
                             fontSize = 11.sp,
                             fontWeight = FontWeight.SemiBold
                         )
@@ -900,7 +901,7 @@ fun ShopItemDetailSheet(
         ) {
             Text(
                 text = rarityName.uppercase(),
-                color = rarityColor,
+                color = if (getRarityTextColor(rarityColor) == Color.White) Color.White else rarityColor,
                 fontWeight = FontWeight.Bold,
                 fontSize = 14.sp
             )

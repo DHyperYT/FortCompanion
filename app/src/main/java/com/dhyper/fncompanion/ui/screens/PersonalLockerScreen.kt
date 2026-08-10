@@ -1,5 +1,6 @@
 package com.dhyper.fncompanion.ui.screens
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -38,6 +39,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -54,13 +56,18 @@ import com.dhyper.fncompanion.data.models.ParsedLockerItem
 import com.dhyper.fncompanion.ui.components.JamTrackPlayer
 import com.dhyper.fncompanion.ui.components.YouTubeButton
 import com.dhyper.fncompanion.ui.components.getRarityColor
+import com.dhyper.fncompanion.ui.components.getRarityTextColor
 import com.dhyper.fncompanion.ui.theme.*
 import com.dhyper.fncompanion.ui.utils.SeasonUtils
 import com.dhyper.fncompanion.ui.viewmodels.LockerSortOption
 import com.dhyper.fncompanion.ui.viewmodels.LockerUiState
 import com.dhyper.fncompanion.ui.viewmodels.PersonalLockerViewModel
 import com.dhyper.fncompanion.ui.viewmodels.CosmeticsViewModel
+import com.dhyper.fncompanion.ui.utils.FileSharingUtils
 import androidx.lifecycle.viewmodel.compose.viewModel
+import android.widget.Toast
+import androidx.compose.ui.graphics.asImageBitmap
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -72,8 +79,13 @@ fun PersonalLockerScreen(
     modifier: Modifier = Modifier
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val isExporting by viewModel.isExporting.collectAsState()
+    val exportProgress by viewModel.exportProgress.collectAsState()
+    val exportedBitmap by viewModel.exportedBitmap.collectAsState()
+    
     var selectedItemForDetail by remember { mutableStateOf<ParsedLockerItem?>(null) }
     var selectedSet by remember { mutableStateOf<CosmeticSet?>(null) }
+    val context = LocalContext.current
 
     val session = when (authState) {
         is AuthState.Active -> authState.session
@@ -234,6 +246,20 @@ fun PersonalLockerScreen(
                                     color = FortniteGold,
                                     fontWeight = FontWeight.Bold
                                 )
+                                Spacer(modifier = Modifier.width(12.dp))
+                                IconButton(
+                                    onClick = { viewModel.toggleFavoritesOnly() },
+                                    modifier = Modifier
+                                        .size(36.dp)
+                                        .background(if (state.favoritesOnly) FortniteGold.copy(alpha = 0.2f) else SleekPrimary.copy(alpha = 0.1f), CircleShape)
+                                ) {
+                                    Icon(
+                                        imageVector = if (state.favoritesOnly) Icons.Default.Star else Icons.Default.StarBorder,
+                                        contentDescription = "Favorites",
+                                        tint = if (state.favoritesOnly) FortniteGold else SleekTextMuted,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
                             }
                         }
                     }
@@ -346,41 +372,50 @@ fun PersonalLockerScreen(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(vertical = 4.dp),
+                            .padding(vertical = 12.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            text = "Showing ${state.filteredItems.size} items (${state.sortOption.displayName})",
-                            fontSize = 12.sp,
-                            color = SleekTextMuted
-                        )
+                        Column {
+                            Text(
+                                text = "Showing ${state.filteredItems.size} items",
+                                fontSize = 13.sp,
+                                color = SleekTextPrimary,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = state.sortOption.displayName,
+                                fontSize = 11.sp,
+                                color = SleekTextMuted
+                            )
+                        }
 
-                        FilterChip(
-                            selected = state.favoritesOnly,
-                            onClick = { viewModel.toggleFavoritesOnly() },
-                            label = { Text("Favorites Only") },
-                            leadingIcon = {
-                                Icon(
-                                    Icons.Default.Star,
-                                    contentDescription = null,
-                                    tint = if (state.favoritesOnly) Color.Black else FortniteGold
-                                )
+                        Button(
+                            onClick = { 
+                                val title = "${session.displayName}'s ${state.selectedCategory?.name?.replace("_", " ") ?: "Locker"}"
+                                viewModel.exportLockerImage(context, title) 
                             },
-                            colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = FortniteGold,
-                                selectedLabelColor = Color.Black,
-                                containerColor = SleekSurface,
-                                labelColor = FortniteGold
+                            enabled = !isExporting && state.selectedCategory != null,
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = SleekCyan,
+                                contentColor = Color.Black,
+                                disabledContainerColor = SleekSurfaceVariant
                             ),
-                            border = FilterChipDefaults.filterChipBorder(
-                                enabled = true,
-                                selected = state.favoritesOnly,
-                                borderColor = SleekSurfaceBorder,
-                                selectedBorderColor = FortniteGold
-                            ),
-                            modifier = Modifier.testTag("locker_fav_chip")
-                        )
+                            shape = RoundedCornerShape(12.dp),
+                            elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp),
+                            contentPadding = PaddingValues(horizontal = 20.dp, vertical = 10.dp),
+                            modifier = Modifier.height(44.dp)
+                        ) {
+                            if (isExporting) {
+                                CircularProgressIndicator(progress = { exportProgress }, modifier = Modifier.size(20.dp), strokeWidth = 3.dp, color = Color.Black)
+                                Spacer(Modifier.width(10.dp))
+                                Text("${(exportProgress * 100).toInt()}%", fontSize = 13.sp, fontWeight = FontWeight.Black)
+                            } else {
+                                Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(Modifier.width(8.dp))
+                                Text("GENERATE IMAGE", fontSize = 13.sp, fontWeight = FontWeight.Black, letterSpacing = 1.sp)
+                            }
+                        }
                     }
 
                     if (state.filteredItems.isEmpty()) {
@@ -404,6 +439,104 @@ fun PersonalLockerScreen(
                                 )
                             }
                         }
+                    }
+
+                    // Export Preview Dialog
+                                    exportedBitmap?.let { bitmap ->
+                        val filename = "FortniteLocker_${session?.displayName ?: "Export"}"
+                        var isGeneratingFull by remember { mutableStateOf(false) }
+                        val scope = rememberCoroutineScope()
+
+                        AlertDialog(
+                            onDismissRequest = { viewModel.clearExportedImage() },
+                            title = { Text("Locker Export Preview", color = SleekTextPrimary, fontWeight = FontWeight.Bold) },
+                            text = {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Card(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .heightIn(max = 400.dp)
+                                            .border(1.dp, SleekSurfaceBorder, RoundedCornerShape(8.dp)),
+                                        shape = RoundedCornerShape(8.dp)
+                                    ) {
+                                        Box(contentAlignment = Alignment.Center) {
+                                            Image(
+                                                bitmap = bitmap.asImageBitmap(),
+                                                contentDescription = null,
+                                                modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()),
+                                                contentScale = ContentScale.FillWidth
+                                            )
+                                            if (isGeneratingFull) {
+                                                Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.5f)), contentAlignment = Alignment.Center) {
+                                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                                        CircularProgressIndicator(progress = { exportProgress }, color = SleekCyan)
+                                                        Spacer(Modifier.height(8.dp))
+                                                        Text("${(exportProgress * 100).toInt()}%", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                    Spacer(Modifier.height(12.dp))
+                                    Text("This is a low-res preview. Share or Save to generate the full high-res image.", fontSize = 11.sp, color = SleekCyan, textAlign = TextAlign.Center)
+                                }
+                            },
+                            confirmButton = {
+                                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Button(
+                                        onClick = { 
+                                            scope.launch {
+                                                isGeneratingFull = true
+                                                val title = "${session?.displayName}'s Locker"
+                                                val fullBitmap = viewModel.generateFullExport(context, title)
+                                                if (fullBitmap != null) {
+                                                    FileSharingUtils.shareBitmap(context, fullBitmap, filename)
+                                                    fullBitmap.recycle()
+                                                }
+                                                isGeneratingFull = false
+                                            }
+                                        },
+                                        modifier = Modifier.weight(1f),
+                                        enabled = !isGeneratingFull,
+                                        colors = ButtonDefaults.buttonColors(containerColor = SleekPrimary)
+                                    ) {
+                                        Icon(Icons.Default.Share, null, Modifier.size(18.dp))
+                                        Spacer(Modifier.width(8.dp))
+                                        Text("Share")
+                                    }
+                                    Button(
+                                        onClick = { 
+                                            scope.launch {
+                                                isGeneratingFull = true
+                                                val title = "${session?.displayName}'s Locker"
+                                                val fullBitmap = viewModel.generateFullExport(context, title)
+                                                if (fullBitmap != null) {
+                                                    val saved = FileSharingUtils.saveBitmapToGallery(context, fullBitmap, filename)
+                                                    if (saved) Toast.makeText(context, "Saved to Gallery!", Toast.LENGTH_SHORT).show()
+                                                    else Toast.makeText(context, "Failed to save.", Toast.LENGTH_SHORT).show()
+                                                    fullBitmap.recycle()
+                                                }
+                                                isGeneratingFull = false
+                                            }
+                                        },
+                                        modifier = Modifier.weight(1f),
+                                        enabled = !isGeneratingFull,
+                                        colors = ButtonDefaults.buttonColors(containerColor = SleekEmerald)
+                                    ) {
+                                        Icon(Icons.Default.Download, null, Modifier.size(18.dp))
+                                        Spacer(Modifier.width(8.dp))
+                                        Text("Save")
+                                    }
+                                }
+                            },
+                            dismissButton = {
+                                TextButton(onClick = { viewModel.clearExportedImage() }, enabled = !isGeneratingFull) {
+                                    Text("Close", color = SleekTextMuted)
+                                }
+                            },
+                            containerColor = SleekSurface,
+                            shape = RoundedCornerShape(16.dp)
+                        )
                     }
 
                     // Item Detail Bottom Sheet
@@ -630,7 +763,7 @@ fun LockerItemCard(
                 Text(
                     text = item.rarity,
                     fontSize = 10.sp,
-                    color = rarityColor,
+                    color = if (getRarityTextColor(rarityColor) == Color.White) Color.White else rarityColor,
                     fontWeight = FontWeight.SemiBold
                 )
             }
@@ -699,7 +832,7 @@ fun LockerDetailSheet(
             ) {
                 Text(
                     text = item.rarity.uppercase(),
-                    color = Color.Black,
+                    color = getRarityTextColor(rarityColor),
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Black
                 )

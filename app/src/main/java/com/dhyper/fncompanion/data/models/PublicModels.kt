@@ -262,7 +262,8 @@ data class StatsResponse(
 data class PlayerStatsData(
     val account: AccountInfo?,
     val battlePass: BattlePassInfo?,
-    val stats: StatsPlatforms?
+    val stats: StatsPlatforms?,
+    val battleRoyale: StatsPlatforms? // Modern API often uses this key
 )
 
 @JsonClass(generateAdapter = true)
@@ -279,7 +280,10 @@ data class BattlePassInfo(
 
 @JsonClass(generateAdapter = true)
 data class StatsPlatforms(
-    val all: StatBreakdown?
+    val all: StatBreakdown?,
+    val keyboardMouse: StatBreakdown?,
+    val gamepad: StatBreakdown?,
+    val touch: StatBreakdown?
 )
 
 @JsonClass(generateAdapter = true)
@@ -287,7 +291,9 @@ data class StatBreakdown(
     val overall: SingleStatGroup?,
     val solo: SingleStatGroup?,
     val duo: SingleStatGroup?,
-    val squad: SingleStatGroup?
+    val trio: SingleStatGroup?,
+    val squad: SingleStatGroup?,
+    val ltm: SingleStatGroup?
 )
 
 @JsonClass(generateAdapter = true)

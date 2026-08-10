@@ -272,45 +272,29 @@ class ShopViewModel(
     private fun sortEntries(entries: List<ShopEntry>): List<ShopEntry> {
         return entries.sortedWith(
             compareBy<ShopEntry> { entry ->
-                val allItems = (entry.items ?: emptyList()) + 
-                              (entry.brItems ?: emptyList()) + 
-                              (entry.cars ?: emptyList()) + 
-                              (entry.vehicles ?: emptyList()) + 
-                              (entry.instruments ?: emptyList())
-                
-                val sectionName = entry.section?.name?.lowercase() ?: ""
+                val sectionName = entry.section?.name ?: ""
+                val lowerSectionName = sectionName.lowercase()
                 val layoutCategory = entry.layout?.category?.lowercase() ?: ""
                 val entryCategories = entry.categories?.map { it.lowercase() } ?: emptyList()
                 
-                // Detection for dedicated mode sections
-                val isJamTrackSection = sectionName.contains("festival") || sectionName.contains("jam") || 
-                                        layoutCategory.contains("jam") || entryCategories.contains("jamtracks")
+                // Specific Detection for sections
+                val isJamTrackSection = lowerSectionName.contains("jam tracks") || 
+                                        lowerSectionName.contains("festival")
                                  
-                val isVehicleSection = sectionName.contains("racing") || sectionName.contains("car") || 
-                                      sectionName.contains("vehicle") || layoutCategory.contains("car") || 
-                                      layoutCategory.contains("vehicle") || entryCategories.contains("cars")
+                val isVehicleSection = lowerSectionName.contains("racing") || 
+                                      lowerSectionName.contains("car") || 
+                                      lowerSectionName.contains("vehicle") || 
+                                      entryCategories.contains("cars") ||
+                                      layoutCategory.contains("car")
                 
-                // Item content detection
-                val hasJamTrack = !entry.tracks.isNullOrEmpty() || allItems.any { it.id.startsWith("sid_", ignoreCase = true) }
-                val hasVehicle = !entry.cars.isNullOrEmpty() || !entry.vehicles.isNullOrEmpty() || 
-                               allItems.any { it.id.startsWith("CarBody_", ignoreCase = true) || it.id.startsWith("ID_Body_", ignoreCase = true) || 
-                                             it.id.startsWith("CarSkin_", ignoreCase = true) || it.id.startsWith("ID_Skin_", ignoreCase = true) || 
-                                             it.id.startsWith("Wheel_", ignoreCase = true) || it.id.startsWith("ID_Wheel_", ignoreCase = true) || 
-                                             it.id.startsWith("ID_DriftTrail_", ignoreCase = true) || it.id.startsWith("ID_Booster_", ignoreCase = true) }
-
-                // Improved: Identify PURE Rocket Racing sections
-                val isPureVehicle = hasVehicle && !hasJamTrack && allItems.all { 
-                    it.id.startsWith("Car", ignoreCase = true) || it.id.startsWith("ID_Body", ignoreCase = true) || 
-                    it.id.startsWith("ID_Skin", ignoreCase = true) || it.id.startsWith("Wheel", ignoreCase = true) || 
-                    it.id.startsWith("ID_Wheel", ignoreCase = true) || it.id.startsWith("ID_Drift", ignoreCase = true) || 
-                    it.id.startsWith("ID_Booster", ignoreCase = true) || it.type?.value?.contains("car", ignoreCase = true) == true
+                val priority = when {
+                    isVehicleSection -> 2 // Vehicles -> Absolute Bottom
+                    isJamTrackSection -> 1 // Jam Tracks -> Just above vehicles
+                    lowerSectionName.contains("lego") || layoutCategory.contains("juno") -> 3 // LEGO -> Middle
+                    else -> 0 // Battle Royale & Featured -> Top
                 }
 
-                when {
-                    isPureVehicle || (hasVehicle && isVehicleSection) -> 2 // Vehicles -> Bottom
-                    hasJamTrack && isJamTrackSection -> 1 // Jam Tracks -> Above Vehicles
-                    else -> 0 // Everything else -> Top
-                }
+                priority
             }
             .thenBy { it.section?.index ?: Int.MAX_VALUE }
             .thenBy { it.layout?.index ?: Int.MAX_VALUE }

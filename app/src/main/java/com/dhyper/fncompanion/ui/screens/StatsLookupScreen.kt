@@ -2,6 +2,7 @@ package com.dhyper.fncompanion.ui.screens
 
 import android.content.Intent
 import android.net.Uri
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -48,18 +49,9 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.material3.*
+import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -72,9 +64,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.dhyper.fncompanion.data.db.AuthEntity
 import com.dhyper.fncompanion.data.db.RecentSearchEntity
-import com.dhyper.fncompanion.data.models.AccountCareerDetails
-import com.dhyper.fncompanion.data.models.PastSeasonData
-import com.dhyper.fncompanion.data.models.SingleStatGroup
+import com.dhyper.fncompanion.data.models.*
 import com.dhyper.fncompanion.ui.theme.FortniteGold
 import com.dhyper.fncompanion.ui.theme.SleekAccent
 import com.dhyper.fncompanion.ui.theme.SleekBackground
@@ -370,17 +360,22 @@ fun StatsLookupScreen(
             }
             is StatsUiState.Success -> {
                 val stats = state.playerStats
+                if (stats == null) {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Text("No detailed stats available for this player.", color = SleekTextMuted)
+                    }
+                } else {
+                    var selectedStatTab by remember { mutableStateOf(0) }
+                    val tabs = listOf("OVERALL", "BATTLE ROYALE", "LTM")
 
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .verticalScroll(rememberScrollState())
-                ) {
-                    if (stats != null) {
+                    Column(modifier = Modifier.fillMaxSize()) {
+                        val allData = stats.battleRoyale ?: stats.stats
+
                         // Tracker Profile Header
                         Card(
                             modifier = Modifier
                                 .fillMaxWidth()
+                                .padding(bottom = 12.dp)
                                 .border(1.dp, SleekCyan.copy(alpha = 0.5f), RoundedCornerShape(16.dp)),
                             shape = RoundedCornerShape(16.dp),
                             colors = CardDefaults.cardColors(containerColor = SleekSurfaceVariant)
@@ -404,42 +399,149 @@ fun StatsLookupScreen(
                             }
                         }
 
-                        Spacer(modifier = Modifier.height(16.dp))
-
-                        // Recent Activity (Seasonal Stats)
-                        Text("Summary", style = MaterialTheme.typography.titleLarge, color = SleekTextPrimary, fontWeight = FontWeight.Bold)
-                        Spacer(modifier = Modifier.height(8.dp))
-                        
-                        val overall = stats.stats?.all?.overall
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            StatCard("Matches", "${overall?.matches ?: 0}", SleekCyan, Modifier.weight(1f))
-                            StatCard("Wins", "${overall?.wins ?: 0}", FortniteGold, Modifier.weight(1f))
-                            StatCard("K/D", String.format("%.2f", overall?.kd ?: 0.0), SleekEmerald, Modifier.weight(1f))
+                        ScrollableTabRow(
+                            selectedTabIndex = selectedStatTab,
+                            containerColor = Color.Transparent,
+                            contentColor = SleekCyan,
+                            edgePadding = 0.dp,
+                            divider = {},
+                            indicator = { tabPositions ->
+                                TabRowDefaults.SecondaryIndicator(
+                                    Modifier.tabIndicatorOffset(tabPositions[selectedStatTab]),
+                                    color = SleekCyan
+                                )
+                            },
+                            modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
+                        ) {
+                            tabs.forEachIndexed { index, title ->
+                                Tab(
+                                    selected = selectedStatTab == index,
+                                    onClick = { selectedStatTab = index },
+                                    text = { Text(title, fontSize = 12.sp, fontWeight = FontWeight.Bold) }
+                                )
+                            }
                         }
 
-                        Spacer(modifier = Modifier.height(16.dp))
-                    }
-
-                    // Playlist Breakdown
-                    val overall = stats?.stats?.all?.overall
-                    if (overall != null) {
-                        Text(
-                            text = "Playlists",
-                            style = MaterialTheme.typography.titleLarge,
-                            color = SleekTextPrimary,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(bottom = 8.dp)
+                        var selectedInputMethod by remember { mutableStateOf(0) }
+                        val inputMethods = listOf(
+                            "ALL" to allData?.all,
+                            "KBM" to allData?.keyboardMouse,
+                            "PAD" to allData?.gamepad,
+                            "TOUCH" to allData?.touch
                         )
+                        
+                        Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            inputMethods.forEachIndexed { index, (label, data) ->
+                                val isSelected = selectedInputMethod == index
+                                FilterChip(
+                                    selected = isSelected,
+                                    onClick = { selectedInputMethod = index },
+                                    label = { Text(label, fontSize = 10.sp) },
+                                    enabled = data != null,
+                                    colors = FilterChipDefaults.filterChipColors(
+                                        selectedContainerColor = SleekPrimary,
+                                        disabledContainerColor = Color.Transparent
+                                    ),
+                                    modifier = Modifier.height(28.dp)
+                                )
+                            }
+                        }
 
-                        PlaylistStatCard("Solo Activity", stats.stats?.all?.solo)
-                        Spacer(modifier = Modifier.height(8.dp))
-                        PlaylistStatCard("Duo Activity", stats.stats?.all?.duo)
-                        Spacer(modifier = Modifier.height(8.dp))
-                        PlaylistStatCard("Squad Activity", stats.stats?.all?.squad)
+                        val currentStats = inputMethods[selectedInputMethod].second
+
+                        if (currentStats == null) {
+                            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                Text("No stats available for this input method.", color = SleekTextMuted)
+                            }
+                        } else {
+                            Column(modifier = Modifier.weight(1f).verticalScroll(rememberScrollState())) {
+                                when (selectedStatTab) {
+                                    0 -> OverallStatsView(currentStats)
+                                    1 -> {
+                                        ModeStatsView("BATTLE ROYALE (BUILDS)", listOf(
+                                            "Solo" to currentStats.solo,
+                                            "Duo" to currentStats.duo,
+                                            "Trio" to currentStats.trio,
+                                            "Squad" to currentStats.squad
+                                        ))
+                                    }
+                                    2 -> ModeStatsView(
+                                        "LTM & SPECIAL MODES",
+                                        listOf(
+                                            "LTM Combined" to currentStats.ltm
+                                        )
+                                    )
+                                }
+                                Spacer(Modifier.height(24.dp))
+                            }
+                        }
                     }
                 }
             }
         }
+    }
+}
+
+@Composable
+fun OverallStatsView(stats: StatBreakdown) {
+    val overall = stats.overall
+    Column {
+        if (overall != null) {
+            Text("LIFETIME SUMMARY", fontSize = 14.sp, fontWeight = FontWeight.Black, color = SleekCyan, letterSpacing = 1.sp)
+            Spacer(Modifier.height(12.dp))
+            
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                StatCard("Matches", "${overall.matches ?: 0}", SleekCyan, Modifier.weight(1f))
+                StatCard("Wins", "${overall.wins ?: 0}", FortniteGold, Modifier.weight(1f))
+                StatCard("K/D", String.format("%.2f", overall.kd ?: 0.0), SleekEmerald, Modifier.weight(1f))
+            }
+            
+            Spacer(Modifier.height(16.dp))
+            
+            Card(
+                modifier = Modifier.fillMaxWidth().border(1.dp, SleekSurfaceBorder, RoundedCornerShape(12.dp)),
+                colors = CardDefaults.cardColors(containerColor = SleekSurface)
+            ) {
+                Column(Modifier.padding(16.dp)) {
+                    StatDetailRow("Total Kills", "${overall.kills ?: 0}")
+                    StatDetailRow("Win Rate", String.format("%.1f%%", overall.winRate ?: 0.0))
+                    StatDetailRow("Kills/Min", String.format("%.2f", overall.killsPerMin ?: 0.0))
+                    StatDetailRow("Avg Match Time", "${(overall.minutesPlayed ?: 0) / (overall.matches ?: 1).coerceAtLeast(1)}m")
+                    StatDetailRow("Players Outlived", "${overall.playersOutlived ?: 0}")
+                }
+            }
+        } else {
+            Text("Overall stats unavailable.", color = SleekTextMuted)
+        }
+    }
+}
+
+@Composable
+fun ModeStatsView(title: String, modes: List<Pair<String, SingleStatGroup?>>) {
+    Column {
+        Text(title, fontSize = 14.sp, fontWeight = FontWeight.Black, color = SleekCyan, letterSpacing = 1.sp)
+        Spacer(Modifier.height(12.dp))
+
+        val playedModes = modes.filter { it.second != null && (it.second?.matches ?: 0L) > 0 }
+        
+        if (playedModes.isEmpty()) {
+            Box(Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
+                Text("No games played in this category.", color = SleekTextMuted, fontSize = 13.sp)
+            }
+        } else {
+            playedModes.forEach { (modeName, statGroup) ->
+                PlaylistStatCard(modeName, statGroup)
+                Spacer(Modifier.height(12.dp))
+            }
+        }
+    }
+}
+
+@Composable
+fun StatDetailRow(label: String, value: String) {
+    Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+        Text(label, color = SleekTextMuted, fontSize = 13.sp)
+        Text(value, color = SleekTextPrimary, fontSize = 13.sp, fontWeight = FontWeight.Bold)
     }
 }
 
