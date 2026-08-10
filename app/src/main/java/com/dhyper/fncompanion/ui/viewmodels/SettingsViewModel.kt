@@ -14,10 +14,12 @@ import com.dhyper.fncompanion.data.db.AuthEntity
 import com.dhyper.fncompanion.data.db.SettingsDao
 import com.dhyper.fncompanion.data.db.SettingsEntity
 import com.dhyper.fncompanion.data.repository.AuthRepository
+import com.dhyper.fncompanion.data.models.AuthState
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
@@ -57,21 +59,34 @@ class SettingsViewModel(
 
     private fun startExpiryCountdown() {
         viewModelScope.launch {
-            while (true) {
-                val active = authDao.getAuthSessionDirect()
-                if (active != null) {
-                    val remaining = active.expiresAtMs - System.currentTimeMillis()
+            authRepository.authSession.collectLatest { state ->
+                val session = when (state) {
+                    is AuthState.Active -> state.session
+                    is AuthState.TokenRefreshing -> state.session
+                    is AuthState.TokenExpired -> state.session
+                    is AuthState.ReauthRequired -> state.session
+                    is AuthState.DecryptionError -> state.session
+                    is AuthState.NetworkError -> state.session
+                    else -> null
+                }
+                
+                if (session == null) {
+                    _tokenExpiryCountdown.value = "N/A"
+                    return@collectLatest
+                }
+
+                while (true) {
+                    val remaining = session.expiresAtMs - System.currentTimeMillis()
                     if (remaining > 0) {
                         val min = (remaining / 1000) / 60
                         val sec = (remaining / 1000) % 60
                         _tokenExpiryCountdown.value = String.format("%02d:%02d", min, sec)
                     } else {
                         _tokenExpiryCountdown.value = "Expired"
+                        break // Wait for refresh to trigger new session state
                     }
-                } else {
-                    _tokenExpiryCountdown.value = "N/A"
+                    kotlinx.coroutines.delay(1000)
                 }
-                kotlinx.coroutines.delay(1000)
             }
         }
     }

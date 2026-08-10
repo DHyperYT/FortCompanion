@@ -15,6 +15,9 @@ interface AuthDao {
     @Query("SELECT * FROM auth_session WHERE isActive = 1 LIMIT 1")
     suspend fun getAuthSessionDirect(): AuthEntity?
 
+    @Query("SELECT * FROM auth_session WHERE accountId = :accountId LIMIT 1")
+    suspend fun getAccountByIdDirect(accountId: String): AuthEntity?
+
     @Transaction
     suspend fun saveAuthSession(session: AuthEntity) {
         clearActiveStatus()

@@ -18,6 +18,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.dhyper.fncompanion.data.models.AuthState
 import com.dhyper.fncompanion.ui.theme.*
 import com.dhyper.fncompanion.ui.viewmodels.AuthViewModel
 import com.dhyper.fncompanion.ui.viewmodels.StatsViewModel
@@ -27,8 +28,18 @@ fun CareerScreen(
     authViewModel: AuthViewModel,
     @Suppress("UNUSED_PARAMETER") statsViewModel: StatsViewModel
 ) {
-    val authSession by authViewModel.authSession.collectAsState()
+    val authState by authViewModel.authSession.collectAsState()
     val pastSeasons by authViewModel.pastSeasons.collectAsState()
+    
+    val session = when (val state = authState) {
+        is AuthState.Active -> state.session
+        is AuthState.TokenRefreshing -> state.session
+        is AuthState.TokenExpired -> state.session
+        is AuthState.NetworkError -> state.session
+        is AuthState.DecryptionError -> state.session
+        is AuthState.ReauthRequired -> state.session
+        else -> null
+    }
 
     Column(
         modifier = Modifier
@@ -59,9 +70,9 @@ fun CareerScreen(
                 Text("OVERALL STATS", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = SleekCyan)
                 Spacer(modifier = Modifier.height(12.dp))
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    CareerStatItem("Account Level", "${authSession?.accountLevel ?: 0}", SleekTextPrimary)
-                    CareerStatItem("Season Level", "${authSession?.seasonalLevel ?: 0}", SleekTextPrimary)
-                    CareerStatItem("Total Wins", "${authSession?.totalWins ?: 0}", FortniteGold)
+                    CareerStatItem("Account Level", "${session?.accountLevel ?: 0}", SleekTextPrimary)
+                    CareerStatItem("Season Level", "${session?.seasonalLevel ?: 0}", SleekTextPrimary)
+                    CareerStatItem("Total Wins", "${session?.totalWins ?: 0}", FortniteGold)
                 }
             }
         }

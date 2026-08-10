@@ -37,6 +37,7 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.work.Data
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
+import com.dhyper.fncompanion.data.models.AuthState
 import com.dhyper.fncompanion.ui.theme.*
 import com.dhyper.fncompanion.ui.viewmodels.AuthViewModel
 import com.dhyper.fncompanion.ui.viewmodels.LoginState
@@ -54,11 +55,22 @@ fun AccountAuthScreen(
     onLoginSuccess: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
-    val authSession by viewModel.authSession.collectAsState()
+    val authState by viewModel.authSession.collectAsState()
     val loginState by viewModel.loginState.collectAsState()
     
+    val session = when (val state = authState) {
+        is AuthState.Active -> state.session
+        is AuthState.TokenRefreshing -> state.session
+        is AuthState.TokenExpired -> state.session
+        is AuthState.ReauthRequired -> state.session
+        is AuthState.DecryptionError -> state.session
+        is AuthState.NetworkError -> state.session
+        else -> null
+    }
+
     var loginAccomplished by remember { mutableStateOf(false) }
 
+    var exchangeCodeInput by remember { mutableStateOf("") }
     val context = LocalContext.current
     val clipboardManager = LocalClipboardManager.current
     
@@ -69,7 +81,6 @@ fun AccountAuthScreen(
         }
     }
 
-    var exchangeCodeInput by remember { mutableStateOf("") }
     var generatedExchangeCode by remember { mutableStateOf<String?>(null) }
     var isGeneratingCode by remember { mutableStateOf(false) }
     var showWebView by remember { mutableStateOf(false) }
@@ -164,7 +175,7 @@ fun AccountAuthScreen(
             .padding(16.dp)
             .verticalScroll(rememberScrollState())
     ) {
-        if (authSession != null && !forceLogin) {
+        if (session != null && !forceLogin) {
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -186,22 +197,67 @@ fun AccountAuthScreen(
                         Column {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Text(
-                                    text = authSession?.displayName ?: "Epic Games Account",
+                                    text = session.displayName,
                                     style = MaterialTheme.typography.titleLarge,
                                     color = SleekTextPrimary,
                                     fontWeight = FontWeight.Bold
                                 )
                                 Spacer(modifier = Modifier.width(6.dp))
-                                Icon(Icons.Default.CheckCircle, null, tint = SleekEmerald, modifier = Modifier.size(18.dp))
+                                when (authState) {
+                                    is AuthState.Active -> Icon(Icons.Default.CheckCircle, null, tint = SleekEmerald, modifier = Modifier.size(18.dp))
+                                    is AuthState.TokenRefreshing -> CircularProgressIndicator(modifier = Modifier.size(16.dp), color = SleekCyan, strokeWidth = 2.dp)
+                                    is AuthState.NetworkError -> Icon(Icons.Default.WifiOff, null, tint = FortniteGold, modifier = Modifier.size(18.dp))
+                                    is AuthState.DecryptionError -> Icon(Icons.Default.VpnKeyOff, null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(18.dp))
+                                    else -> Icon(Icons.Default.Error, null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(18.dp))
+                                }
                             }
                             Spacer(modifier = Modifier.height(4.dp))
-                            Text(text = "Account ID: ${authSession?.accountId}", fontSize = 12.sp, color = SleekTextMuted)
+                            Text(text = "Account ID: ${session.accountId}", fontSize = 12.sp, color = SleekTextMuted)
                         }
                     }
 
                     Spacer(modifier = Modifier.height(16.dp))
-                    Text(text = "Your Epic Games account is connected!", color = SleekTextSecondary, fontSize = 13.sp)
-                    Spacer(modifier = Modifier.height(16.dp))
+                    
+                    when (authState) {
+                        is AuthState.ReauthRequired -> {
+                            Card(
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
+                                modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)
+                            ) {
+                                Column(Modifier.padding(12.dp)) {
+                                    Text("Re-authentication Required", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onErrorContainer)
+                                    Text("The connection to Epic Games was revoked or expired. Please sign in again.", fontSize = 12.sp)
+                                    Spacer(Modifier.height(8.dp))
+                                    Button(onClick = { showWebView = true }, colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)) {
+                                        Text("Sign In Again")
+                                    }
+                                }
+                            }
+                        }
+                        is AuthState.DecryptionError -> {
+                            Card(
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
+                                modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)
+                            ) {
+                                Column(Modifier.padding(12.dp)) {
+                                    Text("Storage Error", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onErrorContainer)
+                                    Text("Could not decrypt your credentials. This can happen after a system update or security change.", fontSize = 12.sp)
+                                }
+                            }
+                        }
+                        is AuthState.NetworkError -> {
+                            Text(text = "Offline: ${(authState as AuthState.NetworkError).message}", color = FortniteGold, fontSize = 12.sp)
+                            Spacer(modifier = Modifier.height(8.dp))
+                        }
+                        is AuthState.TokenRefreshing -> {
+                            Text(text = "Updating session...", color = SleekCyan, fontSize = 12.sp)
+                            Spacer(modifier = Modifier.height(8.dp))
+                        }
+                        else -> {
+                            Text(text = "Your Epic Games account is connected!", color = SleekTextSecondary, fontSize = 13.sp)
+                            Spacer(modifier = Modifier.height(16.dp))
+                        }
+                    }
 
                     AccountButton(text = "Open BR Locker", icon = Icons.Default.Checkroom, color = MaterialTheme.colorScheme.primary, onClick = onNavigateToLocker)
                     Spacer(modifier = Modifier.height(12.dp))

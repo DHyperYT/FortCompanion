@@ -6,6 +6,7 @@ import com.dhyper.fncompanion.data.db.AuthEntity
 import com.dhyper.fncompanion.data.db.PastSeasonEntity
 import com.dhyper.fncompanion.data.repository.AuthRepository
 import com.dhyper.fncompanion.data.repository.EpicAccountRepository
+import com.dhyper.fncompanion.data.models.AuthState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -27,16 +28,24 @@ class AuthViewModel(
     private val epicAccountRepository: EpicAccountRepository = EpicAccountRepository()
 ) : ViewModel() {
 
-    val authSession: StateFlow<AuthEntity?> = authRepository.authSession
+    val authSession: StateFlow<AuthState> = authRepository.authSession
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
-            initialValue = null
+            initialValue = AuthState.NoCredentials
         )
 
     val pastSeasons: StateFlow<List<PastSeasonEntity>> = authSession
-        .flatMapLatest { session ->
-            if (session != null) authRepository.getPastSeasons(session.accountId)
+        .flatMapLatest { state ->
+            val accountId = when (state) {
+                is AuthState.Active -> state.session.accountId
+                is AuthState.TokenExpired -> state.session.accountId
+                is AuthState.ReauthRequired -> state.session.accountId
+                is AuthState.DecryptionError -> state.session.accountId
+                is AuthState.NetworkError -> state.session.accountId
+                else -> null
+            }
+            if (accountId != null) authRepository.getPastSeasons(accountId)
             else flowOf(emptyList())
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
@@ -118,13 +127,70 @@ class AuthViewModel(
     fun refreshStats() {
         viewModelScope.launch {
             epicAccountRepository.clearCache()
-            val session = authRepository.getValidSession() ?: return@launch
-            fetchAndSaveCareer(session)
+            val result = authRepository.ensureActiveSession()
+            result.onSuccess { session ->
+                fetchAndSaveCareer(session)
+            }
         }
     }
 
     fun clearLoginError() {
         _loginState.value = LoginState.Idle
+    }
+
+    fun verifyCurrentToken(onResult: (String) -> Unit) {
+        viewModelScope.launch {
+            val result = authRepository.verifyCurrentToken()
+            result.fold(
+                onSuccess = { onResult("Token Valid: ${it.accountId} (Expires in ${it.expiresIn}s)") },
+                onFailure = { onResult("Token Invalid/Error: ${it.localizedMessage}") }
+            )
+        }
+    }
+
+    fun refreshAccessToken(onResult: (String) -> Unit) {
+        viewModelScope.launch {
+            val result = authRepository.refreshAccessToken()
+            result.fold(
+                onSuccess = { onResult("TOKEN_REFRESHED: Success.") },
+                onFailure = { onResult("REFRESH_TOKEN_INVALID: ${it.localizedMessage}") }
+            )
+        }
+    }
+
+    fun getNewAccessToken(onResult: (String) -> Unit) {
+        viewModelScope.launch {
+            val result = authRepository.forceNewTokenWithDeviceAuth()
+            result.fold(
+                onSuccess = { onResult("DEVICE_AUTH_RECOVERED: Success.") },
+                onFailure = { onResult("DEVICE_AUTH_INVALID: ${it.localizedMessage}") }
+            )
+        }
+    }
+
+    fun testFullAuthRecovery(onResult: (String) -> Unit) {
+        viewModelScope.launch {
+            val verify1 = authRepository.verifyCurrentToken()
+            val initial = if (verify1.isSuccess) "Initial: VALID. " else "Initial: INVALID. "
+            
+            val recovery = authRepository.forceTokenRefresh()
+            recovery.fold(
+                onSuccess = {
+                    val verify2 = authRepository.verifyCurrentToken()
+                    val final = if (verify2.isSuccess) "Final: VALID." else "Final: INVALID."
+                    onResult(initial + "SUCCESS: " + final)
+                },
+                onFailure = {
+                    onResult(initial + "FAILED: ${it.localizedMessage}")
+                }
+            )
+        }
+    }
+
+    fun getRawAuthState(onResult: (String) -> Unit) {
+        viewModelScope.launch {
+            onResult(authRepository.getRawDecryptedSessionJson())
+        }
     }
 
     fun logout() {

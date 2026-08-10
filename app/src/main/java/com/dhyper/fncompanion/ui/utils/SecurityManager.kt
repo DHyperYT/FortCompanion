@@ -62,13 +62,14 @@ object SecurityManager {
         if (ciphertext == null) return null
         try {
             val combined = Base64.decode(ciphertext, Base64.DEFAULT)
+            if (combined.size < 12) throw Exception("Invalid ciphertext length")
             val iv = combined.sliceArray(0 until 12)
             val encrypted = combined.sliceArray(12 until combined.size)
             val cipher = Cipher.getInstance(AES_GCM)
             cipher.init(Cipher.DECRYPT_MODE, getKeystoreKey(), GCMParameterSpec(128, iv))
             return String(cipher.doFinal(encrypted))
         } catch (e: Exception) {
-            return null
+            throw e // Propagate to repository to handle DECRYPTION_ERROR state
         }
     }
 

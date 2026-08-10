@@ -37,14 +37,18 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.*
 import androidx.work.*
 import com.dhyper.fncompanion.data.db.AppDatabase
 import com.dhyper.fncompanion.data.db.SettingsEntity
+import com.dhyper.fncompanion.data.models.AuthState
 import com.dhyper.fncompanion.data.repository.AuthRepository
 import com.dhyper.fncompanion.worker.ShopCheckWorker
 import com.dhyper.fncompanion.worker.ShopRefreshReceiver
@@ -72,6 +76,7 @@ sealed class NavRoute(val route: String, val title: String, val icon: androidx.c
     object Aes : NavRoute("aes", "AES Keys", Icons.Default.VpnKey)
     object Career : NavRoute("career", "Career", Icons.Default.History)
     object AddAccount : NavRoute("add_account", "Add Account", Icons.Default.PersonAdd)
+    object AuthDiagnostic : NavRoute("auth_diagnostic", "Auth Diagnostic", Icons.Default.BugReport)
 }
 
 class MainActivity : FragmentActivity() {
@@ -137,8 +142,27 @@ class MainActivity : FragmentActivity() {
 @Composable
 fun FortniteCompanionApp(settings: SettingsEntity?) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val lifecycleOwner = LocalLifecycleOwner.current
     val db = AppDatabase.getDatabase(context)
-    val authRepository = AuthRepository(db.authDao())
+    val authRepository = remember { AuthRepository(db.authDao()) }
+    
+    // Proactive session check on startup and resume
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                scope.launch { authRepository.ensureActiveSession() }
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
+
+    LaunchedEffect(authRepository) {
+        com.dhyper.fncompanion.data.api.ApiClient.init(authRepository)
+    }
 
     val authViewModel: AuthViewModel = viewModel(factory = object : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST") override fun <T : ViewModel> create(modelClass: Class<T>): T = AuthViewModel(authRepository) as T
@@ -193,8 +217,13 @@ fun FortniteCompanionApp(settings: SettingsEntity?) {
                 },
                 actions = {
                     IconButton(onClick = { navController.navigate(NavRoute.MyAccount.route) }) {
-                        if (authSession != null) Icon(Icons.Default.CheckCircle, contentDescription = null, tint = SleekEmerald)
-                        else Icon(Icons.Default.Lock, contentDescription = null, tint = SleekTextMuted)
+                        when (authSession) {
+                            is AuthState.Active -> Icon(Icons.Default.CheckCircle, contentDescription = null, tint = SleekEmerald)
+                            is AuthState.TokenRefreshing -> CircularProgressIndicator(modifier = Modifier.size(18.dp), color = SleekCyan, strokeWidth = 2.dp)
+                            is AuthState.NoCredentials -> Icon(Icons.Default.Lock, contentDescription = null, tint = SleekTextMuted)
+                            is AuthState.NetworkError -> Icon(Icons.Default.WifiOff, contentDescription = null, tint = FortniteGold)
+                            else -> Icon(Icons.Default.Error, contentDescription = null, tint = MaterialTheme.colorScheme.error)
+                        }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = SleekSurface),
@@ -259,7 +288,14 @@ fun FortniteCompanionApp(settings: SettingsEntity?) {
                         onNavigateToCareer = { navController.navigate(NavRoute.Career.route) }
                     ) 
                 }
-                composable(NavRoute.Locker.route) { PersonalLockerScreen(authSession, lockerViewModel, cosmeticsViewModel, { navController.popBackStack() }) }
+                composable(NavRoute.Locker.route) { 
+                    PersonalLockerScreen(
+                        authState = authSession, 
+                        viewModel = lockerViewModel, 
+                        cosmeticsViewModel = cosmeticsViewModel, 
+                        onNavigateToAuth = { navController.navigate(NavRoute.MyAccount.route) }
+                    ) 
+                }
                 composable(NavRoute.Career.route) { CareerScreen(authViewModel, statsViewModel) }
                 composable(NavRoute.Aes.route) { AesScreen(brExtendedViewModel) }
                 composable(NavRoute.Settings.route) { 
@@ -267,7 +303,8 @@ fun FortniteCompanionApp(settings: SettingsEntity?) {
                         authViewModel, 
                         statsViewModel, 
                         settingsViewModel,
-                        onAddAccount = { navController.navigate(NavRoute.AddAccount.route) }
+                        onAddAccount = { navController.navigate(NavRoute.AddAccount.route) },
+                        onNavigateToDiagnostic = { navController.navigate(NavRoute.AuthDiagnostic.route) }
                     ) 
                 }
                 composable(NavRoute.AddAccount.route) {
@@ -279,6 +316,9 @@ fun FortniteCompanionApp(settings: SettingsEntity?) {
                         forceLogin = true,
                         onLoginSuccess = { navController.popBackStack() }
                     )
+                }
+                composable(NavRoute.AuthDiagnostic.route) {
+                    AuthDiagnosticScreen(authViewModel)
                 }
             }
         }

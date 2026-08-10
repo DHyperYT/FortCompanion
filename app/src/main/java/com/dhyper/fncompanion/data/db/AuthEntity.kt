@@ -18,7 +18,8 @@ data class AuthEntity(
     val loginTimeMs: Long = System.currentTimeMillis(),
     val lastRefreshTimeMs: Long = System.currentTimeMillis(),
     val isActive: Boolean = false,
-    val equippedSkinIcon: String? = null
+    val equippedSkinIcon: String? = null,
+    val deviceAuthStatus: String = "VALID" // VALID, REVOKED, UNKNOWN
 )
 
 @Entity(tableName = "recent_player_search")

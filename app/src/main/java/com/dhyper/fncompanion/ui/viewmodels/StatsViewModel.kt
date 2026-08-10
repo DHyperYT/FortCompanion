@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.dhyper.fncompanion.BuildConfig
 import com.dhyper.fncompanion.data.db.AuthEntity
+import com.dhyper.fncompanion.data.db.RecentSearchEntity
 import com.dhyper.fncompanion.data.db.SettingsDao
 import com.dhyper.fncompanion.data.db.SettingsEntity
 import com.dhyper.fncompanion.data.models.AccountCareerDetails

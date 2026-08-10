@@ -46,6 +46,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.dhyper.fncompanion.data.db.AuthEntity
+import com.dhyper.fncompanion.data.models.AuthState
 import com.dhyper.fncompanion.data.models.CosmeticItem
 import com.dhyper.fncompanion.data.models.CosmeticSet
 import com.dhyper.fncompanion.data.models.LockerCategory
@@ -64,7 +65,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PersonalLockerScreen(
-    session: AuthEntity?,
+    authState: AuthState,
     viewModel: PersonalLockerViewModel,
     cosmeticsViewModel: CosmeticsViewModel, // Added parameter
     onNavigateToAuth: () -> Unit,
@@ -73,6 +74,16 @@ fun PersonalLockerScreen(
     val uiState by viewModel.uiState.collectAsState()
     var selectedItemForDetail by remember { mutableStateOf<ParsedLockerItem?>(null) }
     var selectedSet by remember { mutableStateOf<CosmeticSet?>(null) }
+
+    val session = when (authState) {
+        is AuthState.Active -> authState.session
+        is AuthState.TokenRefreshing -> authState.session
+        is AuthState.TokenExpired -> authState.session
+        is AuthState.NetworkError -> authState.session
+        is AuthState.DecryptionError -> authState.session
+        is AuthState.ReauthRequired -> authState.session
+        else -> null
+    }
 
     LaunchedEffect(session) {
         viewModel.loadLocker(session)

@@ -16,6 +16,21 @@ data class EpicTokenResponse(
     @Json(name = "numericErrorCode") val numericErrorCode: Int?
 )
 
+@JsonClass(generateAdapter = true)
+data class EpicVerifyResponse(
+    @Json(name = "token") val token: String?,
+    @Json(name = "session_id") val sessionId: String?,
+    @Json(name = "token_type") val tokenType: String?,
+    @Json(name = "client_id") val clientId: String?,
+    @Json(name = "account_id") val accountId: String,
+    @Json(name = "expires_in") val expiresIn: Long,
+    @Json(name = "expires_at") val expiresAt: String?,
+    @Json(name = "display_name") val displayName: String?,
+    @Json(name = "app") val app: String?,
+    @Json(name = "in_app_id") val inAppId: String?,
+    @Json(name = "device_id") val deviceId: String?
+)
+
 // --- MCP PROFILE QUERY MODELS ---
 @JsonClass(generateAdapter = true)
 data class McpQueryResponse(

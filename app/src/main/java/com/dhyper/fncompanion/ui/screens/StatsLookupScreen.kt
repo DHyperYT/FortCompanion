@@ -71,6 +71,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.dhyper.fncompanion.data.db.AuthEntity
+import com.dhyper.fncompanion.data.db.RecentSearchEntity
 import com.dhyper.fncompanion.data.models.AccountCareerDetails
 import com.dhyper.fncompanion.data.models.PastSeasonData
 import com.dhyper.fncompanion.data.models.SingleStatGroup

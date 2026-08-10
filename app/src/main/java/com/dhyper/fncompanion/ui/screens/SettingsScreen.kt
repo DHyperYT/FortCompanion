@@ -32,6 +32,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.dhyper.fncompanion.BuildConfig
+import com.dhyper.fncompanion.data.models.AuthState
 import com.dhyper.fncompanion.ui.theme.*
 import com.dhyper.fncompanion.ui.viewmodels.AuthViewModel
 import com.dhyper.fncompanion.ui.viewmodels.SettingsViewModel
@@ -44,7 +45,8 @@ fun SettingsScreen(
     authViewModel: AuthViewModel,
     statsViewModel: StatsViewModel,
     settingsViewModel: SettingsViewModel,
-    onAddAccount: () -> Unit
+    onAddAccount: () -> Unit,
+    onNavigateToDiagnostic: () -> Unit
 ) {
     val context = LocalContext.current
     val allAccounts by settingsViewModel.allAccounts.collectAsState()
@@ -208,7 +210,16 @@ fun SettingsScreen(
         Spacer(modifier = Modifier.height(8.dp))
 
         allAccounts.forEach { account ->
-            val isActive = authViewModel.authSession.collectAsState().value?.accountId == account.accountId
+            val authState by authViewModel.authSession.collectAsState()
+            val isActive = when (val state = authState) {
+                is AuthState.Active -> state.session.accountId == account.accountId
+                is AuthState.TokenRefreshing -> state.session.accountId == account.accountId
+                is AuthState.TokenExpired -> state.session.accountId == account.accountId
+                is AuthState.ReauthRequired -> state.session.accountId == account.accountId
+                is AuthState.DecryptionError -> state.session.accountId == account.accountId
+                is AuthState.NetworkError -> state.session.accountId == account.accountId
+                else -> false
+            }
             
             Card(
                 modifier = Modifier
@@ -371,9 +382,9 @@ fun SettingsScreen(
 
         Spacer(modifier = Modifier.height(32.dp))
 
-        // --- UPDATES ---
+        // --- UPDATES & TOOLS ---
         Text(
-            "UPDATES",
+            "UPDATES & TOOLS",
             fontSize = 12.sp,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.primary,
@@ -405,7 +416,18 @@ fun SettingsScreen(
         Spacer(modifier = Modifier.height(32.dp))
 
         // --- ACCOUNT STATUS (Bottom) ---
-        authViewModel.authSession.collectAsState().value?.let { active ->
+        val authState = authViewModel.authSession.collectAsState().value
+        val session = when (authState) {
+            is AuthState.Active -> authState.session
+            is AuthState.TokenRefreshing -> authState.session
+            is AuthState.TokenExpired -> authState.session
+            is AuthState.NetworkError -> authState.session
+            is AuthState.DecryptionError -> authState.session
+            is AuthState.ReauthRequired -> authState.session
+            else -> null
+        }
+
+        session?.let { active ->
             Text(
                 "SESSION STATUS",
                 fontSize = 12.sp,
@@ -428,6 +450,19 @@ fun SettingsScreen(
                     StatusRow("Last Refresh", lastRefresh)
                 }
             }
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        Button(
+            onClick = onNavigateToDiagnostic,
+            modifier = Modifier.fillMaxWidth(),
+            colors = ButtonDefaults.buttonColors(containerColor = SleekSurfaceVariant),
+            shape = RoundedCornerShape(12.dp)
+        ) {
+            Icon(Icons.Default.BugReport, null, tint = FortniteGold)
+            Spacer(Modifier.width(10.dp))
+            Text("Auth Diagnostics", color = SleekTextPrimary, fontWeight = FontWeight.Bold)
         }
 
         Spacer(modifier = Modifier.height(40.dp))

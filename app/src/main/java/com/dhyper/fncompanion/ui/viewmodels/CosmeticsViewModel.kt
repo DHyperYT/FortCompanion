@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.dhyper.fncompanion.data.db.WishlistDao
 import com.dhyper.fncompanion.data.db.WishlistEntity
+import com.dhyper.fncompanion.data.models.AuthState
 import com.dhyper.fncompanion.data.models.CosmeticItem
 import com.dhyper.fncompanion.data.repository.*
 import com.dhyper.fncompanion.ui.utils.SeasonUtils
@@ -211,11 +212,21 @@ class CosmeticsViewModel(
 
     private fun observeAccountChanges() {
         viewModelScope.launch {
-            authRepo.authSession.collectLatest { session ->
+            authRepo.authSession.collectLatest { state ->
                 // Force a clean state before loading new account data
                 _ownedIds.value = emptySet()
                 _wishlistIds.value = emptySet()
-                
+
+                val session = when (state) {
+                    is AuthState.Active -> state.session
+                    is AuthState.TokenRefreshing -> state.session
+                    is AuthState.TokenExpired -> state.session
+                    is AuthState.NetworkError -> state.session
+                    is AuthState.DecryptionError -> state.session
+                    is AuthState.ReauthRequired -> state.session
+                    else -> null
+                }
+
                 if (session != null) {
                     // 1. Force full reload to update "OWNED" status for the specific account
                     loadData()
@@ -241,8 +252,16 @@ class CosmeticsViewModel(
 
     private fun observeWishlistCleanup() {
         viewModelScope.launch {
-            authRepo.authSession.collectLatest { session ->
-                if (session == null) return@collectLatest
+            authRepo.authSession.collectLatest { state ->
+                val accountId = when (state) {
+                    is AuthState.Active -> state.session.accountId
+                    is AuthState.TokenRefreshing -> state.session.accountId
+                    is AuthState.TokenExpired -> state.session.accountId
+                    is AuthState.NetworkError -> state.session.accountId
+                    is AuthState.DecryptionError -> state.session.accountId
+                    is AuthState.ReauthRequired -> state.session.accountId
+                    else -> return@collectLatest
+                }
 
                 combine(wishlistIds, _ownedIds) { wishlist, owned ->
                     // Case-insensitive intersection check
@@ -251,7 +270,7 @@ class CosmeticsViewModel(
                 }.collect { ownedWishlisted ->
                     if (ownedWishlisted.isNotEmpty()) {
                         ownedWishlisted.forEach { id ->
-                            wishlistDao.removeFromWishlist(id, session.accountId)
+                            wishlistDao.removeFromWishlist(id, accountId)
                         }
                     }
                 }
@@ -274,7 +293,8 @@ class CosmeticsViewModel(
             cosmeticsResult.onFailure { _errorMessage.value = it.localizedMessage }
 
             // Fetch owned items if logged in
-            authRepo.authSession.firstOrNull()?.let { session ->
+            val sessionResult = authRepo.ensureActiveSession()
+            sessionResult.onSuccess { session ->
                 val lockerResult = epicAccountRepo.fetchPersonalLockerCosmetics(session.accessToken, session.accountId)
                 lockerResult.onSuccess { items ->
                     _ownedIds.value = items.map { it.cosmeticId.lowercase() }.toSet()

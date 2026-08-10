@@ -34,7 +34,8 @@ class StwViewModel(
     fun loadStwData() {
         viewModelScope.launch {
             _uiState.value = StwUiState.Loading
-            val session = authRepo.getValidSession()
+            val sessionResult = authRepo.ensureActiveSession()
+            val session = sessionResult.getOrNull()
             if (session == null) {
                 _uiState.value = StwUiState.Unauthenticated
                 return@launch

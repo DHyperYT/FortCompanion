@@ -2,6 +2,7 @@ package com.dhyper.fncompanion.data.api
 
 import com.dhyper.fncompanion.data.models.DeviceAuthResponse
 import com.dhyper.fncompanion.data.models.EpicTokenResponse
+import com.dhyper.fncompanion.data.models.EpicVerifyResponse
 import com.dhyper.fncompanion.data.models.McpQueryResponse
 import okhttp3.RequestBody
 import retrofit2.http.Body
@@ -14,8 +15,9 @@ import retrofit2.http.Path
 import retrofit2.http.Query
 
 interface EpicAccountApi {
+
     @FormUrlEncoded
-    @POST("https://account-public-service-prod03.ol.epicgames.com/account/api/oauth/token")
+    @POST("https://account-public-service-prod.ol.epicgames.com/account/api/oauth/token")
     suspend fun getAccessTokenWithExchangeCode(
         @Header("Authorization") authHeader: String = "Basic M2Y2OWU1NmM3NjQ5NDkyYzhjYzI5ZjFhZjA4YThhMTI6YjUxZWU5Y2IxMjIzNGY1MGE2OWVmYTY3ZWY1MzgxMmU=",
         @Field("grant_type") grantType: String = "exchange_code",
@@ -23,7 +25,15 @@ interface EpicAccountApi {
     ): EpicTokenResponse
 
     @FormUrlEncoded
-    @POST("https://account-public-service-prod03.ol.epicgames.com/account/api/oauth/token")
+    @POST("https://account-public-service-prod.ol.epicgames.com/account/api/oauth/token")
+    suspend fun getAccessTokenWithRefreshToken(
+        @Header("Authorization") authHeader: String = "Basic M2Y2OWU1NmM3NjQ5NDkyYzhjYzI5ZjFhZjA4YThhMTI6YjUxZWU5Y2IxMjIzNGY1MGE2OWVmYTY3ZWY1MzgxMmU=",
+        @Field("grant_type") grantType: String = "refresh_token",
+        @Field("refresh_token") refreshToken: String
+    ): EpicTokenResponse
+
+    @FormUrlEncoded
+    @POST("https://account-public-service-prod.ol.epicgames.com/account/api/oauth/token")
     suspend fun getAccessTokenWithAuthCode(
         @Header("Authorization") authHeader: String = "Basic M2Y2OWU1NmM3NjQ5NDkyYzhjYzI5ZjFhZjA4YThhMTI6YjUxZWU5Y2IxMjIzNGY1MGE2OWVmYTY3ZWY1MzgxMmU=",
         @Field("grant_type") grantType: String = "authorization_code",
@@ -32,7 +42,7 @@ interface EpicAccountApi {
     ): EpicTokenResponse
 
     @FormUrlEncoded
-    @POST("https://account-public-service-prod03.ol.epicgames.com/account/api/oauth/token")
+    @POST("https://account-public-service-prod.ol.epicgames.com/account/api/oauth/token")
     suspend fun getAccessTokenWithDeviceAuth(
         @Header("Authorization") authHeader: String = "Basic M2Y2OWU1NmM3NjQ5NDkyYzhjYzI5ZjFhZjA4YThhMTI6YjUxZWU5Y2IxMjIzNGY1MGE2OWVmYTY3ZWY1MzgxMmU=",
         @Field("grant_type") grantType: String = "device_auth",
@@ -41,7 +51,7 @@ interface EpicAccountApi {
         @Field("secret") secret: String
     ): EpicTokenResponse
 
-    @POST("https://account-public-service-prod03.ol.epicgames.com/account/api/public/account/{accountId}/deviceAuth")
+    @POST("https://account-public-service-prod.ol.epicgames.com/account/api/public/account/{accountId}/deviceAuth")
     suspend fun createDeviceAuth(
         @Header("Authorization") bearerToken: String,
         @Path("accountId") accountId: String,
@@ -68,10 +78,21 @@ interface EpicAccountApi {
         @Body body: Map<String, String>
     ): McpQueryResponse
 
-    @GET("https://account-public-service-prod03.ol.epicgames.com/account/api/oauth/exchange")
+    @GET("https://account-public-service-prod.ol.epicgames.com/account/api/oauth/exchange")
     suspend fun getExchangeCode(
         @Header("Authorization") bearerToken: String
     ): Map<String, Any?>
+
+    @GET("https://account-public-service-prod.ol.epicgames.com/account/api/oauth/verify")
+    suspend fun verifyToken(
+        @Header("Authorization") bearerToken: String
+    ): EpicVerifyResponse
+
+    @retrofit2.http.DELETE("https://account-public-service-prod.ol.epicgames.com/account/api/oauth/sessions/kill")
+    suspend fun killSessions(
+        @Header("Authorization") bearerToken: String,
+        @Query("killType") killType: String = "ALL"
+    )
 
     @GET("https://fortnite-public-service-prod11.ol.epicgames.com/fortnite/api/game/v2/world/info")
     suspend fun getStwWorldInfo(

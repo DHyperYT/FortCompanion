@@ -1,7 +1,10 @@
 package com.dhyper.fncompanion.data.api
 
+import com.dhyper.fncompanion.data.api.AuthInterceptor
+import com.dhyper.fncompanion.data.repository.AuthRepository
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
+import okhttp3.Interceptor
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
@@ -13,9 +16,23 @@ object ApiClient {
         .addLast(KotlinJsonAdapterFactory())
         .build()
 
+    private var authRepository: AuthRepository? = null
+
+    fun init(repository: AuthRepository) {
+        authRepository = repository
+    }
+
     private val okHttpClient = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(15, TimeUnit.SECONDS)
+        .addInterceptor { chain ->
+            val repo = authRepository
+            if (repo != null) {
+                AuthInterceptor(repo).intercept(chain)
+            } else {
+                chain.proceed(chain.request())
+            }
+        }
         .addInterceptor(HttpLoggingInterceptor().apply {
             level = HttpLoggingInterceptor.Level.BASIC
         })

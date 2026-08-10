@@ -42,17 +42,18 @@ class PersonalLockerViewModel(
     private val _uiState = MutableStateFlow<LockerUiState>(LockerUiState.Unauthenticated)
     val uiState: StateFlow<LockerUiState> = _uiState.asStateFlow()
 
-    fun loadLocker(session: AuthEntity?) {
-        if (session == null) {
-            _uiState.value = LockerUiState.Unauthenticated
-            return
-        }
-
+    fun loadLocker(currentSession: AuthEntity?) {
         viewModelScope.launch {
             _uiState.value = LockerUiState.Loading
             
             // 1. Ensure we have a fresh token using Device Auth refresh
-            val validSession = authRepository.getValidSession() ?: session
+            val sessionResult = authRepository.ensureActiveSession()
+            val validSession = sessionResult.getOrNull()
+            
+            if (validSession == null) {
+                _uiState.value = LockerUiState.Unauthenticated
+                return@launch
+            }
             
             val vbucksResult = accountRepository.fetchVBucksBalance(validSession.accessToken, validSession.accountId)
             val lockerResult = accountRepository.fetchPersonalLockerCosmetics(validSession.accessToken, validSession.accountId)
@@ -61,15 +62,6 @@ class PersonalLockerViewModel(
 
             lockerResult.fold(
                 onSuccess = { items ->
-                    if (items.isEmpty()) {
-                        // Force logout if locker is empty (likely expired session)
-                        viewModelScope.launch {
-                            authRepository.logout()
-                        }
-                        _uiState.value = LockerUiState.Unauthenticated
-                        return@fold
-                    }
-
                     val defaultSort = LockerSortOption.FAVORITES_FIRST
                     _uiState.value = LockerUiState.Success(
                         allItems = items,
@@ -80,7 +72,7 @@ class PersonalLockerViewModel(
                 },
                 onFailure = { error ->
                     _uiState.value = LockerUiState.Error(
-                        error.localizedMessage ?: "Failed to query real-time Athena profile for account ${session.displayName}"
+                        error.localizedMessage ?: "Failed to query real-time Athena profile for account ${validSession.displayName}"
                     )
                 }
             )

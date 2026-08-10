@@ -2,6 +2,7 @@ package com.dhyper.fncompanion.ui.viewmodels
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.dhyper.fncompanion.data.models.AuthState
 import com.dhyper.fncompanion.data.models.ShopData
 import com.dhyper.fncompanion.data.models.ShopEntry
 import com.dhyper.fncompanion.data.db.SettingsDao
@@ -125,9 +126,19 @@ class ShopViewModel(
 
     private fun observeAccountChanges() {
         viewModelScope.launch {
-            authRepo.authSession.collectLatest { session ->
+            authRepo.authSession.collectLatest { state ->
                 // Force a full reload to update "OWNED" status
                 loadShop()
+
+                val session = when (state) {
+                    is AuthState.Active -> state.session
+                    is AuthState.TokenRefreshing -> state.session
+                    is AuthState.TokenExpired -> state.session
+                    is AuthState.NetworkError -> state.session
+                    is AuthState.DecryptionError -> state.session
+                    is AuthState.ReauthRequired -> state.session
+                    else -> null
+                }
 
                 if (session != null) {
                     val settings = settingsDao.getSettingsDirect()
@@ -150,8 +161,16 @@ class ShopViewModel(
 
     private fun observeWishlistCleanup() {
         viewModelScope.launch {
-            authRepo.authSession.collectLatest { session ->
-                if (session == null) return@collectLatest
+            authRepo.authSession.collectLatest { state ->
+                val accountId = when (state) {
+                    is AuthState.Active -> state.session.accountId
+                    is AuthState.TokenRefreshing -> state.session.accountId
+                    is AuthState.TokenExpired -> state.session.accountId
+                    is AuthState.NetworkError -> state.session.accountId
+                    is AuthState.DecryptionError -> state.session.accountId
+                    is AuthState.ReauthRequired -> state.session.accountId
+                    else -> return@collectLatest
+                }
                 
                 combine(_wishlistIds, _ownedIds) { wishlist, owned ->
                     val ownedLower = owned.map { it.lowercase() }.toSet()
@@ -159,7 +178,7 @@ class ShopViewModel(
                 }.collect { ownedWishlisted ->
                     if (ownedWishlisted.isNotEmpty()) {
                         ownedWishlisted.forEach { id ->
-                            wishlistDao.removeFromWishlist(id, session.accountId)
+                            wishlistDao.removeFromWishlist(id, accountId)
                         }
                     }
                 }
@@ -203,7 +222,8 @@ class ShopViewModel(
             
             // 1. Fetch owned items in parallel
             launch {
-                authRepo.authSession.firstOrNull()?.let { session ->
+                val sessionResult = authRepo.ensureActiveSession()
+                sessionResult.onSuccess { session ->
                     val lockerResult = epicAccountRepo.fetchPersonalLockerCosmetics(session.accessToken, session.accountId)
                     lockerResult.onSuccess { items ->
                         _ownedIds.value = items.map { it.cosmeticId.lowercase() }.toSet()
