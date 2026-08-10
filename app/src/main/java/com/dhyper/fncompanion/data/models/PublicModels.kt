@@ -378,3 +378,48 @@ data class PlaylistImages(
     val missionIcon: String?
 )
 
+// --- GLOBAL CHALLENGE MAPPINGS (fortnite-central.app) ---
+@JsonClass(generateAdapter = true)
+data class ChallengeMappingResponse(
+    val status: Int,
+    val data: List<ChallengeBundle>?
+)
+
+@JsonClass(generateAdapter = true)
+data class ChallengeBundle(
+    val id: String,
+    val name: String?,
+    val challenges: List<ChallengeDefinition>?
+)
+
+@JsonClass(generateAdapter = true)
+data class ChallengeDefinition(
+    val id: String,
+    val title: String?,
+    val description: String?,
+    val xp: Int?,
+    val progressTarget: Int?,
+    val type: String?
+)
+
+// --- AES MODELS ---
+@JsonClass(generateAdapter = true)
+data class AesResponse(
+    val status: Int,
+    val data: AesData?
+)
+
+@JsonClass(generateAdapter = true)
+data class AesData(
+    val build: String?,
+    val mainKey: String?,
+    val dynamicKeys: List<AesDynamicKey>?
+)
+
+@JsonClass(generateAdapter = true)
+data class AesDynamicKey(
+    val pakFilename: String?,
+    val pakGuid: String?,
+    val key: String?
+)
+

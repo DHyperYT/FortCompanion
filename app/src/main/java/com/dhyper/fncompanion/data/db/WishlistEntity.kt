@@ -3,9 +3,10 @@ package com.dhyper.fncompanion.data.db
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 
-@Entity(tableName = "cosmetic_wishlist")
+@Entity(tableName = "cosmetic_wishlist", primaryKeys = ["id", "accountId"])
 data class WishlistEntity(
-    @PrimaryKey val id: String,
+    val id: String,
+    val accountId: String,
     val name: String,
     val type: String,
     val rarity: String,

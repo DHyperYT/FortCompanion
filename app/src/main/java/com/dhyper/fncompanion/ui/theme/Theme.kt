@@ -27,12 +27,35 @@ private val LightColorScheme = DarkColorScheme
 
 @Composable
 fun FortniteCompanionTheme(
-  darkTheme: Boolean = true,
-  content: @Composable () -> Unit,
+    accentColor: String = "Cyan",
+    content: @Composable () -> Unit,
 ) {
-  MaterialTheme(
-    colorScheme = DarkColorScheme,
-    typography = Typography,
-    content = content
-  )
+    val selectedAccent = when (accentColor) {
+        "Primary" -> SleekPrimary
+        "Emerald" -> SleekEmerald
+        "Gold" -> FortniteGold
+        else -> SleekCyan
+    }
+
+    val colorScheme = darkColorScheme(
+        primary = selectedAccent,
+        secondary = selectedAccent,
+        tertiary = SleekEmerald,
+        background = SleekBackground,
+        surface = SleekSurface,
+        surfaceVariant = SleekSurfaceVariant,
+        outline = SleekSurfaceBorder,
+        onPrimary = Color.White,
+        onSecondary = Color.Black,
+        onTertiary = Color.Black,
+        onBackground = SleekTextPrimary,
+        onSurface = SleekTextPrimary,
+        onSurfaceVariant = SleekTextSecondary
+    )
+
+    MaterialTheme(
+        colorScheme = colorScheme,
+        typography = Typography,
+        content = content
+    )
 }

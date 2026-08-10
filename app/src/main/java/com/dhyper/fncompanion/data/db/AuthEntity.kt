@@ -5,8 +5,7 @@ import androidx.room.PrimaryKey
 
 @Entity(tableName = "auth_session")
 data class AuthEntity(
-    @PrimaryKey val id: Int = 1,
-    val accountId: String,
+    @PrimaryKey val accountId: String,
     val displayName: String,
     val accessToken: String,
     val refreshToken: String?,
@@ -16,7 +15,10 @@ data class AuthEntity(
     val accountLevel: Int = 0,
     val seasonalLevel: Int = 0,
     val totalWins: Int = 0,
-    val loginTimeMs: Long = System.currentTimeMillis()
+    val loginTimeMs: Long = System.currentTimeMillis(),
+    val lastRefreshTimeMs: Long = System.currentTimeMillis(),
+    val isActive: Boolean = false,
+    val equippedSkinIcon: String? = null
 )
 
 @Entity(tableName = "recent_player_search")

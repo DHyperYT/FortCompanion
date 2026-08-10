@@ -90,6 +90,7 @@ import com.dhyper.fncompanion.ui.theme.SleekSurfaceVariant
 import com.dhyper.fncompanion.ui.theme.SleekTextMuted
 import com.dhyper.fncompanion.ui.theme.SleekTextPrimary
 import com.dhyper.fncompanion.ui.theme.SleekTextSecondary
+import com.dhyper.fncompanion.ui.utils.SeasonUtils
 import com.dhyper.fncompanion.ui.viewmodels.ShopUiState
 import com.dhyper.fncompanion.ui.viewmodels.ShopViewModel
 
@@ -98,7 +99,6 @@ import com.dhyper.fncompanion.ui.viewmodels.ShopViewModel
 fun ShopScreen(
     viewModel: ShopViewModel,
     cosmeticsViewModel: com.dhyper.fncompanion.ui.viewmodels.CosmeticsViewModel,
-    onNavigateToWishlist: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -109,11 +109,15 @@ fun ShopScreen(
     var selectedSet by remember { mutableStateOf<com.dhyper.fncompanion.data.models.CosmeticSet?>(null) }
 
     val categories = listOf(
-        "All", "Bundles", "Outfit", "Back Bling", "Pickaxe", "Glider", "Emote", "Wrap", 
-        "Contrail", "Music", "Loading Screen", "Emoticon", "Spray", "Sidekick", 
-        "Jam Track", "Banner", "Kicks", "Car", "Car Decal", "Wheels", "Car Trail", 
-        "Car Boost", "Guitar", "Bass", "Drums", "Keytar", "Mic", "Lego Build", 
-        "Lego Decor", "Aura"
+        "All", "Bundles", 
+        // Battle Royale (Primary)
+        "Outfit", "Back Bling", "Pickaxe", "Glider", "Emote", "Wrap", "Contrail", "Music", "Aura",
+        // Vehicles (Rocket Racing) - Grouped Together
+        "Vehicles", "Car", "Car Decal", "Wheels", "Car Trail", "Car Boost",
+        // Festival
+        "Jam Track", "Guitar", "Bass", "Drums", "Keytar", "Mic",
+        // LEGO & Misc
+        "Lego Build", "Lego Decor", "Loading Screen", "Emoticon", "Spray", "Sidekick", "Banner", "Kicks"
     )
 
     Column(
@@ -122,29 +126,16 @@ fun ShopScreen(
             .background(MaterialTheme.colorScheme.background)
             .padding(horizontal = 12.dp)
     ) {
-        // Shop Timer & Wishlist Button
+        // Shop Timer
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(top = 8.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
+            horizontalArrangement = Arrangement.End,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Wishlist Items Button
-            Button(
-                onClick = onNavigateToWishlist,
-                colors = ButtonDefaults.buttonColors(containerColor = SleekPrimary.copy(alpha = 0.1f)),
-                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
-                shape = RoundedCornerShape(8.dp),
-                modifier = Modifier.height(32.dp).border(1.dp, SleekPrimary.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
-            ) {
-                Icon(Icons.Default.Star, contentDescription = null, tint = FortniteGold, modifier = Modifier.size(16.dp))
-                Spacer(modifier = Modifier.width(6.dp))
-                Text("Wishlist Items", color = SleekTextPrimary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-            }
-
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Default.Schedule, contentDescription = null, tint = SleekCyan, modifier = Modifier.size(14.dp))
+                Icon(Icons.Default.Schedule, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(14.dp))
                 Spacer(modifier = Modifier.width(4.dp))
                 Text(
                     text = "Resets in: $countdown",
@@ -305,7 +296,25 @@ fun ShopScreen(
     selectedEntryForDetail?.let { entry ->
         val successState = uiState as? ShopUiState.Success
         val allItems = (entry.items ?: emptyList()) + (entry.brItems ?: emptyList()) + (entry.cars ?: emptyList()) + (entry.vehicles ?: emptyList()) + (entry.instruments ?: emptyList())
-        val isOwned = allItems.all { successState?.ownedIds?.contains(it.id.lowercase()) == true }
+        val tracksAsCosmetics = entry.tracks?.map { t ->
+            val trackMap = t.track as? Map<*, *>
+            val apiCosmeticId = trackMap?.get("id")?.toString()
+            val sidFromDevName = Regex("""sid_[a-zA-Z0-9_]+""").find(t.devName ?: "")?.value
+            val idField = t.id ?: ""
+            val realId = when {
+                !apiCosmeticId.isNullOrBlank() -> apiCosmeticId
+                !sidFromDevName.isNullOrBlank() -> sidFromDevName
+                !idField.startsWith("v2:/") -> idField
+                else -> idField
+            }
+            com.dhyper.fncompanion.data.models.CosmeticItem(
+                id = realId,
+                name = trackMap?.get("title")?.toString() ?: t.title ?: t.devName ?: "Track",
+                description = null, type = null, rarity = null, series = null, images = null, introduction = null, set = null, added = null
+            )
+        } ?: emptyList()
+        val itemsList = allItems + tracksAsCosmetics
+        val isOwned = itemsList.isNotEmpty() && itemsList.all { successState?.ownedIds?.contains(it.id.lowercase()) == true }
         
         val videoId by cosmeticsViewModel.selectedVideoId.collectAsState()
         val isSearchingVideo by cosmeticsViewModel.isSearchingVideo.collectAsState()
@@ -515,11 +524,15 @@ private fun getShopEntryImage(entry: ShopEntry): String? {
 
 @Composable
 fun ShopCategoryHeader(category: String) {
-    Column(modifier = Modifier.padding(top = 16.dp, bottom = 8.dp)) {
+    val isModeHeader = category.contains("Racing", ignoreCase = true) || 
+                      category.contains("Festival", ignoreCase = true) || 
+                      category.contains("LEGO", ignoreCase = true)
+    
+    Column(modifier = Modifier.padding(top = 24.dp, bottom = 12.dp)) {
         Text(
             text = category.uppercase(),
-            style = MaterialTheme.typography.titleMedium,
-            color = SleekCyan,
+            style = if (isModeHeader) MaterialTheme.typography.headlineSmall else MaterialTheme.typography.titleMedium,
+            color = if (isModeHeader) SleekEmerald else SleekCyan,
             fontWeight = FontWeight.Black,
             letterSpacing = 1.sp
         )
@@ -527,8 +540,8 @@ fun ShopCategoryHeader(category: String) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(2.dp)
-                .background(Brush.horizontalGradient(listOf(SleekCyan, Color.Transparent)))
+                .height(if (isModeHeader) 3.dp else 2.dp)
+                .background(Brush.horizontalGradient(listOf(if (isModeHeader) SleekEmerald else SleekCyan, Color.Transparent)))
         )
     }
 }
@@ -543,7 +556,14 @@ fun ShopItemCard(
     onWishlistToggle: (com.dhyper.fncompanion.data.models.CosmeticItem) -> Unit,
     onClick: () -> Unit
 ) {
-    val allItems = (entry.items ?: emptyList()) + (entry.brItems ?: emptyList()) + (entry.cars ?: emptyList()) + (entry.vehicles ?: emptyList()) + (entry.instruments ?: emptyList())
+    val trackItems = entry.tracks?.map { t ->
+        val trackMap = t.track as? Map<*, *>
+        val apiCosmeticId = trackMap?.get("id")?.toString()
+        val realId = apiCosmeticId ?: t.id ?: ""
+        com.dhyper.fncompanion.data.models.CosmeticItem(id = realId, name = t.title ?: "", description = null, type = null, rarity = null, series = null, images = null, introduction = null, set = null, added = null)
+    } ?: emptyList()
+
+    val allItems = (entry.items ?: emptyList()) + (entry.brItems ?: emptyList()) + (entry.cars ?: emptyList()) + (entry.vehicles ?: emptyList()) + (entry.instruments ?: emptyList()) + trackItems
     val firstItem = allItems.firstOrNull()
     
     val title = getShopEntryTitle(entry)
@@ -715,7 +735,8 @@ fun ShopItemCard(
                         .size(30.dp)
                         .background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
                 ) {
-                    val isWishlisted = wishlistIds.contains(firstItem.id)
+                    val isWishlisted = wishlistIds.any { it.equals(firstItem.id, ignoreCase = true) } || 
+                                       wishlistIds.any { it.equals(firstItem.id.replace("sid_", ""), ignoreCase = true) }
                     Icon(
                         imageVector = if (isWishlisted) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
                         contentDescription = "Wishlist",
@@ -725,6 +746,14 @@ fun ShopItemCard(
                 }
             }
         }
+    }
+}
+
+@Composable
+fun DetailRow(label: String, value: String) {
+    Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+        Text(label, modifier = Modifier.width(100.dp), color = SleekTextMuted, fontSize = 13.sp)
+        Text(value, color = SleekTextPrimary, fontSize = 13.sp)
     }
 }
 
@@ -745,6 +774,22 @@ fun ShopItemDetailSheet(
     // Add tracks to the items list for display
     val tracksAsCosmetics = entry.tracks?.map { t ->
         val trackMap = t.track as? Map<*, *>
+        
+        // 1. Try to get cosmetic ID from the nested track metadata first
+        val apiCosmeticId = trackMap?.get("id")?.toString()
+        
+        // 2. Try to extract sid_ from devName (very reliable for Jam Tracks)
+        val sidFromDevName = Regex("""sid_[a-zA-Z0-9_]+""").find(t.devName ?: "")?.value
+        
+        // 3. Fallback to the ID field only if it doesn't look like an offer ID
+        val idField = t.id ?: ""
+        val realId = when {
+            !apiCosmeticId.isNullOrBlank() -> apiCosmeticId
+            !sidFromDevName.isNullOrBlank() -> sidFromDevName
+            !idField.startsWith("v2:/") -> idField
+            else -> idField
+        }
+        
         val title = trackMap?.get("title")?.toString() ?: t.title ?: t.devName ?: "Track"
         val artist = trackMap?.get("artist")?.toString() ?: t.artist ?: "Unknown Artist"
         val album = trackMap?.get("album")?.toString() ?: t.album
@@ -756,7 +801,7 @@ fun ShopItemDetailSheet(
         val albumName = if (album.isNullOrBlank() || album.contains("unknown", ignoreCase = true)) "" else " from $album"
         
         com.dhyper.fncompanion.data.models.CosmeticItem(
-            id = t.id ?: "",
+            id = realId,
             name = title,
             description = "Jam Track by $artist$albumName",
             type = com.dhyper.fncompanion.data.models.CosmeticType("Track", "Jam Track"),
@@ -774,17 +819,15 @@ fun ShopItemDetailSheet(
         )
     } ?: emptyList()
 
-    val firstItem = allItems.firstOrNull()
+    val itemsList = allItems + tracksAsCosmetics
+    val firstItem = itemsList.firstOrNull()
     val rarityName = firstItem?.rarity?.value ?: firstItem?.series?.value ?: if (!entry.tracks.isNullOrEmpty()) "Festival" else "Common"
     val rarityColor = getRarityColor(rarityName)
     val price = entry.finalPrice ?: entry.regularPrice ?: 0
     val title = getShopEntryTitle(entry)
     val imageUrl = getShopEntryImage(entry)
-    val itemsList = allItems + tracksAsCosmetics
     
-    val skin = allItems.find { it.type?.value?.equals("outfit", ignoreCase = true) == true }
-    val isBundle = (entry.bundle != null || title.contains("Bundle", ignoreCase = true) || itemsList.size > 1) && 
-                   (skin == null || !title.trim().equals(skin.name.trim(), ignoreCase = true) || itemsList.size > 1)
+    val isRealBundle = entry.bundle != null || itemsList.size > 1 || title.contains("Bundle", ignoreCase = true)
 
     Column(
         modifier = Modifier
@@ -813,23 +856,23 @@ fun ShopItemDetailSheet(
                 )
             }
             
-            // Wishlist toggle in detail view - Disabled for bundles
-            if (!isOwned && firstItem != null && onWishlistToggle != null && !isBundle) {
-                IconButton(
-                    onClick = { onWishlistToggle(firstItem) },
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(12.dp)
-                        .background(Color.Black.copy(alpha = 0.5f), CircleShape)
-                ) {
-                    val isWishlisted = wishlistIds.contains(firstItem.id)
-                    Icon(
-                        imageVector = if (isWishlisted) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                        contentDescription = "Wishlist",
-                        tint = if (isWishlisted) Color.Red else Color.White
-                    )
-                }
-            }
+                    // Wishlist toggle in detail view - Disabled for bundles
+                    if (!isOwned && firstItem != null && onWishlistToggle != null && !isRealBundle) {
+                        IconButton(
+                            onClick = { onWishlistToggle(firstItem) },
+                            modifier = Modifier
+                                .align(Alignment.TopEnd)
+                                .padding(12.dp)
+                                .background(Color.Black.copy(alpha = 0.5f), CircleShape)
+                        ) {
+                            val isWishlisted = wishlistIds.any { it.equals(firstItem.id, ignoreCase = true) }
+                            Icon(
+                                imageVector = if (isWishlisted) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                                contentDescription = "Wishlist",
+                                tint = if (isWishlisted) Color.Red else Color.White
+                            )
+                        }
+                    }
         }
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -874,8 +917,62 @@ fun ShopItemDetailSheet(
                 text = intro,
                 style = MaterialTheme.typography.labelMedium,
                 color = SleekCyan,
-                modifier = Modifier.padding(bottom = 12.dp)
+                modifier = Modifier.padding(bottom = 8.dp)
             )
+        }
+
+        // --- ENHANCED DETAILS (Locker/Wishlist Style) ---
+        if (!isRealBundle) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 8.dp)
+                    .background(SleekSurfaceVariant.copy(alpha = 0.5f), RoundedCornerShape(12.dp))
+                    .padding(12.dp)
+            ) {
+                val item = itemsList.firstOrNull()
+                DetailRow("Item ID", item?.id ?: "Unknown")
+                
+                // Jam Track Metadata - ONLY if not a bundle
+                if (entry.tracks?.isNotEmpty() == true) {
+                    val t = entry.tracks!!.first()
+                    val trackMap = t.track as? Map<*, *>
+                    val bpm = (trackMap?.get("bpm") as? Number)?.toInt() ?: t.bpm
+                    val duration = (trackMap?.get("duration") as? Number)?.toInt() ?: t.duration
+                    
+                    bpm?.let { DetailRow("BPM", it.toString()) }
+                    duration?.let { 
+                        val mins = it / 60
+                        val secs = it % 60
+                        DetailRow("Duration", String.format(java.util.Locale.US, "%d:%02d", mins, secs))
+                    }
+                }
+
+                item?.introduction?.let {
+                    DetailRow("Introduced", SeasonUtils.getFormattedIntroduction(it.chapter, it.season))
+                }
+                
+                item?.set?.text?.let { DetailRow("Set", it) }
+                item?.added?.let { DetailRow("Added", it.substringBefore("T")) }
+                
+                // Ownership Price Badge
+                Spacer(modifier = Modifier.height(8.dp))
+                if (isOwned) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.CheckCircle, null, tint = SleekEmerald, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("OWNED", color = SleekEmerald, fontWeight = FontWeight.Black, fontSize = 13.sp)
+                    }
+                } else {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(modifier = Modifier.size(16.dp).background(FortniteGold, CircleShape), contentAlignment = Alignment.Center) {
+                            Text("V", color = Color.Black, fontSize = 9.sp, fontWeight = FontWeight.Black)
+                        }
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("$price V-Bucks", color = FortniteGold, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                    }
+                }
+            }
         }
 
         // --- SINGLE ITEM JAM TRACK OR MUSIC PACK SUPPORT ---
@@ -1000,21 +1097,46 @@ fun ShopItemDetailSheet(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    modifier = Modifier
-                        .size(24.dp)
-                        .background(FortniteGold, CircleShape),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text("V", color = Color.Black, fontSize = 14.sp, fontWeight = FontWeight.Black)
+                if (isOwned) {
+                    Icon(Icons.Default.CheckCircle, contentDescription = null, tint = SleekEmerald, modifier = Modifier.size(24.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "OWNED",
+                        style = MaterialTheme.typography.titleLarge,
+                        color = SleekEmerald,
+                        fontWeight = FontWeight.Black
+                    )
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .size(24.dp)
+                            .background(FortniteGold, CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("V", color = Color.Black, fontSize = 14.sp, fontWeight = FontWeight.Black)
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    
+                    val ownedCount = itemsList.count { ownedIds.contains(it.id.lowercase()) }
+                    val hasDiscount = isRealBundle && ownedCount > 0
+                    
+                    Column {
+                        Text(
+                            text = "$price V-Bucks",
+                            style = MaterialTheme.typography.titleLarge,
+                            color = if (hasDiscount) SleekEmerald else FortniteGold,
+                            fontWeight = FontWeight.Bold
+                        )
+                        if (hasDiscount) {
+                            Text(
+                                text = "Reduced Price (Owned $ownedCount/${itemsList.size})",
+                                fontSize = 10.sp,
+                                color = SleekEmerald,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
                 }
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = "$price V-Bucks",
-                    style = MaterialTheme.typography.titleLarge,
-                    color = FortniteGold,
-                    fontWeight = FontWeight.Bold
-                )
             }
 
             Button(

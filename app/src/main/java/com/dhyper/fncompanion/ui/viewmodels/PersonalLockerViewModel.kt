@@ -163,7 +163,9 @@ class PersonalLockerViewModel(
         val filtered = list.filter { item ->
             val matchCat = category == null || item.category == category
             val matchFav = !favsOnly || item.isFavorite
-            val matchQuery = query.isBlank() || item.name.contains(query, ignoreCase = true)
+            val matchQuery = query.isBlank() || 
+                             item.name.contains(query, ignoreCase = true) ||
+                             item.artist?.contains(query, ignoreCase = true) == true
             matchCat && matchFav && matchQuery
         }
 

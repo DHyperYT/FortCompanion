@@ -191,4 +191,26 @@ data class StwReward(
     val rarity: String = "Common"
 )
 
+// --- QUEST MODELS ---
+data class FortniteQuest(
+    val id: String,
+    val templateId: String,
+    val name: String,
+    val description: String?,
+    val category: String?,
+    val progress: Int,
+    val target: Int,
+    val isCompleted: Boolean,
+    val objectives: List<QuestObjective> = emptyList(),
+    val rewardXp: Int = 0,
+    val expiry: String? = null
+)
+
+data class QuestObjective(
+    val id: String,
+    val description: String,
+    val current: Int,
+    val target: Int
+)
+
 

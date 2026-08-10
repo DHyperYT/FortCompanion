@@ -45,4 +45,7 @@ interface FortnitePublicApi {
 
     @GET("v2/playlists")
     suspend fun getPlaylists(): com.dhyper.fncompanion.data.models.PlaylistsResponse
+
+    @GET("v2/aes")
+    suspend fun getAes(): com.dhyper.fncompanion.data.models.AesResponse
 }

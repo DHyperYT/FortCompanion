@@ -42,9 +42,11 @@ import com.dhyper.fncompanion.ui.viewmodels.CosmeticsViewModel
 @Composable
 fun CosmeticsScreen(
     viewModel: CosmeticsViewModel,
+    shopViewModel: com.dhyper.fncompanion.ui.viewmodels.ShopViewModel? = null,
     modifier: Modifier = Modifier
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val shopState by shopViewModel?.uiState?.collectAsState() ?: remember { mutableStateOf(null) }
     var selectedCosmetic by remember { mutableStateOf<CosmeticItem?>(null) }
     var selectedSet by remember { mutableStateOf<CosmeticSet?>(null) }
     
@@ -187,10 +189,14 @@ fun CosmeticsScreen(
                     ) {
                         items(state.filteredItems) { item ->
                             val isOwned = state.ownedIds.contains(item.id.lowercase())
+                            val isWishlisted = state.wishlistIds.any { it.equals(item.id, ignoreCase = true) }
+                            val inShop = viewModel.isItemInShop(item.id, shopState)
+
                             CosmeticBrowserCard(
                                 item = item,
-                                isWishlisted = state.wishlistIds.contains(item.id),
+                                isWishlisted = isWishlisted,
                                 isOwned = isOwned,
+                                inShop = inShop,
                                 onWishlistToggle = { viewModel.toggleWishlist(item) },
                                 onClick = { selectedCosmetic = item }
                             )
@@ -228,10 +234,13 @@ fun CosmeticsScreen(
             sheetState = rememberModalBottomSheetState(),
             containerColor = SleekSurface
         ) {
+            val isOwned = state?.ownedIds?.contains(item.id.lowercase()) ?: false
+            val isWishlisted = state?.wishlistIds?.any { it.equals(item.id, ignoreCase = true) } ?: false
+            
             CosmeticDetailSheet(
                 item = item,
-                isOwned = state?.ownedIds?.contains(item.id.lowercase()) ?: false,
-                isWishlisted = state?.wishlistIds?.contains(item.id) ?: false,
+                isOwned = isOwned,
+                isWishlisted = isWishlisted,
                 videoId = videoId,
                 isSearchingVideo = isSearchingVideo,
                 onWishlistToggle = { viewModel.toggleWishlist(item) },
@@ -500,6 +509,7 @@ fun CosmeticBrowserCard(
     item: CosmeticItem,
     isWishlisted: Boolean,
     isOwned: Boolean,
+    inShop: Boolean = false,
     onWishlistToggle: () -> Unit,
     onClick: () -> Unit
 ) {
@@ -512,7 +522,7 @@ fun CosmeticBrowserCard(
         modifier = Modifier
             .fillMaxWidth()
             .clickable { onClick() }
-            .border(1.dp, if(isOwned) Color.Gray.copy(alpha = 0.3f) else SleekSurfaceBorder, RoundedCornerShape(12.dp)),
+            .border(1.dp, if(isOwned) Color.Gray.copy(alpha = 0.3f) else if(inShop) FortniteGold else SleekSurfaceBorder, RoundedCornerShape(12.dp)),
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(containerColor = if (isOwned) SleekSurface.copy(alpha = 0.5f) else SleekSurface)
     ) {
@@ -557,6 +567,16 @@ fun CosmeticBrowserCard(
                                 textAlign = TextAlign.Center,
                                 modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)
                             )
+                        }
+                    } else if (inShop) {
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.TopStart)
+                                .padding(6.dp)
+                                .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(4.dp))
+                                .padding(horizontal = 4.dp, vertical = 2.dp)
+                        ) {
+                            Text("IN SHOP", color = Color.Black, fontSize = 8.sp, fontWeight = FontWeight.Black)
                         }
                     }
                 }

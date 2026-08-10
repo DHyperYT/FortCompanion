@@ -37,7 +37,10 @@ object SeasonUtils {
     
     fun getFormattedIntroduction(chapterStr: String?, seasonStr: String?): String {
         val chapter = chapterStr?.toIntOrNull() ?: 1
-        val season = seasonStr?.toIntOrNull() ?: 1
+        val season = when {
+            seasonStr?.equals("X", ignoreCase = true) == true -> 10
+            else -> seasonStr?.toIntOrNull() ?: 1
+        }
         val globalNum = getGlobalSeasonNumber(chapter, season)
         return formatSeasonName(globalNum)
     }

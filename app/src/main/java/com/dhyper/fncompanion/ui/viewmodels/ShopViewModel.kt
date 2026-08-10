@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.dhyper.fncompanion.data.models.ShopData
 import com.dhyper.fncompanion.data.models.ShopEntry
+import com.dhyper.fncompanion.data.db.SettingsDao
 import com.dhyper.fncompanion.data.db.WishlistDao
 import com.dhyper.fncompanion.data.db.WishlistEntity
 import com.dhyper.fncompanion.data.repository.AuthRepository
@@ -33,7 +34,8 @@ class ShopViewModel(
     private val repository: FortniteRepository = FortniteRepository(),
     private val epicAccountRepo: EpicAccountRepository = EpicAccountRepository(),
     private val authRepo: AuthRepository,
-    private val wishlistDao: WishlistDao
+    private val wishlistDao: WishlistDao,
+    private val settingsDao: com.dhyper.fncompanion.data.db.SettingsDao
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<ShopUiState>(ShopUiState.Loading)
@@ -48,15 +50,15 @@ class ShopViewModel(
     val countdown: StateFlow<String> = _countdown.asStateFlow()
 
     private val _ownedIds = MutableStateFlow<Set<String>>(emptySet())
-    private val _wishlistIds = wishlistDao.getAllWishlistedItems()
-        .map { list -> list.map { it.id }.toSet() }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptySet())
+    private val _wishlistIds = MutableStateFlow<Set<String>>(emptySet())
+    val wishlistIds: StateFlow<Set<String>> = _wishlistIds.asStateFlow()
 
     private var currentShopData: ShopData? = null
 
     init {
         startCountdown()
         observeWishlistCleanup()
+        observeAccountChanges()
         
         // Main UI State Pipeline
         combine(_searchQuery, _selectedCategory, _wishlistIds, _ownedIds) { query, cat, wishlist, owned ->
@@ -68,7 +70,33 @@ class ShopViewModel(
             val setPrices = mutableMapOf<String, Pair<Int, Set<String>>>()
 
             allEntries.forEach { entry ->
-                val items = (entry.items ?: emptyList()) + (entry.brItems ?: emptyList())
+                val trackItems = entry.tracks?.map { t ->
+                    val trackMap = t.track as? Map<*, *>
+                    val apiCosmeticId = trackMap?.get("id")?.toString()
+                    val sidFromDevName = Regex("""sid_[a-zA-Z0-9_]+""").find(t.devName ?: "")?.value
+                    val idField = t.id ?: ""
+                    
+                    val realId = when {
+                        !apiCosmeticId.isNullOrBlank() -> apiCosmeticId
+                        !sidFromDevName.isNullOrBlank() -> sidFromDevName
+                        !idField.startsWith("v2:/") -> idField
+                        else -> idField
+                    }
+                    
+                    com.dhyper.fncompanion.data.models.CosmeticItem(
+                        id = realId,
+                        name = t.title ?: t.devName ?: "Track",
+                        description = "", type = null, rarity = null, series = null, images = null, introduction = null, set = null, added = null
+                    )
+                } ?: emptyList()
+
+                val items = (entry.items ?: emptyList()) + 
+                           (entry.brItems ?: emptyList()) + 
+                           (entry.cars ?: emptyList()) + 
+                           (entry.vehicles ?: emptyList()) + 
+                           (entry.instruments ?: emptyList()) +
+                           trackItems
+
                 val p = entry.finalPrice ?: entry.regularPrice ?: 0
                 val t = getShopEntryTitleInternal(entry)
                 val sk = items.find { it.type?.value?.equals("outfit", ignoreCase = true) == true }
@@ -95,16 +123,44 @@ class ShopViewModel(
         loadShop()
     }
 
+    private fun observeAccountChanges() {
+        viewModelScope.launch {
+            authRepo.authSession.collectLatest { session ->
+                // Force a full reload to update "OWNED" status
+                loadShop()
+
+                if (session != null) {
+                    val settings = settingsDao.getSettingsDirect()
+                    if (settings?.useUniversalWishlist == true) {
+                        wishlistDao.getUniversalWishlist().collect { list ->
+                            _wishlistIds.value = list.map { it.id }.toSet()
+                        }
+                    } else {
+                        wishlistDao.getAllWishlistedItems(session.accountId).collect { list ->
+                            _wishlistIds.value = list.map { it.id }.toSet()
+                        }
+                    }
+                } else {
+                    _ownedIds.value = emptySet()
+                    _wishlistIds.value = emptySet()
+                }
+            }
+        }
+    }
+
     private fun observeWishlistCleanup() {
         viewModelScope.launch {
-            combine(_wishlistIds, _ownedIds) { wishlist, owned ->
-                // Case-insensitive intersection check
-                val ownedLower = owned.map { it.lowercase() }.toSet()
-                wishlist.filter { it.lowercase() in ownedLower }
-            }.collect { ownedWishlisted ->
-                if (ownedWishlisted.isNotEmpty()) {
-                    ownedWishlisted.forEach { id ->
-                        wishlistDao.removeFromWishlist(id)
+            authRepo.authSession.collectLatest { session ->
+                if (session == null) return@collectLatest
+                
+                combine(_wishlistIds, _ownedIds) { wishlist, owned ->
+                    val ownedLower = owned.map { it.lowercase() }.toSet()
+                    wishlist.filter { it.lowercase() in ownedLower }
+                }.collect { ownedWishlisted ->
+                    if (ownedWishlisted.isNotEmpty()) {
+                        ownedWishlisted.forEach { id ->
+                            wishlistDao.removeFromWishlist(id, session.accountId)
+                        }
                     }
                 }
             }
@@ -179,10 +235,50 @@ class ShopViewModel(
 
     private fun sortEntries(entries: List<ShopEntry>): List<ShopEntry> {
         return entries.sortedWith(
-            compareBy<ShopEntry> { it.section?.index ?: it.layout?.index ?: Int.MAX_VALUE }
-                .thenByDescending { it.section?.landingPriority ?: 0 }
-                .thenBy { it.section?.name ?: it.layout?.name ?: "Special Offers" }
-                .thenBy { it.devName ?: "" }
+            compareBy<ShopEntry> { entry ->
+                val allItems = (entry.items ?: emptyList()) + 
+                              (entry.brItems ?: emptyList()) + 
+                              (entry.cars ?: emptyList()) + 
+                              (entry.vehicles ?: emptyList()) + 
+                              (entry.instruments ?: emptyList())
+                
+                val sectionName = entry.section?.name?.lowercase() ?: ""
+                val layoutCategory = entry.layout?.category?.lowercase() ?: ""
+                val entryCategories = entry.categories?.map { it.lowercase() } ?: emptyList()
+                
+                // Detection for dedicated mode sections
+                val isJamTrackSection = sectionName.contains("festival") || sectionName.contains("jam") || 
+                                        layoutCategory.contains("jam") || entryCategories.contains("jamtracks")
+                                 
+                val isVehicleSection = sectionName.contains("racing") || sectionName.contains("car") || 
+                                      sectionName.contains("vehicle") || layoutCategory.contains("car") || 
+                                      layoutCategory.contains("vehicle") || entryCategories.contains("cars")
+                
+                // Item content detection
+                val hasJamTrack = !entry.tracks.isNullOrEmpty() || allItems.any { it.id.startsWith("sid_", ignoreCase = true) }
+                val hasVehicle = !entry.cars.isNullOrEmpty() || !entry.vehicles.isNullOrEmpty() || 
+                               allItems.any { it.id.startsWith("CarBody_", ignoreCase = true) || it.id.startsWith("ID_Body_", ignoreCase = true) || 
+                                             it.id.startsWith("CarSkin_", ignoreCase = true) || it.id.startsWith("ID_Skin_", ignoreCase = true) || 
+                                             it.id.startsWith("Wheel_", ignoreCase = true) || it.id.startsWith("ID_Wheel_", ignoreCase = true) || 
+                                             it.id.startsWith("ID_DriftTrail_", ignoreCase = true) || it.id.startsWith("ID_Booster_", ignoreCase = true) }
+
+                // Improved: Identify PURE Rocket Racing sections
+                val isPureVehicle = hasVehicle && !hasJamTrack && allItems.all { 
+                    it.id.startsWith("Car", ignoreCase = true) || it.id.startsWith("ID_Body", ignoreCase = true) || 
+                    it.id.startsWith("ID_Skin", ignoreCase = true) || it.id.startsWith("Wheel", ignoreCase = true) || 
+                    it.id.startsWith("ID_Wheel", ignoreCase = true) || it.id.startsWith("ID_Drift", ignoreCase = true) || 
+                    it.id.startsWith("ID_Booster", ignoreCase = true) || it.type?.value?.contains("car", ignoreCase = true) == true
+                }
+
+                when {
+                    isPureVehicle || (hasVehicle && isVehicleSection) -> 2 // Vehicles -> Bottom
+                    hasJamTrack && isJamTrackSection -> 1 // Jam Tracks -> Above Vehicles
+                    else -> 0 // Everything else -> Top
+                }
+            }
+            .thenBy { it.section?.index ?: Int.MAX_VALUE }
+            .thenBy { it.layout?.index ?: Int.MAX_VALUE }
+            .thenBy { it.devName ?: "" }
         )
     }
 
@@ -195,15 +291,25 @@ class ShopViewModel(
     }
 
     fun toggleWishlist(item: com.dhyper.fncompanion.data.models.CosmeticItem) {
-        if (_ownedIds.value.contains(item.id.lowercase())) return
+        val itemId = item.id.lowercase()
+        if (_ownedIds.value.contains(itemId)) return
 
         viewModelScope.launch {
-            if (_wishlistIds.value.contains(item.id)) {
-                wishlistDao.removeFromWishlist(item.id)
+            val session = authRepo.getValidSession() ?: return@launch
+            val settings = settingsDao.getSettingsDirect()
+            val useUniversal = settings?.useUniversalWishlist == true
+            
+            val targetAccountId = if (useUniversal) "GLOBAL" else session.accountId
+            
+            val wishlistSet = _wishlistIds.value.map { it.lowercase() }.toSet()
+            if (wishlistSet.contains(itemId)) {
+                val originalId = _wishlistIds.value.find { it.lowercase() == itemId } ?: item.id
+                wishlistDao.removeFromWishlist(originalId, targetAccountId)
             } else {
                 wishlistDao.addToWishlist(
                     WishlistEntity(
                         id = item.id,
+                        accountId = targetAccountId,
                         name = item.name,
                         type = item.type?.displayValue ?: "Other",
                         rarity = item.rarity?.value ?: "Rare",
@@ -216,7 +322,28 @@ class ShopViewModel(
 
     private fun filterEntries(entries: List<ShopEntry>, category: String, query: String, wishlist: Set<String>): List<ShopEntry> {
         return entries.filter { entry ->
-            val allItems = (entry.items ?: emptyList()) + (entry.brItems ?: emptyList()) + (entry.cars ?: emptyList()) + (entry.vehicles ?: emptyList()) + (entry.instruments ?: emptyList())
+            val trackIds = entry.tracks?.map { t ->
+                val trackMap = t.track as? Map<*, *>
+                val apiCosmeticId = trackMap?.get("id")?.toString()
+                val sidFromDevName = Regex("""sid_[a-zA-Z0-9_]+""").find(t.devName ?: "")?.value
+                val idField = t.id ?: ""
+                
+                when {
+                    !apiCosmeticId.isNullOrBlank() -> apiCosmeticId
+                    !sidFromDevName.isNullOrBlank() -> sidFromDevName
+                    !idField.startsWith("v2:/") -> idField
+                    else -> idField
+                }
+            } ?: emptyList()
+            
+            val allItems = (entry.items ?: emptyList()) + 
+                          (entry.brItems ?: emptyList()) + 
+                          (entry.cars ?: emptyList()) + 
+                          (entry.vehicles ?: emptyList()) + 
+                          (entry.instruments ?: emptyList()) +
+                          trackIds.map { id -> 
+                              com.dhyper.fncompanion.data.models.CosmeticItem(id = id, name = "", description = null, type = null, rarity = null, series = null, images = null, introduction = null, set = null, added = null)
+                          }
             val title = getShopEntryTitleInternal(entry)
             val skin = allItems.find { it.type?.value?.equals("outfit", ignoreCase = true) == true }
             val isBundle = (entry.bundle != null || title.contains("Bundle", ignoreCase = true)) && 
@@ -238,6 +365,11 @@ class ShopViewModel(
                 "Spray" -> allItems.any { it.id.contains("SPID_", ignoreCase = true) || it.id.contains("Spray_", ignoreCase = true) }
                 "Sidekick" -> allItems.any { it.id.startsWith("Companion_", ignoreCase = true) && !it.id.contains("reactfx", ignoreCase = true) && !it.id.contains("vtid", ignoreCase = true) }
                 "Jam Track" -> !entry.tracks.isNullOrEmpty() || allItems.any { it.id.startsWith("sid_", ignoreCase = true) }
+                "Vehicles" -> !entry.cars.isNullOrEmpty() || !entry.vehicles.isNullOrEmpty() || 
+                             allItems.any { it.id.startsWith("CarBody_", ignoreCase = true) || it.id.startsWith("ID_Body_", ignoreCase = true) || 
+                                           it.id.startsWith("CarSkin_", ignoreCase = true) || it.id.startsWith("ID_Skin_", ignoreCase = true) || 
+                                           it.id.startsWith("Wheel_", ignoreCase = true) || it.id.startsWith("ID_Wheel_", ignoreCase = true) || 
+                                           it.id.startsWith("ID_DriftTrail_", ignoreCase = true) || it.id.startsWith("ID_Booster_", ignoreCase = true) }
                 "Banner" -> allItems.any { it.id.startsWith("BRS", ignoreCase = false) || it.id.startsWith("Banner_", ignoreCase = true) }
                 "Kicks" -> allItems.any { it.id.startsWith("Shoes_", ignoreCase = true) }
                 "Car" -> allItems.any { it.id.startsWith("CarBody_", ignoreCase = true) || it.id.startsWith("ID_Body_", ignoreCase = true) }

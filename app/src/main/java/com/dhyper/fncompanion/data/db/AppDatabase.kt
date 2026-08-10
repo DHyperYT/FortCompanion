@@ -6,13 +6,14 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 
 @Database(
-    entities = [AuthEntity::class, RecentSearchEntity::class, WishlistEntity::class, PastSeasonEntity::class],
-    version = 4,
+    entities = [AuthEntity::class, RecentSearchEntity::class, WishlistEntity::class, PastSeasonEntity::class, SettingsEntity::class],
+    version = 7,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun authDao(): AuthDao
     abstract fun wishlistDao(): WishlistDao
+    abstract fun settingsDao(): SettingsDao
 
     companion object {
         @Volatile

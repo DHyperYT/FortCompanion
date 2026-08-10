@@ -24,7 +24,14 @@ class YouTubeRepository {
             val videoRendererRegex = Regex(""""videoRenderer":\{"videoId":"([^"]+)"""")
             val match = videoRendererRegex.find(html)
             
-            match?.groupValues?.get(1)
+            val videoId = match?.groupValues?.get(1)
+            
+            // Log for debugging (if needed)
+            if (videoId != null) {
+                android.util.Log.d("YouTubeSearch", "Found direct video ID: $videoId for query: $query")
+            }
+            
+            videoId
         } catch (e: Exception) {
             null
         }

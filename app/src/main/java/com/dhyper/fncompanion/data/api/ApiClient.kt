@@ -38,4 +38,13 @@ object ApiClient {
             .build()
             .create(EpicAccountApi::class.java)
     }
+
+    val centralApi: CentralApi by lazy {
+        Retrofit.Builder()
+            .baseUrl("https://fortnite-central.app/")
+            .client(okHttpClient)
+            .addConverterFactory(MoshiConverterFactory.create(moshi))
+            .build()
+            .create(CentralApi::class.java)
+    }
 }

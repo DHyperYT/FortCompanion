@@ -68,6 +68,11 @@ interface EpicAccountApi {
         @Body body: Map<String, String>
     ): McpQueryResponse
 
+    @GET("https://account-public-service-prod03.ol.epicgames.com/account/api/oauth/exchange")
+    suspend fun getExchangeCode(
+        @Header("Authorization") bearerToken: String
+    ): Map<String, Any?>
+
     @GET("https://fortnite-public-service-prod11.ol.epicgames.com/fortnite/api/game/v2/world/info")
     suspend fun getStwWorldInfo(
         @Header("Authorization") bearerToken: String,

@@ -41,6 +41,37 @@ class EpicAccountRepository {
         )
     }
 
+    suspend fun fetchEquippedSkinIcon(accessToken: String, accountId: String): String? {
+        return try {
+            val response = api.queryMcpProfile(
+                bearerToken = "Bearer $accessToken",
+                accountId = accountId,
+                profileId = "athena"
+            )
+            val profile = response.profileChanges?.firstOrNull()?.profile
+            val items = profile?.items ?: emptyMap()
+            val stats = profile?.stats?.attributes ?: emptyMap()
+
+            // 1. Find the active loadout
+            val loadouts = items.filter { it.value.templateId.startsWith("AthenaCosmeticLoadout:", ignoreCase = true) }
+            val activeLoadoutId = stats["active_loadout_id"]?.toString() ?: loadouts.keys.firstOrNull()
+            
+            val loadout = items[activeLoadoutId]
+            val characterId = loadout?.attributes?.get("character_slot")?.toString() ?: ""
+            
+            val characterItem = items[characterId]
+            val templateId = characterItem?.templateId ?: "AthenaCharacter:CID_001_Athena_Character_Default"
+            
+            val cosmeticId = extractCosmeticId(templateId)
+            val apiMap = getCosmeticsMap()
+            val apiDetails = cosmeticId?.let { apiMap[it.lowercase()] }
+            
+            apiDetails?.images?.icon ?: apiDetails?.images?.smallIcon
+        } catch (e: Exception) {
+            null
+        }
+    }
+
     suspend fun fetchVBucksBalance(accessToken: String, accountId: String): Result<Long> {
         return try {
             val response = api.queryMcpProfile(
@@ -252,6 +283,198 @@ class EpicAccountRepository {
             Result.success(Triple(accountLevel, seasonalLevel, lifetimeWins))
         } catch (e: Exception) {
             Result.failure(e)
+        }
+    }
+
+    suspend fun fetchQuests(
+        accessToken: String,
+        accountId: String
+    ): Result<List<com.dhyper.fncompanion.data.models.FortniteQuest>> = coroutineScope {
+        return@coroutineScope try {
+            // 1. Fetch Global Challenge Mappings (Cached in FortniteRepository)
+            val mappingsResult = FortniteRepository().fetchChallenges()
+            val bundlesMap = mappingsResult.getOrDefault(emptyList())
+            val challengeLookup = mutableMapOf<String, com.dhyper.fncompanion.data.models.ChallengeDefinition>()
+            val bundleNameLookup = mutableMapOf<String, String>()
+
+            bundlesMap.forEach { bundle ->
+                bundleNameLookup[bundle.id.lowercase()] = bundle.name ?: "Unknown Bundle"
+                bundle.challenges?.forEach { challenge ->
+                    challengeLookup[challenge.id.lowercase()] = challenge
+                }
+            }
+
+            // 2. Fetch User Quests from MCP
+            val profiles = listOf("athena", "common_core")
+            val deferred = profiles.map { profileId ->
+                async {
+                    try {
+                        api.queryMcpProfile(
+                            bearerToken = "Bearer $accessToken",
+                            accountId = accountId,
+                            profileId = profileId
+                        )
+                    } catch (e: Exception) {
+                        null
+                    }
+                }
+            }
+
+            val responses = deferred.awaitAll()
+            val allQuests = mutableListOf<com.dhyper.fncompanion.data.models.FortniteQuest>()
+
+            responses.filterNotNull().forEach { response ->
+                val items = response.profileChanges?.firstOrNull()?.profile?.items ?: return@forEach
+
+                items.forEach { (id, data) ->
+                    val tid = data.templateId
+                    if (tid.startsWith("Quest:", ignoreCase = true) || 
+                        tid.startsWith("Challenge:", ignoreCase = true) ||
+                        tid.contains("_Quest_", ignoreCase = true)) {
+                        
+                        val attrs = data.attributes ?: emptyMap()
+                        val state = attrs["quest_state"]?.toString() ?: attrs["status"]?.toString() ?: "Active"
+                        if (state.equals("claimed", ignoreCase = true)) return@forEach
+
+                        val isCompleted = state.equals("completed", ignoreCase = true)
+                        
+                        // Normalized ID for lookup
+                        val rawId = tid.substringAfter(":")
+                        val normalizedTid = rawId.lowercase()
+                        
+                        // Priority search for the most accurate mapping
+                        val mapping = challengeLookup[normalizedTid] ?: 
+                                     challengeLookup[normalizedTid.removePrefix("athena_")] ?:
+                                     challengeLookup[normalizedTid.replace("athena_", "")] ?:
+                                     challengeLookup["quest_" + normalizedTid.removePrefix("athena_")] ?:
+                                     challengeLookup["challenge_" + normalizedTid.removePrefix("athena_")]
+
+                        // Extract Objectives
+                        val objectives = mutableListOf<com.dhyper.fncompanion.data.models.QuestObjective>()
+                        var totalProgress = 0
+                        var totalTarget = mapping?.progressTarget ?: 1
+
+                        attrs.forEach { (key, value) ->
+                            if (key.startsWith("completion_") && key.endsWith("_count")) {
+                                val objId = key.substringAfter("completion_").substringBefore("_count")
+                                val current = parseNumberAttr(value) ?: 0
+                                
+                                val target = parseNumberAttr(attrs["target_$objId"]) 
+                                          ?: parseNumberAttr(attrs["obj_${objId}_target"])
+                                          ?: parseNumberAttr(attrs["obj_${objId}_count"])
+                                          ?: mapping?.progressTarget
+                                          ?: 1
+                                
+                                objectives.add(
+                                    com.dhyper.fncompanion.data.models.QuestObjective(
+                                        id = objId,
+                                        description = mapping?.title ?: cleanObjectiveName(objId, tid),
+                                        current = current,
+                                        target = target
+                                    )
+                                )
+                                totalProgress += current
+                                // If mapping had multiple objectives, we'd need to sum them, 
+                                // but usually, we just take the first one or use totalTarget
+                            }
+                        }
+
+                        if (objectives.isEmpty()) {
+                            val current = parseNumberAttr(attrs["completion_count"]) ?: (if (isCompleted) totalTarget else 0)
+                            totalProgress = current
+                            objectives.add(
+                                com.dhyper.fncompanion.data.models.QuestObjective(
+                                    id = "default",
+                                    description = mapping?.title ?: "Complete challenge",
+                                    current = current,
+                                    target = totalTarget
+                                )
+                            )
+                        }
+
+                        val name = mapping?.title ?: cleanQuestName(tid)
+                        val rawBucket = attrs["bucket"]?.toString() ?: attrs["challenge_bundle_id"]?.toString() ?: "General"
+                        val bundleName = bundleNameLookup[rawBucket.lowercase()] ?: formatQuestCategory(rawBucket)
+                        
+                        if (name.isNotBlank() && 
+                            !name.contains("Tbd", ignoreCase = true) && 
+                            !tid.contains("hidden", ignoreCase = true) &&
+                            !tid.contains("test", ignoreCase = true)) {
+                            
+                            allQuests.add(
+                                com.dhyper.fncompanion.data.models.FortniteQuest(
+                                    id = id,
+                                    templateId = tid,
+                                    name = name,
+                                    description = mapping?.description ?: attrs["challenge_bundle_id"]?.toString() ?: "Fortnite Quest",
+                                    category = bundleName,
+                                    progress = totalProgress,
+                                    target = totalTarget,
+                                    isCompleted = isCompleted,
+                                    objectives = objectives,
+                                    rewardXp = mapping?.xp ?: parseNumberAttr(attrs["xp_reward_scalar"])?.let { (it * 10000) } ?: 0
+                                )
+                            )
+                        }
+                    }
+                }
+            }
+
+            Result.success(allQuests.sortedWith(
+                compareBy<com.dhyper.fncompanion.data.models.FortniteQuest> { it.isCompleted }
+                    .thenBy { it.category }
+                    .thenBy { it.name }
+            ))
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    private fun cleanObjectiveName(objId: String, @Suppress("UNUSED_PARAMETER") tid: String): String {
+        // If it's a numeric index, try to get more context from tid
+        if (objId.all { it.isDigit() }) {
+            return "Stage ${objId.toInt() + 1}"
+        }
+        
+        return objId.replace("_", " ")
+            .replace(Regex("(?i)athena"), "")
+            .replace(Regex("(?i)quest"), "")
+            .trim()
+            .lowercase()
+            .replaceFirstChar { it.uppercase() }
+    }
+
+    private fun cleanQuestName(tid: String): String {
+        val raw = tid.substringAfter(":", tid)
+            .replace(Regex("(?i)^Athena_?"), "")
+            .replace(Regex("(?i)^Quest_?"), "")
+            .replace(Regex("(?i)^Challenge_?"), "")
+            .replace(Regex("(?i)^S\\d+_?"), "") // Remove Season tags like S32
+            .replace(Regex("(?i)_C\\d+S\\d+$"), "") // Remove Chapter/Season tags
+            .replace(Regex("(?i)_Quest$"), "")
+            .replace("_", " ")
+            .trim()
+        
+        if (raw.isBlank()) return tid
+        
+        return raw.split(" ").filter { it.isNotBlank() }.joinToString(" ") { word ->
+            word.lowercase().replaceFirstChar { it.uppercase() }
+        }
+    }
+
+    private fun formatQuestCategory(bucket: String): String {
+        return when {
+            bucket.contains("Weekly", ignoreCase = true) -> "Weekly Quests"
+            bucket.contains("Daily", ignoreCase = true) -> "Daily Quests"
+            bucket.contains("Milestone", ignoreCase = true) -> "Milestones"
+            bucket.contains("Story", ignoreCase = true) -> "Story"
+            bucket.contains("Event", ignoreCase = true) -> "Events"
+            bucket.contains("Survivor", ignoreCase = true) -> "Survivor"
+            else -> bucket.substringAfterLast("_")
+                .replace(Regex("([a-z])([A-Z])"), "$1 $2")
+                .trim()
+                .lowercase()
+                .replaceFirstChar { it.uppercase() }
         }
     }
 

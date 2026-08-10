@@ -30,6 +30,8 @@ fun BrHubScreen(
     onNavigateToMap: () -> Unit,
     onNavigateToNews: () -> Unit,
     onNavigateToTracker: () -> Unit,
+    onNavigateToAes: () -> Unit,
+    onNavigateToCosmetics: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Box(modifier = modifier.fillMaxSize()) {
@@ -84,7 +86,7 @@ fun BrHubScreen(
                     title = "MAPS",
                     subtitle = "View Islands",
                     icon = Icons.Default.Map,
-                    color = SleekCyan,
+                    color = MaterialTheme.colorScheme.primary,
                     onClick = onNavigateToMap,
                     modifier = Modifier.weight(1f)
                 )
@@ -108,6 +110,28 @@ fun BrHubScreen(
                     icon = Icons.Default.Leaderboard,
                     color = FortniteGold,
                     onClick = onNavigateToTracker,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Row(modifier = Modifier.fillMaxWidth()) {
+                HubCard(
+                    title = "AES KEYS",
+                    subtitle = "Main & Dynamic",
+                    icon = Icons.Default.VpnKey,
+                    color = SleekAccent,
+                    onClick = onNavigateToAes,
+                    modifier = Modifier.weight(1f)
+                )
+                Spacer(modifier = Modifier.width(16.dp))
+                HubCard(
+                    title = "ALL COSMETICS",
+                    subtitle = "Browse & Wishlist",
+                    icon = Icons.Default.Shield,
+                    color = FortniteBlue,
+                    onClick = onNavigateToCosmetics,
                     modifier = Modifier.weight(1f)
                 )
             }

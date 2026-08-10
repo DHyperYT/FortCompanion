@@ -2,6 +2,7 @@ package com.dhyper.fncompanion.data.repository
 
 import com.dhyper.fncompanion.BuildConfig
 import com.dhyper.fncompanion.data.api.ApiClient
+import com.dhyper.fncompanion.data.models.ChallengeBundle
 import com.dhyper.fncompanion.data.models.CosmeticItem
 import com.dhyper.fncompanion.data.models.MapData
 import com.dhyper.fncompanion.data.models.NewsData
@@ -18,10 +19,27 @@ class FortniteRepository {
 
     companion object {
         private var cachedFullCosmetics: List<CosmeticItem>? = null
+        private var cachedChallenges: List<com.dhyper.fncompanion.data.models.ChallengeBundle>? = null
     }
 
     fun clearCache() {
         cachedFullCosmetics = null
+        cachedChallenges = null
+    }
+
+    suspend fun fetchChallenges(): Result<List<com.dhyper.fncompanion.data.models.ChallengeBundle>> {
+        cachedChallenges?.let { return Result.success(it) }
+        return try {
+            val response = ApiClient.centralApi.getChallenges()
+            if (response.status == 200 && response.data != null) {
+                cachedChallenges = response.data
+                Result.success(response.data)
+            } else {
+                Result.failure(Exception("Failed to fetch challenge mappings: ${response.status}"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
     }
 
     suspend fun fetchItemShop(): Result<ShopData> {
@@ -77,7 +95,10 @@ class FortniteRepository {
 
     suspend fun searchPlayerStats(accountName: String, accountType: String = "epic", apiKey: String? = null): Result<PlayerStatsData> {
         return try {
-            val keyToUse = apiKey?.ifBlank { null } ?: BuildConfig.FORTNITE_API_KEY
+            val keyToUse = apiKey?.ifBlank { null }
+            if (keyToUse.isNullOrBlank()) {
+                return Result.failure(Exception("Fortnite-API.com Key is missing. Please set it in Settings."))
+            }
             val response = api.getPlayerStats(apiKey = keyToUse, name = accountName.trim(), accountType = accountType)
             if (response.status == 200 && response.data != null) {
                 Result.success(response.data)
@@ -175,13 +196,13 @@ class FortniteRepository {
         }
     }
 
-    suspend fun fetchPlaylists(): Result<List<com.dhyper.fncompanion.data.models.PlaylistData>> {
+    suspend fun fetchAes(): Result<com.dhyper.fncompanion.data.models.AesData> {
         return try {
-            val response = api.getPlaylists()
+            val response = api.getAes()
             if (response.status == 200 && response.data != null) {
                 Result.success(response.data)
             } else {
-                Result.failure(Exception("Failed to fetch playlists: ${response.status}"))
+                Result.failure(Exception("Failed to fetch AES keys: ${response.status}"))
             }
         } catch (e: Exception) {
             Result.failure(e)

@@ -46,8 +46,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.dhyper.fncompanion.data.models.NewsMotd
+import com.dhyper.fncompanion.ui.theme.FortniteFont
 import com.dhyper.fncompanion.ui.theme.SleekBackground
 import com.dhyper.fncompanion.ui.theme.SleekCyan
+import com.dhyper.fncompanion.ui.theme.SleekEmerald
 import com.dhyper.fncompanion.ui.theme.SleekPrimary
 import com.dhyper.fncompanion.ui.theme.SleekSurface
 import com.dhyper.fncompanion.ui.theme.SleekSurfaceBorder
@@ -64,7 +66,11 @@ fun NewsScreen(
     modifier: Modifier = Modifier
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    val tabs = listOf("BR" to "Battle Royale")
+    val tabs = listOf(
+        "BR" to "Battle Royale",
+        "STW" to "Save The World",
+        "Creative" to "Creative"
+    )
 
     Column(
         modifier = modifier
@@ -180,22 +186,41 @@ fun NewsCard(motd: NewsMotd) {
         colors = CardDefaults.cardColors(containerColor = SleekSurfaceVariant)
     ) {
         Column {
-            val imageUrl = motd.image ?: motd.tileImage
-            if (!imageUrl.isNullOrEmpty()) {
-                AsyncImage(
-                    model = imageUrl,
-                    contentDescription = motd.title,
+            Box {
+                val imageUrl = motd.image ?: motd.tileImage
+                if (!imageUrl.isNullOrEmpty()) {
+                    AsyncImage(
+                        model = imageUrl,
+                        contentDescription = motd.title,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .aspectRatio(16f / 9f),
+                        contentScale = ContentScale.Crop
+                    )
+                }
+                
+                // Live/New Badge
+                Box(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .aspectRatio(16f / 9f),
-                    contentScale = ContentScale.Crop
-                )
+                        .padding(12.dp)
+                        .background(SleekEmerald, RoundedCornerShape(4.dp))
+                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                        .align(Alignment.TopStart)
+                ) {
+                    Text(
+                        "LIVE",
+                        color = Color.White,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Black
+                    )
+                }
             }
 
             Column(modifier = Modifier.padding(12.dp)) {
                 Text(
                     text = motd.title,
                     style = MaterialTheme.typography.titleLarge,
+                    fontFamily = FortniteFont,
                     color = SleekTextPrimary,
                     fontWeight = FontWeight.Bold
                 )

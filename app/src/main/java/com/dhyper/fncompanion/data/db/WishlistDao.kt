@@ -8,15 +8,18 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface WishlistDao {
+    @Query("SELECT * FROM cosmetic_wishlist WHERE accountId = :accountId ORDER BY addedAtMs DESC")
+    fun getAllWishlistedItems(accountId: String): Flow<List<WishlistEntity>>
+
     @Query("SELECT * FROM cosmetic_wishlist ORDER BY addedAtMs DESC")
-    fun getAllWishlistedItems(): Flow<List<WishlistEntity>>
+    fun getUniversalWishlist(): Flow<List<WishlistEntity>>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun addToWishlist(item: WishlistEntity)
 
-    @Query("DELETE FROM cosmetic_wishlist WHERE id = :itemId")
-    suspend fun removeFromWishlist(itemId: String)
+    @Query("DELETE FROM cosmetic_wishlist WHERE id = :itemId AND accountId = :accountId")
+    suspend fun removeFromWishlist(itemId: String, accountId: String)
 
-    @Query("SELECT EXISTS(SELECT 1 FROM cosmetic_wishlist WHERE id = :itemId)")
-    suspend fun isWishlisted(itemId: String): Boolean
+    @Query("SELECT EXISTS(SELECT 1 FROM cosmetic_wishlist WHERE id = :itemId AND accountId = :accountId)")
+    suspend fun isWishlisted(itemId: String, accountId: String): Boolean
 }

@@ -23,43 +23,91 @@ class ShopCheckWorker(
         val repository = FortniteRepository()
         val db = AppDatabase.getDatabase(applicationContext)
         val wishlistDao = db.wishlistDao()
+        val authDao = db.authDao()
+        val settingsDao = db.settingsDao()
 
-        val wishlist = wishlistDao.getAllWishlistedItems().first()
-        if (wishlist.isEmpty()) {
-            if (isManualTest) sendNotification("Wishlist is empty. Add items to test!")
-            return Result.success()
-        }
+        // 1. Get all logged-in accounts
+        val accounts = authDao.getAllAccounts().first()
+        if (accounts.isEmpty()) return Result.success()
 
+        // 2. Check universal wishlist setting
+        val settings = settingsDao.getSettingsDirect()
+        val isUniversal = settings?.useUniversalWishlist == true
+
+        // 3. Fetch the shop once
         val shopResult = repository.fetchItemShop()
         shopResult.fold(
             onSuccess = { shopData ->
-                val allShopItems = shopData.entries?.flatMap { entry ->
-                    (entry.items ?: emptyList()) + 
-                    (entry.brItems ?: emptyList()) + 
-                    (entry.cars ?: emptyList()) + 
-                    (entry.vehicles ?: emptyList()) + 
-                    (entry.instruments ?: emptyList())
-                } ?: emptyList()
+                val allShopItemIds = shopData.entries?.flatMap { entry ->
+                    val standardItems = (entry.items ?: emptyList()) + 
+                                     (entry.brItems ?: emptyList()) + 
+                                     (entry.cars ?: emptyList()) + 
+                                     (entry.vehicles ?: emptyList()) + 
+                                     (entry.instruments ?: emptyList())
+                    
+                    val standardIds = standardItems.map { it.id.lowercase() }
+                    
+                    val trackIds = entry.tracks?.flatMap { t ->
+                        val trackMap = t.track as? Map<*, *>
+                        val apiCosmeticId = trackMap?.get("id")?.toString()
+                        val sidFromDevName = Regex("""sid_[a-zA-Z0-9_]+""", RegexOption.IGNORE_CASE).find(t.devName ?: "")?.value
+                        val idField = t.id ?: ""
+                        
+                        val ids = mutableListOf<String>()
+                        if (!apiCosmeticId.isNullOrBlank()) ids.add(apiCosmeticId.lowercase())
+                        if (!sidFromDevName.isNullOrBlank()) ids.add(sidFromDevName.lowercase())
+                        if (idField.isNotBlank()) ids.add(idField.lowercase())
+                        
+                        ids
+                    } ?: emptyList()
+                    
+                    standardIds + trackIds
+                }?.toSet() ?: emptySet()
                 
-                val foundItems = wishlist.filter { wishItem ->
-                    allShopItems.any { shopItem -> shopItem.id.equals(wishItem.id, ignoreCase = true) }
-                }
+                if (isUniversal) {
+                    val universalWishlist = wishlistDao.getUniversalWishlist().first()
+                    val foundItems = universalWishlist.filter { wishItem ->
+                        val wishId = wishItem.id.lowercase()
+                        val wishIdNoPrefix = wishId.substringAfter(":")
+                        
+                        allShopItemIds.contains(wishId) || 
+                        allShopItemIds.contains(wishIdNoPrefix) ||
+                        (wishId.startsWith("sid_") && allShopItemIds.any { it.contains(wishId) }) ||
+                        allShopItemIds.any { it.contains(wishIdNoPrefix) && it.startsWith("sid_") }
+                    }
 
-                if (foundItems.isNotEmpty()) {
-                    sendNotification(foundItems.joinToString { it.name })
-                } else if (isManualTest) {
-                    sendNotification("Shop check complete: None of your wishlisted items are currently in the shop.")
+                    if (foundItems.isNotEmpty()) {
+                        sendNotification("Universal Wishlist: ${foundItems.joinToString { it.name }}", 999)
+                    }
+                } else {
+                    // 4. Check wishlist for each account
+                    accounts.forEachIndexed { index, account ->
+                        val wishlist = wishlistDao.getAllWishlistedItems(account.accountId).first()
+                        val foundItems = wishlist.filter { wishItem ->
+                            val wishId = wishItem.id.lowercase()
+                            val wishIdNoPrefix = wishId.substringAfter(":")
+                            
+                            allShopItemIds.contains(wishId) || 
+                            allShopItemIds.contains(wishIdNoPrefix) ||
+                            (wishId.startsWith("sid_") && allShopItemIds.any { it.contains(wishId) }) ||
+                            allShopItemIds.any { it.contains(wishIdNoPrefix) && it.startsWith("sid_") }
+                        }
+
+                        if (foundItems.isNotEmpty()) {
+                            sendNotification("${account.displayName}: ${foundItems.joinToString { it.name }}", index + 100)
+                        }
+                    }
                 }
             },
             onFailure = {
-                if (isManualTest) sendNotification("Failed to check shop: ${it.localizedMessage}")
+                if (isManualTest) sendNotification("Failed to check shop: ${it.localizedMessage}", 0)
             }
         )
 
         return Result.success()
     }
 
-    private fun sendNotification(itemNames: String) {
+    private fun sendNotification(itemNames: String, notificationId: Int) {
         val channelId = "shop_alerts"
         val notificationManager = applicationContext.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
@@ -83,6 +131,6 @@ class ShopCheckWorker(
             .setAutoCancel(true)
             .build()
 
-        notificationManager.notify(1, notification)
+        notificationManager.notify(notificationId, notification)
     }
 }

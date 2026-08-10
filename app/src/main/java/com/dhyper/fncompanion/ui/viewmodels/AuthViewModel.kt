@@ -108,6 +108,13 @@ class AuthViewModel(
         }
     }
 
+    fun generateExchangeCode(onResult: (String?) -> Unit) {
+        viewModelScope.launch {
+            val result = authRepository.generateExchangeCode()
+            onResult(result.getOrNull())
+        }
+    }
+
     fun refreshStats() {
         viewModelScope.launch {
             epicAccountRepository.clearCache()

@@ -4,6 +4,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.dhyper.fncompanion.BuildConfig
 import com.dhyper.fncompanion.data.db.AuthEntity
+import com.dhyper.fncompanion.data.db.SettingsDao
+import com.dhyper.fncompanion.data.db.SettingsEntity
 import com.dhyper.fncompanion.data.models.AccountCareerDetails
 import com.dhyper.fncompanion.data.models.PastSeasonData
 import com.dhyper.fncompanion.data.models.PlayerStatsData
@@ -30,7 +32,8 @@ sealed class StatsUiState {
 class StatsViewModel(
     private val fortniteRepo: FortniteRepository = FortniteRepository(),
     private val epicAccountRepo: EpicAccountRepository = EpicAccountRepository(),
-    private val authRepo: AuthRepository
+    private val authRepo: AuthRepository,
+    private val settingsDao: SettingsDao
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<StatsUiState>(StatsUiState.Idle)
@@ -41,11 +44,22 @@ class StatsViewModel(
 
     val recentSearches = authRepo.recentSearches
 
-    private val _apiKey = MutableStateFlow<String?>(BuildConfig.FORTNITE_API_KEY)
+    private val _apiKey = MutableStateFlow<String?>(null)
     val apiKey: StateFlow<String?> = _apiKey.asStateFlow()
 
+    init {
+        viewModelScope.launch {
+            settingsDao.getSettings().collect {
+                _apiKey.value = it?.fortniteApiKey
+            }
+        }
+    }
+
     fun setApiKey(key: String?) {
-        _apiKey.value = key?.trim()?.ifBlank { null }
+        viewModelScope.launch {
+            val current = settingsDao.getSettingsDirect() ?: SettingsEntity()
+            settingsDao.saveSettings(current.copy(fortniteApiKey = key))
+        }
     }
 
     fun setAccountType(type: String) {
