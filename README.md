@@ -1,6 +1,19 @@
 # Fortnite Companion
 
-Companion app for Fortnite, including features like cosmetic viewing, item shop, wishlisting with notifications, epic games account sign in (via epic's oauth) for locker viewing, map viewer, stats viewer, and stw data powered by fortnitedb.com
+Fortnite Companion is a feature-rich companion app for Fortnite that lets you authenticate and manage your Epic Games accounts, switch between multiple accounts, maintain persistent sessions, and securely import/export your account credentials. View your Battle Royale locker, item shop, player stats, maps, STW data powered by FortniteDB, AES keys, and all cosmetics in the game. Create per-account or universal wishlists, receive shop and wishlist notifications, generate exchange codes for quick Epic Games or Fortnite Mobile sign-ins, and listen to Jam Tracks and Music Packs directly through YouTube.
+
+## Security & Privacy
+
+Fortnite Companion is designed to keep your Epic Games login credentials on your device.
+
+- **Credentials stay on your device.** Login information and stored authentication data are not uploaded to or stored on any servers.
+- **Epic Games authentication.** Authentication data is used to communicate with Epic Games when logging in or refreshing a session.
+- **Encrypted storage.** Stored account credentials are protected using Android Keystore-backed encryption.
+- **Secure backups.** Account exports are encrypted with a password you choose. The password is required to restore the backup.
+- **No account credentials are sent to third parties.** Fortnite Companion does not transmit your Epic Games login credentials to external services.
+- **API services.** Features that use fortnite-api.com may send the required API requests to that service, but your Epic Games login credentials are not included in those requests.
+
+Your account credentials remain under your control. If you uninstall the app or lose access to your device without an encrypted backup, locally stored authentication data may be lost.
 
 ## How to build
 
@@ -11,7 +24,6 @@ Companion app for Fortnite, including features like cosmetic viewing, item shop,
 3. Allow Android Studio to fix any incompatibilities as it imports the project.
 4. Run the app.
 
-API Key is acquired from https://fortnite-api.com, get it and place it in the .env (rename .env.example to it)
-
+API Key is acquired from https://fortnite-api.com
 
 (AI Assisted Code, i will revamp this fully when i manage to code shit like that completely on my own)
