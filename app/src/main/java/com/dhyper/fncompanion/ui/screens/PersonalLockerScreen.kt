@@ -395,7 +395,7 @@ fun PersonalLockerScreen(
                             contentPadding = PaddingValues(bottom = 16.dp),
                             modifier = Modifier.fillMaxSize()
                         ) {
-                            items(state.filteredItems) { item ->
+                            items(state.filteredItems, key = { it.templateId + it.cosmeticId }) { item ->
                                 LockerItemCard(
                                     item = item,
                                     onClick = {
@@ -579,7 +579,10 @@ fun LockerItemCard(
                 val iconToLoad = item.iconUrl ?: "" 
                 
                 AsyncImage(
-                    model = iconToLoad,
+                    model = coil.request.ImageRequest.Builder(androidx.compose.ui.platform.LocalContext.current)
+                        .data(iconToLoad)
+                        .crossfade(true)
+                        .build(),
                     contentDescription = item.name,
                     modifier = Modifier.fillMaxSize().padding(if (item.category == LockerCategory.OUTFIT) 0.dp else 4.dp),
                     contentScale = ContentScale.Fit

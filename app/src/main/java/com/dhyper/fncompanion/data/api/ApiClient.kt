@@ -17,26 +17,33 @@ object ApiClient {
         .build()
 
     private var authRepository: AuthRepository? = null
+    private var cache: okhttp3.Cache? = null
 
-    fun init(repository: AuthRepository) {
+    fun init(repository: AuthRepository, context: android.content.Context) {
         authRepository = repository
+        val cacheSize = (10 * 1024 * 1024).toLong() // 10 MB
+        cache = okhttp3.Cache(context.cacheDir, cacheSize)
     }
 
-    private val okHttpClient = OkHttpClient.Builder()
-        .connectTimeout(15, TimeUnit.SECONDS)
-        .readTimeout(15, TimeUnit.SECONDS)
-        .addInterceptor { chain ->
-            val repo = authRepository
-            if (repo != null) {
-                AuthInterceptor(repo).intercept(chain)
-            } else {
-                chain.proceed(chain.request())
+    private val okHttpClient: OkHttpClient by lazy {
+        OkHttpClient.Builder()
+            .connectTimeout(15, TimeUnit.SECONDS)
+            .readTimeout(15, TimeUnit.SECONDS)
+            .cache(cache)
+            .addInterceptor { chain ->
+                val request = chain.request()
+                val repo = authRepository
+                if (repo != null) {
+                    AuthInterceptor(repo).intercept(chain)
+                } else {
+                    chain.proceed(request)
+                }
             }
-        }
-        .addInterceptor(HttpLoggingInterceptor().apply {
-            level = HttpLoggingInterceptor.Level.BASIC
-        })
-        .build()
+            .addInterceptor(HttpLoggingInterceptor().apply {
+                level = HttpLoggingInterceptor.Level.BASIC
+            })
+            .build()
+    }
 
     val publicApi: FortnitePublicApi by lazy {
         Retrofit.Builder()

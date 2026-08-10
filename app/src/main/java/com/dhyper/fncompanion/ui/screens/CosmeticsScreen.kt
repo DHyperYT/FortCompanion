@@ -47,6 +47,14 @@ fun CosmeticsScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val shopState by shopViewModel?.uiState?.collectAsState() ?: remember { mutableStateOf(null) }
+    
+    var searchText by remember { mutableStateOf("") }
+    
+    // Sync local typing to ViewModel with background processing
+    LaunchedEffect(searchText) {
+        viewModel.updateSearch(searchText)
+    }
+
     var selectedCosmetic by remember { mutableStateOf<CosmeticItem?>(null) }
     var selectedSet by remember { mutableStateOf<CosmeticSet?>(null) }
     
@@ -66,8 +74,8 @@ fun CosmeticsScreen(
     ) {
         // Search Bar
         OutlinedTextField(
-            value = if (uiState is CosmeticsUiState.Success) (uiState as CosmeticsUiState.Success).searchQuery else "",
-            onValueChange = { viewModel.updateSearch(it) },
+            value = searchText,
+            onValueChange = { searchText = it },
             modifier = Modifier.fillMaxWidth(),
             placeholder = { Text("Search all 10,000+ cosmetics...", color = SleekTextMuted) },
             leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = SleekCyan) },
@@ -187,10 +195,12 @@ fun CosmeticsScreen(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         modifier = Modifier.weight(1f)
                     ) {
-                        items(state.filteredItems) { item ->
+                        items(state.filteredItems, key = { it.id }) { item ->
                             val isOwned = state.ownedIds.contains(item.id.lowercase())
                             val isWishlisted = state.wishlistIds.any { it.equals(item.id, ignoreCase = true) }
-                            val inShop = viewModel.isItemInShop(item.id, shopState)
+                            val inShop = if (shopState is com.dhyper.fncompanion.ui.viewmodels.ShopUiState.Success) {
+                                (shopState as com.dhyper.fncompanion.ui.viewmodels.ShopUiState.Success).shopItemIds.contains(item.id.lowercase())
+                            } else false
 
                             CosmeticBrowserCard(
                                 item = item,
@@ -545,7 +555,10 @@ fun CosmeticBrowserCard(
                         ?: item.images?.background
 
                     AsyncImage(
-                        model = iconToLoad,
+                        model = coil.request.ImageRequest.Builder(androidx.compose.ui.platform.LocalContext.current)
+                            .data(iconToLoad)
+                            .crossfade(true)
+                            .build(),
                         contentDescription = item.name,
                         modifier = Modifier.fillMaxSize(),
                         contentScale = ContentScale.Fit,

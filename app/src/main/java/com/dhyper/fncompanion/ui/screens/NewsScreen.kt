@@ -165,7 +165,7 @@ fun NewsScreen(
                         verticalArrangement = Arrangement.spacedBy(12.dp),
                         modifier = Modifier.fillMaxSize()
                     ) {
-                        items(motds) { motd ->
+                        items(motds, key = { it.id }) { motd ->
                             NewsCard(motd = motd)
                         }
                     }

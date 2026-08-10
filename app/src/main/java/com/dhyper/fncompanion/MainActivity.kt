@@ -161,7 +161,7 @@ fun FortniteCompanionApp(settings: SettingsEntity?) {
     }
 
     LaunchedEffect(authRepository) {
-        com.dhyper.fncompanion.data.api.ApiClient.init(authRepository)
+        com.dhyper.fncompanion.data.api.ApiClient.init(authRepository, context)
     }
 
     val authViewModel: AuthViewModel = viewModel(factory = object : ViewModelProvider.Factory {

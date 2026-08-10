@@ -102,7 +102,14 @@ fun ShopScreen(
     modifier: Modifier = Modifier
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    val searchQuery by viewModel.searchQuery.collectAsState()
+    
+    var searchText by remember { mutableStateOf("") }
+    
+    // Sync local typing to ViewModel
+    LaunchedEffect(searchText) {
+        viewModel.setSearchQuery(searchText)
+    }
+
     val countdown by viewModel.countdown.collectAsState()
     var selectedEntryForDetail by remember { mutableStateOf<ShopEntry?>(null) }
     var selectedCosmeticDetail by remember { mutableStateOf<com.dhyper.fncompanion.data.models.CosmeticItem?>(null) }
@@ -149,16 +156,16 @@ fun ShopScreen(
         // Search & Filter Header
         Spacer(modifier = Modifier.height(4.dp))
         OutlinedTextField(
-            value = searchQuery,
-            onValueChange = { viewModel.setSearchQuery(it) },
+            value = searchText,
+            onValueChange = { searchText = it },
             modifier = Modifier
                 .fillMaxWidth()
                 .testTag("shop_search_input"),
             placeholder = { Text("Search Item Shop...", color = SleekTextMuted) },
             leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Search", tint = SleekCyan) },
-            trailingIcon = if (searchQuery.isNotEmpty()) {
+            trailingIcon = if (searchText.isNotEmpty()) {
                 {
-                    IconButton(onClick = { viewModel.setSearchQuery("") }) {
+                    IconButton(onClick = { searchText = "" }) {
                         Icon(Icons.Default.Close, contentDescription = "Clear", tint = SleekTextMuted)
                     }
                 }
@@ -269,12 +276,12 @@ fun ShopScreen(
                             } else null
                             
                             if (index == 0 || currentCategory != previousCategory) {
-                                item(span = { GridItemSpan(2) }) {
+                                item(key = "header_${currentCategory}_$index", span = { GridItemSpan(2) }) {
                                     ShopCategoryHeader(currentCategory)
                                 }
                             }
                             
-                            item {
+                            item(key = entry.offerId ?: "entry_$index") {
                                 ShopItemCard(
                                     entry = entry,
                                     ownedIds = state.ownedIds,
@@ -637,7 +644,10 @@ fun ShopItemCard(
                 ) {
                     if (!imageUrl.isNullOrEmpty()) {
                         AsyncImage(
-                            model = imageUrl,
+                            model = coil.request.ImageRequest.Builder(androidx.compose.ui.platform.LocalContext.current)
+                                .data(imageUrl)
+                                .crossfade(true)
+                                .build(),
                             contentDescription = title,
                             modifier = Modifier.fillMaxSize(),
                             contentScale = ContentScale.Fit,

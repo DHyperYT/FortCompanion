@@ -23,18 +23,19 @@ sealed class CosmeticsUiState {
     data class Success(
         val allItems: List<CosmeticItem>,
         val filteredItems: List<CosmeticItem>,
-        val searchQuery: String = "",
         val selectedCategory: String = "All",
         val wishlistIds: Set<String> = emptySet(),
         val ownedIds: Set<String> = emptySet(),
         val wishlistOnly: Boolean = false,
         val sortOption: CosmeticSortOption = CosmeticSortOption.NAME_ASC,
         val currentPage: Int = 1,
-        val totalPages: Int = 1
+        val totalPages: Int = 1,
+        val shopItemIds: Set<String> = emptySet()
     ) : CosmeticsUiState()
     data class Error(val message: String) : CosmeticsUiState()
 }
 
+@OptIn(kotlinx.coroutines.FlowPreview::class, kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 class CosmeticsViewModel(
     private val repository: FortniteRepository = FortniteRepository(),
     private val epicAccountRepo: EpicAccountRepository = EpicAccountRepository(),
@@ -66,8 +67,20 @@ class CosmeticsViewModel(
     private val _isLoading = MutableStateFlow(true)
     private val _errorMessage = MutableStateFlow<String?>(null)
 
+    private val debouncedSearchQuery = _searchQuery.debounce(300)
+
     val uiState: StateFlow<CosmeticsUiState> = combine(
-        _allItems, _searchQuery, _selectedCategory, _wishlistIds, _ownedIds, _wishlistOnly, _sortOption, _currentPage, _isLoading, _errorMessage, _setFilter
+        _allItems, 
+        debouncedSearchQuery, 
+        _selectedCategory, 
+        _wishlistIds, 
+        _ownedIds, 
+        _wishlistOnly, 
+        _sortOption, 
+        _currentPage, 
+        _isLoading, 
+        _errorMessage, 
+        _setFilter
     ) { args: Array<Any?> ->
         val all = args[0] as List<CosmeticItem>
         val query = args[1] as String
@@ -84,6 +97,7 @@ class CosmeticsViewModel(
         if (error != null) return@combine CosmeticsUiState.Error(error)
         if (loading) return@combine CosmeticsUiState.Loading
 
+        // Perform filtering and sorting on Dispatchers.Default
         val filteredBase = all.filter { item ->
             val matchesCategory = when (cat) {
                 "All" -> true
@@ -142,39 +156,24 @@ class CosmeticsViewModel(
             when (sort) {
                 CosmeticSortOption.NAME_ASC -> list.sortedBy { it.name }
                 CosmeticSortOption.ADDED_DESC -> {
-                    // Optimized sort: Date first, then ID number or Global Season as a reliable fallback for Chapter 1 items
                     list.sortedWith { a, b ->
                         val dateA = a.added ?: ""
                         val dateB = b.added ?: ""
-                        
-                        // Treat "2019-11-20" as the cutoff point where date sorting becomes unreliable
                         val isFallbackDate = dateA.startsWith("2019-11-20") && dateB.startsWith("2019-11-20")
-
                         if (!isFallbackDate) {
                             val dateCmp = dateB.compareTo(dateA)
                             if (dateCmp != 0) return@sortedWith dateCmp
                         }
-
-                        // Try to extract numeric part from CID_, EID_, etc.
                         val numA = extractNumericFromId(a.id)
                         val numB = extractNumericFromId(b.id)
-                        
                         if (numA > 0 && numB > 0) {
                             val numCmp = numB.compareTo(numA)
                             if (numCmp != 0) return@sortedWith numCmp
                         }
-
-                        val globalA = SeasonUtils.getGlobalSeasonNumber(
-                            a.introduction?.chapter?.toIntOrNull() ?: 1,
-                            a.introduction?.season?.toIntOrNull() ?: 1
-                        )
-                        val globalB = SeasonUtils.getGlobalSeasonNumber(
-                            b.introduction?.chapter?.toIntOrNull() ?: 1,
-                            b.introduction?.season?.toIntOrNull() ?: 1
-                        )
+                        val globalA = SeasonUtils.getGlobalSeasonNumber(a.introduction?.chapter?.toIntOrNull() ?: 1, a.introduction?.season?.toIntOrNull() ?: 1)
+                        val globalB = SeasonUtils.getGlobalSeasonNumber(b.introduction?.chapter?.toIntOrNull() ?: 1, b.introduction?.season?.toIntOrNull() ?: 1)
                         val seasonCmp = globalB.compareTo(globalA)
                         if (seasonCmp != 0) return@sortedWith seasonCmp
-
                         a.name.compareTo(b.name)
                     }
                 }
@@ -185,15 +184,11 @@ class CosmeticsViewModel(
 
         val totalPages = (filteredBase.size + ITEMS_PER_PAGE - 1) / ITEMS_PER_PAGE
         val safePage = page.coerceIn(1, totalPages.coerceAtLeast(1))
-        
-        val pagedList = filteredBase
-            .drop((safePage - 1) * ITEMS_PER_PAGE)
-            .take(ITEMS_PER_PAGE)
+        val pagedList = filteredBase.drop((safePage - 1) * ITEMS_PER_PAGE).take(ITEMS_PER_PAGE)
 
         CosmeticsUiState.Success(
             allItems = all,
             filteredItems = pagedList,
-            searchQuery = query,
             selectedCategory = cat,
             wishlistIds = wishlist,
             ownedIds = owned,
@@ -202,7 +197,9 @@ class CosmeticsViewModel(
             currentPage = safePage,
             totalPages = totalPages
         )
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), CosmeticsUiState.Loading)
+    }
+    .flowOn(kotlinx.coroutines.Dispatchers.Default)
+    .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), CosmeticsUiState.Loading)
 
     init {
         observeAccountChanges()
@@ -212,69 +209,77 @@ class CosmeticsViewModel(
 
     private fun observeAccountChanges() {
         viewModelScope.launch {
-            authRepo.authSession.collectLatest { state ->
-                // Force a clean state before loading new account data
-                _ownedIds.value = emptySet()
-                _wishlistIds.value = emptySet()
-
-                val session = when (state) {
-                    is AuthState.Active -> state.session
-                    is AuthState.TokenRefreshing -> state.session
-                    is AuthState.TokenExpired -> state.session
-                    is AuthState.NetworkError -> state.session
-                    is AuthState.DecryptionError -> state.session
-                    is AuthState.ReauthRequired -> state.session
-                    else -> null
+            authRepo.authSession
+                .map { state ->
+                    when (state) {
+                        is AuthState.Active -> state.session.accountId
+                        is AuthState.TokenRefreshing -> state.session.accountId
+                        is AuthState.TokenExpired -> state.session.accountId
+                        is AuthState.NetworkError -> state.session.accountId
+                        is AuthState.DecryptionError -> state.session.accountId
+                        is AuthState.ReauthRequired -> state.session.accountId
+                        else -> null
+                    }
                 }
+                .distinctUntilChanged()
+                .collectLatest { accountId ->
+                    // Force a clean state before loading new account data
+                    _ownedIds.value = emptySet()
+                    _wishlistIds.value = emptySet()
 
-                if (session != null) {
-                    // 1. Force full reload to update "OWNED" status for the specific account
-                    loadData()
-                    
-                    // 2. Load account-specific or universal wishlist
-                    val settings = settingsDao.getSettingsDirect()
-                    if (settings?.useUniversalWishlist == true) {
-                        wishlistDao.getUniversalWishlist().collect { list ->
-                            _wishlistIds.value = list.map { it.id }.toSet()
+                    if (accountId != null) {
+                        // 1. Force full reload to update "OWNED" status for the specific account
+                        loadData()
+                        
+                        // 2. Load account-specific or universal wishlist
+                        val settings = settingsDao.getSettingsDirect()
+                        if (settings?.useUniversalWishlist == true) {
+                            wishlistDao.getUniversalWishlist().collect { list ->
+                                _wishlistIds.value = list.map { it.id }.toSet()
+                            }
+                        } else {
+                            wishlistDao.getAllWishlistedItems(accountId).collect { list ->
+                                _wishlistIds.value = list.map { it.id }.toSet()
+                            }
                         }
                     } else {
-                        wishlistDao.getAllWishlistedItems(session.accountId).collect { list ->
-                            _wishlistIds.value = list.map { it.id }.toSet()
-                        }
+                        // Logged out
+                        loadData()
                     }
-                } else {
-                    // Logged out
-                    loadData()
                 }
-            }
         }
     }
 
     private fun observeWishlistCleanup() {
         viewModelScope.launch {
-            authRepo.authSession.collectLatest { state ->
-                val accountId = when (state) {
-                    is AuthState.Active -> state.session.accountId
-                    is AuthState.TokenRefreshing -> state.session.accountId
-                    is AuthState.TokenExpired -> state.session.accountId
-                    is AuthState.NetworkError -> state.session.accountId
-                    is AuthState.DecryptionError -> state.session.accountId
-                    is AuthState.ReauthRequired -> state.session.accountId
-                    else -> return@collectLatest
+            authRepo.authSession
+                .map { state ->
+                    when (state) {
+                        is AuthState.Active -> state.session.accountId
+                        is AuthState.TokenRefreshing -> state.session.accountId
+                        is AuthState.TokenExpired -> state.session.accountId
+                        is AuthState.NetworkError -> state.session.accountId
+                        is AuthState.DecryptionError -> state.session.accountId
+                        is AuthState.ReauthRequired -> state.session.accountId
+                        else -> null
+                    }
                 }
+                .distinctUntilChanged()
+                .collectLatest { accountId ->
+                    if (accountId == null) return@collectLatest
 
-                combine(wishlistIds, _ownedIds) { wishlist, owned ->
-                    // Case-insensitive intersection check
-                    val ownedLower = owned.map { it.lowercase() }.toSet()
-                    wishlist.filter { it.lowercase() in ownedLower }
-                }.collect { ownedWishlisted ->
-                    if (ownedWishlisted.isNotEmpty()) {
-                        ownedWishlisted.forEach { id ->
-                            wishlistDao.removeFromWishlist(id, accountId)
+                    combine(wishlistIds, _ownedIds) { wishlist, owned ->
+                        // Case-insensitive intersection check
+                        val ownedLower = owned.map { it.lowercase() }.toSet()
+                        wishlist.filter { it.lowercase() in ownedLower }
+                    }.collect { ownedWishlisted ->
+                        if (ownedWishlisted.isNotEmpty()) {
+                            ownedWishlisted.forEach { id ->
+                                wishlistDao.removeFromWishlist(id, accountId)
+                            }
                         }
                     }
                 }
-            }
         }
     }
 
@@ -411,17 +416,4 @@ class CosmeticsViewModel(
         }
     }
 
-    fun isItemInShop(itemId: String, shopState: ShopUiState?): Boolean {
-        if (shopState !is ShopUiState.Success) return false
-        val searchId = itemId.lowercase()
-        return shopState.shopData.entries?.any { entry ->
-            val allIds = ((entry.items ?: emptyList()) + (entry.brItems ?: emptyList())).map { it.id.lowercase() }
-            val trackIds = entry.tracks?.map { t ->
-                val trackMap = t.track as? Map<*, *>
-                trackMap?.get("id")?.toString()?.lowercase() ?: t.id?.lowercase() ?: ""
-            } ?: emptyList()
-            
-            allIds.contains(searchId) || trackIds.contains(searchId)
-        } ?: false
-    }
 }

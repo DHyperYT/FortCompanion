@@ -26,7 +26,8 @@ sealed class ShopUiState {
         val ownedIds: Set<String> = emptySet(),
         val wishlistIds: Set<String> = emptySet(),
         val individualPrices: Map<String, Int> = emptyMap(),
-        val skinSetPrices: Map<String, Pair<Int, Set<String>>> = emptyMap()
+        val skinSetPrices: Map<String, Pair<Int, Set<String>>> = emptyMap(),
+        val shopItemIds: Set<String> = emptySet()
     ) : ShopUiState()
     data class Error(val message: String) : ShopUiState()
 }
@@ -43,8 +44,6 @@ class ShopViewModel(
     val uiState: StateFlow<ShopUiState> = _uiState.asStateFlow()
 
     private val _searchQuery = MutableStateFlow("")
-    val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
-
     private val _selectedCategory = MutableStateFlow("All")
 
     private val _countdown = MutableStateFlow("")
@@ -56,19 +55,22 @@ class ShopViewModel(
 
     private var currentShopData: ShopData? = null
 
+    @OptIn(kotlinx.coroutines.FlowPreview::class)
+    private val debouncedSearchQuery = _searchQuery.debounce(300)
+
     init {
         startCountdown()
         observeWishlistCleanup()
         observeAccountChanges()
         
         // Main UI State Pipeline
-        combine(_searchQuery, _selectedCategory, _wishlistIds, _ownedIds) { query, cat, wishlist, owned ->
+        combine(debouncedSearchQuery, _selectedCategory, _wishlistIds, _ownedIds) { query, cat, wishlist, owned ->
             val data = currentShopData ?: return@combine null
             val allEntries = data.entries ?: emptyList()
-            val sorted = sortEntries(allEntries)
             
             val indPrices = mutableMapOf<String, Int>()
             val setPrices = mutableMapOf<String, Pair<Int, Set<String>>>()
+            val allShopIds = mutableSetOf<String>()
 
             allEntries.forEach { entry ->
                 val trackItems = entry.tracks?.map { t ->
@@ -97,6 +99,8 @@ class ShopViewModel(
                            (entry.vehicles ?: emptyList()) + 
                            (entry.instruments ?: emptyList()) +
                            trackItems
+                
+                items.forEach { allShopIds.add(it.id.lowercase()) }
 
                 val p = entry.finalPrice ?: entry.regularPrice ?: 0
                 val t = getShopEntryTitleInternal(entry)
@@ -108,6 +112,8 @@ class ShopViewModel(
                 }
             }
 
+            val sorted = sortEntries(allEntries)
+
             ShopUiState.Success(
                 shopData = data,
                 filteredEntries = filterEntries(sorted, cat, query, wishlist),
@@ -115,9 +121,11 @@ class ShopViewModel(
                 ownedIds = owned,
                 wishlistIds = wishlist,
                 individualPrices = indPrices,
-                skinSetPrices = setPrices
+                skinSetPrices = setPrices,
+                shopItemIds = allShopIds
             )
         }.filterNotNull()
+         .flowOn(kotlinx.coroutines.Dispatchers.Default)
          .onEach { _uiState.value = it }
          .launchIn(viewModelScope)
 
@@ -126,63 +134,71 @@ class ShopViewModel(
 
     private fun observeAccountChanges() {
         viewModelScope.launch {
-            authRepo.authSession.collectLatest { state ->
-                // Force a full reload to update "OWNED" status
-                loadShop()
-
-                val session = when (state) {
-                    is AuthState.Active -> state.session
-                    is AuthState.TokenRefreshing -> state.session
-                    is AuthState.TokenExpired -> state.session
-                    is AuthState.NetworkError -> state.session
-                    is AuthState.DecryptionError -> state.session
-                    is AuthState.ReauthRequired -> state.session
-                    else -> null
+            authRepo.authSession
+                .map { state ->
+                    when (state) {
+                        is AuthState.Active -> state.session.accountId
+                        is AuthState.TokenRefreshing -> state.session.accountId
+                        is AuthState.TokenExpired -> state.session.accountId
+                        is AuthState.NetworkError -> state.session.accountId
+                        is AuthState.DecryptionError -> state.session.accountId
+                        is AuthState.ReauthRequired -> state.session.accountId
+                        else -> null
+                    }
                 }
+                .distinctUntilChanged()
+                .collectLatest { accountId ->
+                    // Force a full reload to update "OWNED" status
+                    loadShop()
 
-                if (session != null) {
-                    val settings = settingsDao.getSettingsDirect()
-                    if (settings?.useUniversalWishlist == true) {
-                        wishlistDao.getUniversalWishlist().collect { list ->
-                            _wishlistIds.value = list.map { it.id }.toSet()
+                    if (accountId != null) {
+                        val settings = settingsDao.getSettingsDirect()
+                        if (settings?.useUniversalWishlist == true) {
+                            wishlistDao.getUniversalWishlist().collect { list ->
+                                _wishlistIds.value = list.map { it.id }.toSet()
+                            }
+                        } else {
+                            wishlistDao.getAllWishlistedItems(accountId).collect { list ->
+                                _wishlistIds.value = list.map { it.id }.toSet()
+                            }
                         }
                     } else {
-                        wishlistDao.getAllWishlistedItems(session.accountId).collect { list ->
-                            _wishlistIds.value = list.map { it.id }.toSet()
-                        }
+                        _ownedIds.value = emptySet()
+                        _wishlistIds.value = emptySet()
                     }
-                } else {
-                    _ownedIds.value = emptySet()
-                    _wishlistIds.value = emptySet()
                 }
-            }
         }
     }
 
     private fun observeWishlistCleanup() {
         viewModelScope.launch {
-            authRepo.authSession.collectLatest { state ->
-                val accountId = when (state) {
-                    is AuthState.Active -> state.session.accountId
-                    is AuthState.TokenRefreshing -> state.session.accountId
-                    is AuthState.TokenExpired -> state.session.accountId
-                    is AuthState.NetworkError -> state.session.accountId
-                    is AuthState.DecryptionError -> state.session.accountId
-                    is AuthState.ReauthRequired -> state.session.accountId
-                    else -> return@collectLatest
+            authRepo.authSession
+                .map { state ->
+                    when (state) {
+                        is AuthState.Active -> state.session.accountId
+                        is AuthState.TokenRefreshing -> state.session.accountId
+                        is AuthState.TokenExpired -> state.session.accountId
+                        is AuthState.NetworkError -> state.session.accountId
+                        is AuthState.DecryptionError -> state.session.accountId
+                        is AuthState.ReauthRequired -> state.session.accountId
+                        else -> null
+                    }
                 }
-                
-                combine(_wishlistIds, _ownedIds) { wishlist, owned ->
-                    val ownedLower = owned.map { it.lowercase() }.toSet()
-                    wishlist.filter { it.lowercase() in ownedLower }
-                }.collect { ownedWishlisted ->
-                    if (ownedWishlisted.isNotEmpty()) {
-                        ownedWishlisted.forEach { id ->
-                            wishlistDao.removeFromWishlist(id, accountId)
+                .distinctUntilChanged()
+                .collectLatest { accountId ->
+                    if (accountId == null) return@collectLatest
+                    
+                    combine(_wishlistIds, _ownedIds) { wishlist, owned ->
+                        val ownedLower = owned.map { it.lowercase() }.toSet()
+                        wishlist.filter { it.lowercase() in ownedLower }
+                    }.collect { ownedWishlisted ->
+                        if (ownedWishlisted.isNotEmpty()) {
+                            ownedWishlisted.forEach { id ->
+                                wishlistDao.removeFromWishlist(id, accountId)
+                            }
                         }
                     }
                 }
-            }
         }
     }
 
