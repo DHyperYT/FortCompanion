@@ -24,7 +24,7 @@ object SeasonUtils {
             seasonNum in 23..26 -> "Chapter 4 Season ${seasonNum - 22}"
             seasonNum == 27 -> "Chapter 4 Season OG"
             seasonNum in 28..31 -> "Chapter 5 Season ${seasonNum - 27}"
-            seasonNum == 32 -> "Chapter 5 Mini-Season 1"
+            seasonNum == 32 -> "Chapter 2 Season Remix"
             seasonNum in 33..34 -> "Chapter 6 Season ${seasonNum - 32}"
             seasonNum == 35 -> "Chapter 6 Mini-Season 1"
             seasonNum == 36 -> "Chapter 6 Season 3"
@@ -35,13 +35,19 @@ object SeasonUtils {
         }
     }
     
-    fun getFormattedIntroduction(chapterStr: String?, seasonStr: String?): String {
+    fun getGlobalSeasonNumber(chapterStr: String?, seasonStr: String?): Int {
+        if (chapterStr == "2" && seasonStr?.contains("Remix", ignoreCase = true) == true) {
+            return 32
+        }
         val chapter = chapterStr?.toIntOrNull() ?: 1
         val season = when {
             seasonStr?.equals("X", ignoreCase = true) == true -> 10
             else -> seasonStr?.toIntOrNull() ?: 1
         }
-        val globalNum = getGlobalSeasonNumber(chapter, season)
-        return formatSeasonName(globalNum)
+        return getGlobalSeasonNumber(chapter, season)
+    }
+
+    fun getFormattedIntroduction(chapterStr: String?, seasonStr: String?): String {
+        return formatSeasonName(getGlobalSeasonNumber(chapterStr, seasonStr))
     }
 }

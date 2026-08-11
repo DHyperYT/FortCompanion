@@ -116,7 +116,7 @@ class CosmeticsViewModel(
                 "Emote" -> item.type?.displayValue?.contains("Emote", ignoreCase = true) == true || 
                            item.id.startsWith("EID_", ignoreCase = true) || item.id.startsWith("Dance_", ignoreCase = true)
                 "Wrap" -> item.id.startsWith("Wrap_", ignoreCase = true)
-                "Contrail" -> item.id.startsWith("Contrail_", ignoreCase = true)
+                "Contrail" -> item.id.startsWith("Contrail_", ignoreCase = true) || item.id.startsWith("Trails_ID_", ignoreCase = true)
                 "Music" -> item.id.startsWith("MusicPack_", ignoreCase = true)
                 "Loading Screen" -> item.id.startsWith("LSID_", ignoreCase = true) || item.id.startsWith("LoadingScreen_", ignoreCase = true)
                 "Sidekick" -> item.id.startsWith("Companion_", ignoreCase = true) && 
@@ -161,8 +161,8 @@ class CosmeticsViewModel(
                         .thenByDescending { extractNumericFromId(it.id) }
                         .thenByDescending { 
                             SeasonUtils.getGlobalSeasonNumber(
-                                it.introduction?.chapter?.toIntOrNull() ?: 1, 
-                                it.introduction?.season?.toIntOrNull() ?: 1
+                                it.introduction?.chapter, 
+                                it.introduction?.season
                             )
                         }
                         .thenBy { it.name }
@@ -339,8 +339,8 @@ class CosmeticsViewModel(
     }
 
     private fun extractNumericFromId(id: String): Int {
-        // Handle CID_123, EID_123, BID_123, etc.
-        val match = Regex("(?i)[A-Z]+_([0-9]+)").find(id)
+        // Find any sequence of digits after a prefix or underscore (e.g., CID_001, Trails_ID_123)
+        val match = Regex("""(?i)[A-Z_]+_(\d+)""").find(id)
         return match?.groupValues?.get(1)?.toIntOrNull() ?: 0
     }
 
