@@ -249,7 +249,7 @@ fun CosmeticDetailSheet(
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
                             Box(modifier = Modifier.size(70.dp).background(SleekSurface)) {
-                                val subIcon = subItem.images?.icon ?: subItem.images?.smallIcon ?: subItem.images?.featured
+                                val subIcon = resolveCosmeticIcon(subItem)
                                 if (!subIcon.isNullOrEmpty()) {
                                     AsyncImage(
                                         model = subIcon,
@@ -330,4 +330,37 @@ fun CosmeticDetailRow(label: String, value: String) {
         Text(label, modifier = Modifier.width(100.dp), color = SleekTextMuted, fontSize = 13.sp)
         Text(value, color = SleekTextPrimary, fontSize = 13.sp)
     }
+}
+
+fun resolveCosmeticIcon(item: CosmeticItem): String? {
+    val images = item.images ?: return null
+    val id = item.id.lowercase()
+    val type = item.type?.value?.lowercase() ?: ""
+    
+    return when {
+        // Vehicles: prioritize standard icons (like BR locker)
+        id.startsWith("car") || id.startsWith("id_") || type.contains("car") || 
+        type.contains("wheel") || type.contains("boost") || type.contains("trail") || type.contains("decal") ||
+        id.startsWith("id_body_") || id.startsWith("carbody_") ||
+        id.startsWith("id_skin_") || id.startsWith("carskin_") ||
+        id.startsWith("id_wheel_") || id.startsWith("wheel_") ||
+        id.startsWith("id_booster_") || id.startsWith("id_drifttrail_") -> {
+            images.icon ?: images.smallIcon ?: images.featured ?: images.decal ?: images.large ?: images.small
+        }
+        
+        // Jam Tracks: prioritize cover art
+        id.startsWith("sid_") || type.contains("track") -> {
+            images.coverart ?: images.albumArt ?: images.other?.albumArt ?: images.featured ?: images.smallIcon ?: images.large ?: images.small ?: images.icon
+        }
+        
+        // Lego items: prioritize lego-specific assets
+        id.startsWith("jbsid") || type.contains("lego") -> {
+            images.legoLarge ?: images.legoSmall ?: images.lego?.large ?: images.lego?.small ?: images.lego?.icon ?: images.large ?: images.small ?: images.icon
+        }
+        
+        // Standard BR and others
+        else -> {
+            images.icon ?: images.smallIcon ?: images.featured ?: images.largeIcon ?: images.large ?: images.small
+        }
+    } ?: images.icon_background ?: images.other?.background ?: images.background ?: images.full_background
 }

@@ -32,6 +32,7 @@ import coil.compose.AsyncImage
 import com.dhyper.fncompanion.data.models.CosmeticItem
 import com.dhyper.fncompanion.data.models.CosmeticSet
 import com.dhyper.fncompanion.ui.components.CosmeticDetailSheet
+import com.dhyper.fncompanion.ui.components.resolveCosmeticIcon
 import com.dhyper.fncompanion.ui.components.JamTrackPlayer
 import com.dhyper.fncompanion.ui.components.YouTubeButton
 import com.dhyper.fncompanion.ui.components.getRarityColor
@@ -364,21 +365,7 @@ fun CosmeticBrowserCard(
                             else Brush.verticalGradient(listOf(rarityColor.copy(alpha = 0.4f), Color.Transparent))
                         )
                 ) {
-                    val iconToLoad = when {
-                        item.type?.value?.contains("lego", true) == true || item.id.startsWith("JBSID_", true) -> 
-                            item.images?.legoSmall ?: item.images?.lego?.small ?: item.images?.lego?.large ?: item.images?.lego?.icon ?: item.images?.large ?: item.images?.small ?: item.images?.icon
-                        item.type?.value?.contains("track", true) == true || item.id.startsWith("sid_", true) -> 
-                            item.images?.coverart ?: item.images?.albumArt ?: item.images?.other?.albumArt ?: item.images?.featured
-                        item.type?.value?.contains("car", true) == true || item.type?.value?.contains("wheel", true) == true || 
-                        item.type?.value?.contains("boost", true) == true || item.type?.value?.contains("trail", true) == true ->
-                            item.images?.featured ?: item.images?.decal ?: item.images?.large ?: item.images?.icon ?: item.images?.smallIcon
-                        item.type?.value?.contains("instrument", true) == true || item.id.startsWith("Sparks_", true) ||
-                        item.type?.value?.contains("guitar", true) == true || item.type?.value?.contains("bass", true) == true ||
-                        item.type?.value?.contains("drum", true) == true || item.type?.value?.contains("mic", true) == true ->
-                            item.images?.large ?: item.images?.small ?: item.images?.featured ?: item.images?.icon
-                        else -> 
-                            item.images?.icon ?: item.images?.smallIcon ?: item.images?.largeIcon ?: item.images?.featured
-                    } ?: item.images?.icon_background ?: item.images?.other?.background ?: item.images?.background ?: item.images?.full_background
+                    val iconToLoad = resolveCosmeticIcon(item)
 
                     AsyncImage(
                         model = coil.request.ImageRequest.Builder(androidx.compose.ui.platform.LocalContext.current)

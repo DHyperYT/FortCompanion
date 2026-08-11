@@ -4,7 +4,6 @@ import android.util.Log
 import com.dhyper.fncompanion.data.api.ApiClient
 import com.dhyper.fncompanion.data.db.AuthDao
 import com.dhyper.fncompanion.data.db.AuthEntity
-import com.dhyper.fncompanion.data.db.PastSeasonEntity
 import com.dhyper.fncompanion.data.db.RecentSearchEntity
 import com.dhyper.fncompanion.data.db.SettingsDao
 import com.dhyper.fncompanion.data.db.WishlistDao
@@ -381,8 +380,22 @@ class AuthRepository(private val authDao: AuthDao) {
 
     suspend fun exportAppData(password: CharArray, settingsDao: SettingsDao, wishlistDao: WishlistDao): Result<String> {
         return try {
-            val accounts = authDao.getAllAccounts().first().map { decryptSession(it)!! }
-            val settings = settingsDao.getSettingsDirect()
+            // Sanitize accounts: Remove transient "live" data like accessToken and expiry
+            val accounts = authDao.getAllAccounts().first().map { 
+                val decrypted = decryptSession(it)!!
+                decrypted.copy(
+                    accessToken = "EXPIRED",
+                    expiresAtMs = 0,
+                    isActive = false,
+                    lastRefreshTimeMs = 0
+                )
+            }
+            
+            // Sanitize settings: Remove live detector state
+            val settings = settingsDao.getSettingsDirect()?.copy(
+                lastVBucksMissionId = null
+            )
+            
             val wishlist = wishlistDao.getAllWishlistDirect()
             
             val backup = AppDataBackup(accounts, settings, wishlist)
@@ -407,11 +420,16 @@ class AuthRepository(private val authDao: AuthDao) {
                 AppDataBackup(accounts = oldAccounts ?: emptyList())
             } ?: return Result.failure(Exception("Failed to parse backup data"))
 
-            // Restore accounts
+            // Restore accounts (Tokens will be refreshed on first use via deviceAuth/refreshToken)
             backup.accounts.forEach { authDao.upsertAuthSession(encryptSession(it)) }
             
-            // Restore settings (API key etc)
-            backup.settings?.let { settingsDao.saveSettings(it) }
+            // Restore settings (API key etc), but preserve existing live state if any
+            backup.settings?.let { newSettings ->
+                val current = settingsDao.getSettingsDirect()
+                settingsDao.saveSettings(newSettings.copy(
+                    lastVBucksMissionId = current?.lastVBucksMissionId // Don't overwrite current live state
+                ))
+            }
             
             // Restore wishlist
             backup.wishlist.forEach { wishlistDao.addToWishlist(it) }
@@ -423,26 +441,9 @@ class AuthRepository(private val authDao: AuthDao) {
     }
 
     // Pass-throughs
-    fun getPastSeasons(accountId: String): Flow<List<PastSeasonEntity>> = authDao.getPastSeasons(accountId)
     val recentSearches: Flow<List<RecentSearchEntity>> = authDao.getRecentSearches()
     suspend fun addRecentSearch(name: String) { if (name.isNotBlank()) authDao.saveRecentSearch(RecentSearchEntity(accountName = name.trim())) }
     suspend fun removeRecentSearch(name: String) { authDao.deleteRecentSearch(name) }
-
-    suspend fun updateSessionStats(
-        accountLevel: Int,
-        seasonalLevel: Int,
-        totalWins: Int,
-        pastSeasons: List<PastSeasonEntity> = emptyList()
-    ) {
-        val current = decryptSession(authDao.getAuthSessionDirect()) ?: return
-        val updated = current.copy(accountLevel = accountLevel, seasonalLevel = seasonalLevel, totalWins = totalWins)
-        sessionCache.value = sessionCache.value + (updated.accountId to updated)
-        authDao.saveAuthSession(encryptSession(updated))
-        if (pastSeasons.isNotEmpty()) {
-            authDao.clearPastSeasons(current.accountId)
-            authDao.savePastSeasons(pastSeasons.map { it.copy(accountId = current.accountId) })
-        }
-    }
 
     suspend fun getValidSession(): AuthEntity? = ensureActiveSession().getOrNull()
 

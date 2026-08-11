@@ -78,6 +78,7 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.dhyper.fncompanion.data.models.ShopEntry
 import com.dhyper.fncompanion.ui.components.CosmeticDetailSheet
+import com.dhyper.fncompanion.ui.components.resolveCosmeticIcon
 import com.dhyper.fncompanion.ui.components.JamTrackPlayer
 import com.dhyper.fncompanion.ui.components.YouTubeButton
 import com.dhyper.fncompanion.ui.components.getRarityColor
@@ -755,7 +756,7 @@ private fun getShopEntryImage(entry: ShopEntry): String? {
     if (!referencedCosmeticId.isNullOrBlank()) {
         val referencedItem = allItems.find { it.id.equals(referencedCosmeticId, ignoreCase = true) }
         if (referencedItem != null) {
-            val resolved = resolveIncludedItemImage(referencedItem)
+            val resolved = resolveCosmeticIcon(referencedItem)
             if (!resolved.isNullOrBlank()) return resolved
         }
     }
@@ -763,7 +764,7 @@ private fun getShopEntryImage(entry: ShopEntry): String? {
     // 5. Fallback to the first item's resolved image
     val firstItem = allItems.firstOrNull()
     if (firstItem != null) {
-        val resolved = resolveIncludedItemImage(firstItem)
+        val resolved = resolveCosmeticIcon(firstItem)
         if (!resolved.isNullOrBlank()) return resolved
     }
 
@@ -772,35 +773,6 @@ private fun getShopEntryImage(entry: ShopEntry): String? {
            firstItem?.images?.icon ?: 
            firstItem?.images?.smallIcon ?:
            "https://fortnite-api.com/images/cosmetics/br/${firstItem?.id}/icon.png"
-}
-
-fun resolveIncludedItemImage(item: com.dhyper.fncompanion.data.models.CosmeticItem): String? {
-    val images = item.images ?: return null
-    val id = item.id.lowercase()
-    val type = item.type?.value?.lowercase() ?: ""
-    
-    return when {
-        // Vehicles: prioritize large renders
-        id.startsWith("car") || id.startsWith("id_") || type.contains("car") || 
-        type.contains("wheel") || type.contains("boost") || type.contains("trail") || type.contains("decal") -> {
-            images.large ?: images.small ?: images.featured ?: images.decal ?: images.icon ?: images.smallIcon
-        }
-        
-        // Jam Tracks: prioritize cover art
-        id.startsWith("sid_") || type.contains("track") -> {
-            images.coverart ?: images.albumArt ?: images.other?.albumArt ?: images.large ?: images.small ?: images.icon
-        }
-        
-        // Lego items: prioritize lego-specific assets
-        id.startsWith("jbsid") || type.contains("lego") -> {
-            images.legoLarge ?: images.legoSmall ?: images.lego?.large ?: images.lego?.small ?: images.lego?.icon ?: images.large ?: images.small ?: images.icon
-        }
-        
-        // Standard BR and others: strictly prioritize icon and smallIcon for detailed cards
-        else -> {
-            images.icon ?: images.smallIcon ?: images.featured ?: images.largeIcon ?: images.large ?: images.small
-        }
-    }
 }
 
 fun getItemsForEntry(entry: ShopEntry): List<com.dhyper.fncompanion.data.models.CosmeticItem> {
@@ -855,7 +827,15 @@ fun getItemsForEntry(entry: ShopEntry): List<com.dhyper.fncompanion.data.models.
             id = realId, name = title, description = "Jam Track by $artist$albumName",
             type = com.dhyper.fncompanion.data.models.CosmeticType("Track", "Jam Track"),
             rarity = com.dhyper.fncompanion.data.models.CosmeticRarity("Festival", "Festival"),
-            series = null, images = com.dhyper.fncompanion.data.models.CosmeticImages(albumArt, albumArt, albumArt, null, null, albumArt),
+            series = null, 
+            images = com.dhyper.fncompanion.data.models.CosmeticImages(
+                smallIcon = albumArt,
+                featured = albumArt,
+                albumArt = albumArt,
+                icon = albumArt,
+                background = null,
+                full_background = null
+            ),
             variants = null, introduction = null, set = null, added = null, 
             previewUrl = trackMap?.get("previewUrl")?.toString() ?: t.previewUrl, 
             artist = artist, album = album, 

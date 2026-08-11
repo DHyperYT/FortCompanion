@@ -2,8 +2,6 @@ package com.dhyper.fncompanion.ui.viewmodels
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.dhyper.fncompanion.data.db.AuthEntity
-import com.dhyper.fncompanion.data.db.PastSeasonEntity
 import com.dhyper.fncompanion.data.repository.AuthRepository
 import com.dhyper.fncompanion.data.repository.EpicAccountRepository
 import com.dhyper.fncompanion.data.models.AuthState
@@ -35,21 +33,6 @@ class AuthViewModel(
             initialValue = AuthState.NoCredentials
         )
 
-    val pastSeasons: StateFlow<List<PastSeasonEntity>> = authSession
-        .flatMapLatest { state ->
-            val accountId = when (state) {
-                is AuthState.Active -> state.session.accountId
-                is AuthState.TokenExpired -> state.session.accountId
-                is AuthState.ReauthRequired -> state.session.accountId
-                is AuthState.DecryptionError -> state.session.accountId
-                is AuthState.NetworkError -> state.session.accountId
-                else -> null
-            }
-            if (accountId != null) authRepository.getPastSeasons(accountId)
-            else flowOf(emptyList())
-        }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
-
     private val _loginState = MutableStateFlow<LoginState>(LoginState.Idle)
     val loginState: StateFlow<LoginState> = _loginState.asStateFlow()
 
@@ -58,8 +41,7 @@ class AuthViewModel(
             _loginState.value = LoginState.LoggingIn
             val result = authRepository.loginWithExchangeCode(exchangeCode)
             result.fold(
-                onSuccess = { session ->
-                    fetchAndSaveCareer(session)
+                onSuccess = { _ ->
                     _loginState.value = LoginState.Idle
                 },
                 onFailure = { error ->
@@ -76,8 +58,7 @@ class AuthViewModel(
             _loginState.value = LoginState.LoggingIn
             val result = authRepository.loginWithAuthCode(code)
             result.fold(
-                onSuccess = { session ->
-                    fetchAndSaveCareer(session)
+                onSuccess = { _ ->
                     _loginState.value = LoginState.Idle
                 },
                 onFailure = { error ->
@@ -86,34 +67,6 @@ class AuthViewModel(
                     )
                 }
             )
-        }
-    }
-
-    private fun fetchAndSaveCareer(session: AuthEntity) {
-        viewModelScope.launch {
-            val careerResult = epicAccountRepository.fetchPersonalCareerDetails(
-                accessToken = session.accessToken,
-                accountId = session.accountId,
-                displayName = session.displayName
-            )
-            careerResult.onSuccess { details ->
-                authRepository.updateSessionStats(
-                    accountLevel = details.accountLevel,
-                    seasonalLevel = details.seasonalLevel,
-                    totalWins = details.lifetimeWins,
-                    pastSeasons = details.pastSeasons.map {
-                        PastSeasonEntity(
-                            accountId = session.accountId,
-                            seasonNumber = it.seasonNumber,
-                            seasonName = it.seasonName,
-                            seasonLevel = it.seasonLevel,
-                            battlePassTier = it.battlePassTier,
-                            seasonWins = it.seasonWins,
-                            hasBattlePass = it.hasBattlePass
-                        )
-                    }
-                )
-            }
         }
     }
 
@@ -127,10 +80,6 @@ class AuthViewModel(
     fun refreshStats() {
         viewModelScope.launch {
             epicAccountRepository.clearCache()
-            val result = authRepository.ensureActiveSession()
-            result.onSuccess { session ->
-                fetchAndSaveCareer(session)
-            }
         }
     }
 

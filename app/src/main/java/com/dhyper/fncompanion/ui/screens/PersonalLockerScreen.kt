@@ -637,7 +637,7 @@ fun PersonalLockerScreen(
                                         // Locker items are ParsedLockerItem, while set detail results are CosmeticItem.
                                         // Use the shared browser card style.
                                         val isOwned = state.allItems.any { it.cosmeticId.equals(item.id, ignoreCase = true) }
-                                        com.dhyper.fncompanion.ui.screens.CosmeticBrowserCard(
+                                        CosmeticBrowserCard(
                                             item = item,
                                             isWishlisted = false,
                                             isOwned = isOwned,

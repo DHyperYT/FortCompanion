@@ -47,14 +47,4 @@ interface AuthDao {
 
     @Query("DELETE FROM recent_player_search WHERE accountName = :name")
     suspend fun deleteRecentSearch(name: String)
-
-    // Past Seasons
-    @Query("SELECT * FROM past_seasons WHERE accountId = :accountId ORDER BY seasonNumber DESC")
-    fun getPastSeasons(accountId: String): Flow<List<PastSeasonEntity>>
-
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun savePastSeasons(seasons: List<PastSeasonEntity>)
-
-    @Query("DELETE FROM past_seasons WHERE accountId = :accountId")
-    suspend fun clearPastSeasons(accountId: String)
 }

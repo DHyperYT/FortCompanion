@@ -155,11 +155,11 @@ class EpicAccountRepository {
                                 apiDetails?.images?.other?.albumArt ?: 
                                 apiDetails?.images?.featured
                             LockerCategory.CAR, LockerCategory.WHEELS, LockerCategory.CAR_TRAIL, LockerCategory.CAR_BOOST, LockerCategory.CAR_DECAL ->
+                                apiDetails?.images?.icon ?: 
+                                apiDetails?.images?.smallIcon ?: 
                                 apiDetails?.images?.featured ?: 
                                 apiDetails?.images?.decal ?:
-                                apiDetails?.images?.large ?:
-                                apiDetails?.images?.icon ?: 
-                                apiDetails?.images?.smallIcon
+                                apiDetails?.images?.large
                             LockerCategory.GUITAR, LockerCategory.BASS, LockerCategory.DRUMS, LockerCategory.KEYTAR, LockerCategory.MIC ->
                                 apiDetails?.images?.large ?:
                                 apiDetails?.images?.small ?:
@@ -236,12 +236,12 @@ class EpicAccountRepository {
             val profile = response.profileChanges?.firstOrNull()?.profile
             val attributes = profile?.stats?.attributes ?: emptyMap()
 
-            val accountLevel = parseNumberAttr(attributes["accountLevel"]) ?: parseNumberAttr(attributes["account_level"]) ?: 320
-            val seasonalLevel = parseNumberAttr(attributes["level"]) ?: parseNumberAttr(attributes["season_level"]) ?: 85
-            val currentSeasonNum = parseNumberAttr(attributes["season_num"]) ?: 43
-            val currentBpTier = parseNumberAttr(attributes["book_level"]) ?: parseNumberAttr(attributes["pass_level"]) ?: 78
-            val lifetimeWins = parseNumberAttr(attributes["lifetime_wins"]) ?: parseNumberAttr(attributes["wins_count"]) ?: 142
-            val seasonalWins = parseNumberAttr(attributes["seasonal_wins"]) ?: parseNumberAttr(attributes["season_wins"]) ?: 18
+            val accountLevel = parseNumberAttr(attributes["accountLevel"]) ?: parseNumberAttr(attributes["account_level"]) ?: 0
+            val seasonalLevel = parseNumberAttr(attributes["level"]) ?: parseNumberAttr(attributes["season_level"]) ?: 0
+            val currentSeasonNum = parseNumberAttr(attributes["season_num"]) ?: parseNumberAttr(attributes["season_number"]) ?: 43
+            val currentBpTier = parseNumberAttr(attributes["book_level"]) ?: parseNumberAttr(attributes["pass_level"]) ?: 0
+            val lifetimeWins = parseNumberAttr(attributes["lifetime_wins"]) ?: parseNumberAttr(attributes["wins_count"]) ?: 0
+            val seasonalWins = parseNumberAttr(attributes["seasonal_wins"]) ?: parseNumberAttr(attributes["season_wins"]) ?: 0
 
             val pastSeasonsList = mutableListOf<PastSeasonData>()
             val rawPastSeasons = attributes["past_seasons"] as? List<*>
