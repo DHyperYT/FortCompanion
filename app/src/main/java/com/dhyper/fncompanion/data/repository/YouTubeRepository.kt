@@ -19,14 +19,18 @@ class YouTubeRepository {
 
             val html = doc.html()
             
-            // Look for videoId specifically within a videoRenderer block to avoid Shorts and Playlists
-            // videoRenderer is used for standard long-form videos
+            // 1. Try specific videoRenderer for standard results
             val videoRendererRegex = Regex(""""videoRenderer":\{"videoId":"([^"]+)"""")
             val match = videoRendererRegex.find(html)
+            var videoId = match?.groupValues?.get(1)
             
-            val videoId = match?.groupValues?.get(1)
+            // 2. Fallback to any videoId if the above fails
+            if (videoId == null) {
+                val fallbackRegex = Regex(""""videoId":"([^"]+)"""")
+                videoId = fallbackRegex.find(html)?.groupValues?.get(1)
+            }
             
-            // Log for debugging (if needed)
+            // Log for debugging
             if (videoId != null) {
                 android.util.Log.d("YouTubeSearch", "Found direct video ID: $videoId for query: $query")
             }

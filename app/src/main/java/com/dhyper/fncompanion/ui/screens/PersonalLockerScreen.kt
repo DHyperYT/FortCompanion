@@ -53,6 +53,7 @@ import com.dhyper.fncompanion.data.models.CosmeticItem
 import com.dhyper.fncompanion.data.models.CosmeticSet
 import com.dhyper.fncompanion.data.models.LockerCategory
 import com.dhyper.fncompanion.data.models.ParsedLockerItem
+import com.dhyper.fncompanion.ui.components.CosmeticDetailSheet
 import com.dhyper.fncompanion.ui.components.JamTrackPlayer
 import com.dhyper.fncompanion.ui.components.YouTubeButton
 import com.dhyper.fncompanion.ui.components.getRarityColor
@@ -565,15 +566,44 @@ fun PersonalLockerScreen(
                             sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
                             containerColor = SleekSurface
                         ) {
-                            LockerDetailSheet(
-                                item = item,
+                            // Convert locker item to cosmetic item for shared sheet
+                            val detailItem = remember(item) {
+                                CosmeticItem(
+                                    id = item.cosmeticId,
+                                    name = item.name,
+                                    description = item.description,
+                                    type = com.dhyper.fncompanion.data.models.CosmeticType(item.category.name, item.category.name),
+                                    rarity = com.dhyper.fncompanion.data.models.CosmeticRarity(item.rarity, item.rarity),
+                                    series = null,
+                                    images = com.dhyper.fncompanion.data.models.CosmeticImages(
+                                        smallIcon = item.iconUrl,
+                                        largeIcon = item.largeIconUrl,
+                                        featured = item.largeIconUrl,
+                                        background = null,
+                                        full_background = null
+                                    ),
+                                    variants = item.variants,
+                                    introduction = item.introduction,
+                                    set = item.set,
+                                    added = item.added,
+                                    artist = item.artist,
+                                    bpm = item.bpm,
+                                    duration = item.duration
+                                )
+                            }
+
+                            CosmeticDetailSheet(
+                                item = detailItem,
+                                isOwned = true,
+                                isWishlisted = false,
                                 videoId = videoId,
                                 isSearchingVideo = isSearchingVideo,
+                                onWishlistToggle = { },
                                 onSetClick = { setId ->
                                     selectedSet = item.set
                                     selectedItemForDetail = null
                                 },
-                                onDismiss = { selectedItemForDetail = null }
+                                onClose = { selectedItemForDetail = null }
                             )
                         }
                     }
@@ -604,13 +634,16 @@ fun PersonalLockerScreen(
                                     modifier = Modifier.heightIn(max = 500.dp)
                                 ) {
                                     items(setItemResult) { item ->
-                                        CosmeticBrowserCard(
+                                        // Locker items are ParsedLockerItem, while set detail results are CosmeticItem.
+                                        // Use the shared browser card style.
+                                        val isOwned = state.allItems.any { it.cosmeticId.equals(item.id, ignoreCase = true) }
+                                        com.dhyper.fncompanion.ui.screens.CosmeticBrowserCard(
                                             item = item,
                                             isWishlisted = false,
-                                            isOwned = state.allItems.any { it.cosmeticId.equals(item.id, ignoreCase = true) },
+                                            isOwned = isOwned,
                                             onWishlistToggle = { },
                                             onClick = { 
-                                                // Link back to a detail if needed
+                                                // Switch detail if possible
                                             }
                                         )
                                     }
@@ -764,262 +797,5 @@ fun LockerItemCard(
                 )
             }
         }
-    }
-}
-
-@Composable
-fun LockerDetailSheet(
-    item: ParsedLockerItem,
-    videoId: String?,
-    isSearchingVideo: Boolean,
-    onSetClick: (String) -> Unit,
-    onDismiss: () -> Unit
-) {
-    val rarityColor = getRarityColor(item.rarity)
-
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(20.dp)
-            .verticalScroll(rememberScrollState()),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Box(
-            modifier = Modifier
-                .size(180.dp)
-                .border(2.dp, rarityColor, RoundedCornerShape(16.dp))
-                .background(
-                    Brush.verticalGradient(
-                        colors = listOf(rarityColor.copy(alpha = 0.4f), SleekSurface)
-                    ),
-                    shape = RoundedCornerShape(16.dp)
-                ),
-            contentAlignment = Alignment.Center
-        ) {
-            val detailIcon = item.largeIconUrl ?: item.iconUrl
-            if (!detailIcon.isNullOrEmpty()) {
-                AsyncImage(
-                    model = detailIcon,
-                    contentDescription = item.name,
-                    modifier = Modifier.fillMaxSize().padding(8.dp),
-                    contentScale = ContentScale.Fit
-                )
-            } else {
-                Icon(Icons.Default.Checkroom, contentDescription = null, tint = rarityColor, modifier = Modifier.size(64.dp))
-            }
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        Text(
-            text = item.name,
-            style = MaterialTheme.typography.headlineSmall,
-            color = SleekTextPrimary,
-            fontWeight = FontWeight.Bold,
-            textAlign = TextAlign.Center
-        )
-
-        Spacer(modifier = Modifier.height(4.dp))
-
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(
-                modifier = Modifier
-                    .background(rarityColor, RoundedCornerShape(6.dp))
-                    .padding(horizontal = 8.dp, vertical = 2.dp)
-            ) {
-                Text(
-                    text = item.rarity.uppercase(),
-                    color = getRarityTextColor(rarityColor),
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Black
-                )
-            }
-
-            Spacer(modifier = Modifier.width(8.dp))
-
-            Text(
-                text = item.category.name.replace("_", " "),
-                color = SleekCyan,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Bold
-            )
-        }
-
-        if (item.quantity > 1) {
-            Spacer(modifier = Modifier.height(8.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Default.ContentCopy, contentDescription = null, tint = SleekCyan, modifier = Modifier.size(16.dp))
-                Spacer(modifier = Modifier.width(6.dp))
-                Text("Quantity: ${item.quantity}", color = SleekTextPrimary, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-            }
-        }
-
-        if (item.description != null) {
-            Text(
-                text = item.description,
-                style = MaterialTheme.typography.bodyLarge,
-                color = SleekTextSecondary,
-                modifier = Modifier.padding(top = 12.dp),
-                textAlign = TextAlign.Center
-            )
-        }
-
-        // --- AUDIO/VIDEO ---
-        val isTrack = item.category == LockerCategory.JAM_TRACK || item.templateId.contains("sid_", ignoreCase = true)
-        val isMusicPack = item.category == LockerCategory.MUSIC || item.templateId.contains("MusicPack_", ignoreCase = true)
-        
-        if ((isTrack || isMusicPack) && item.category != LockerCategory.LEGO_BUILD && item.category != LockerCategory.LEGO_DECOR) {
-            // 1. Prioritize 30s Official Preview (for tracks)
-            if (isTrack) {
-                item.previewUrl?.let { url ->
-                    Spacer(modifier = Modifier.height(12.dp))
-                    JamTrackPlayer(previewUrl = url)
-                    Spacer(modifier = Modifier.height(12.dp))
-                }
-            }
-            
-            // 2. Direct Link to YouTube
-            val artist = item.artist ?: ""
-            val query = when {
-                isTrack && artist.contains("Epic Games", ignoreCase = true) -> 
-                    "Fortnite ${item.name} Jam Track -emote"
-                isTrack -> 
-                    "$artist ${item.name} official audio"
-                else -> "Fortnite ${item.name} Music Pack"
-            }
-            
-            if (isSearchingVideo) {
-                Box(modifier = Modifier.fillMaxWidth().height(48.dp), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(color = SleekCyan, modifier = Modifier.size(24.dp))
-                }
-            } else {
-                YouTubeButton(query = query, videoId = videoId)
-            }
-        }
-
-        // --- STYLES / VARIANTS ---
-        if (!item.variants.isNullOrEmpty()) {
-            Spacer(modifier = Modifier.height(16.dp))
-            Text(
-                text = "AVAILABLE STYLES",
-                style = MaterialTheme.typography.titleMedium,
-                color = SleekTextPrimary,
-                fontWeight = FontWeight.Bold
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            item.variants.forEach { variant ->
-                if (!variant.options.isNullOrEmpty()) {
-                    Text(
-                        text = variant.type?.uppercase() ?: "VARIANT",
-                        fontSize = 11.sp,
-                        color = SleekCyan,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(bottom = 4.dp)
-                    )
-                    LazyRow(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        contentPadding = PaddingValues(bottom = 12.dp)
-                    ) {
-                        items(variant.options) { option ->
-                            Card(
-                                modifier = Modifier
-                                    .size(70.dp)
-                                    .border(1.dp, SleekSurfaceBorder, RoundedCornerShape(8.dp)),
-                                shape = RoundedCornerShape(8.dp),
-                                colors = CardDefaults.cardColors(containerColor = SleekSurfaceVariant)
-                            ) {
-                                Box(contentAlignment = Alignment.Center) {
-                                    if (!option.image.isNullOrEmpty()) {
-                                        AsyncImage(
-                                            model = option.image,
-                                            contentDescription = option.name,
-                                            modifier = Modifier.fillMaxSize(),
-                                            contentScale = ContentScale.Fit
-                                        )
-                                    }
-                                    Box(
-                                        modifier = Modifier
-                                            .align(Alignment.BottomCenter)
-                                            .fillMaxWidth()
-                                            .background(Color.Black.copy(alpha = 0.6f))
-                                            .padding(vertical = 2.dp)
-                                    ) {
-                                        Text(
-                                            text = option.name ?: "Style",
-                                            color = Color.White,
-                                            fontSize = 8.sp,
-                                            textAlign = TextAlign.Center,
-                                            modifier = Modifier.fillMaxWidth(),
-                                            maxLines = 1
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(12.dp),
-            colors = CardDefaults.cardColors(containerColor = SleekSurfaceVariant)
-        ) {
-            Column(modifier = Modifier.padding(12.dp)) {
-                LockerDetailRow("Item ID", item.cosmeticId)
-                
-                // Track metadata for locker
-                if (isTrack) {
-                    item.bpm?.let { LockerDetailRow("BPM", it.toString()) }
-                    item.duration?.let { 
-                        val mins = it / 60
-                        val secs = it % 60
-                        LockerDetailRow("Duration", String.format(java.util.Locale.US, "%d:%02d", mins, secs))
-                    }
-                }
-
-                item.introduction?.let {
-                    LockerDetailRow("Introduced", SeasonUtils.getFormattedIntroduction(it.chapter, it.season))
-                }
-                
-                item.set?.let { set ->
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp).clickable { onSetClick(set.value ?: "") },
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text("Set", modifier = Modifier.width(120.dp), color = SleekTextMuted, fontSize = 13.sp)
-                        Text(set.text ?: "None", color = SleekCyan, fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                        Spacer(modifier = Modifier.weight(1f))
-                        Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null, tint = SleekCyan, modifier = Modifier.size(16.dp))
-                    }
-                }
-                
-                item.added?.let {
-                    LockerDetailRow("Added", it.substringBefore("T"))
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(20.dp))
-
-        Button(
-            onClick = onDismiss,
-            modifier = Modifier.fillMaxWidth(),
-            colors = ButtonDefaults.buttonColors(containerColor = SleekPrimary),
-            shape = RoundedCornerShape(10.dp)
-        ) {
-            Text("Close", color = Color.White, fontWeight = FontWeight.Bold)
-        }
-    }
-}
-
-@Composable
-fun LockerDetailRow(label: String, value: String) {
-    Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-        Text(label, modifier = Modifier.width(120.dp), color = SleekTextMuted, fontSize = 13.sp)
-        Text(value, color = SleekTextPrimary, fontSize = 13.sp)
     }
 }

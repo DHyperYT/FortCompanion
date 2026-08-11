@@ -77,6 +77,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.dhyper.fncompanion.data.models.ShopEntry
+import com.dhyper.fncompanion.ui.components.CosmeticDetailSheet
 import com.dhyper.fncompanion.ui.components.JamTrackPlayer
 import com.dhyper.fncompanion.ui.components.YouTubeButton
 import com.dhyper.fncompanion.ui.components.getRarityColor
@@ -359,12 +360,14 @@ fun ShopScreen(
             sheetState = rememberModalBottomSheetState(),
             containerColor = SleekSurface
         ) {
+            val price = successState?.individualPrices?.get(item.id.lowercase())
             CosmeticDetailSheet(
                 item = item,
                 isOwned = successState?.ownedIds?.contains(item.id.lowercase()) ?: false,
                 isWishlisted = successState?.wishlistIds?.contains(item.id) ?: false,
                 videoId = videoId,
                 isSearchingVideo = isSearchingVideo,
+                price = price,
                 onWishlistToggle = { viewModel.toggleWishlist(item) },
                 onSetClick = { 
                     selectedSet = item.set
@@ -426,228 +429,6 @@ fun ShopScreen(
                 }
             }
         }
-    }
-}
-
-private fun cleanShopTitle(rawName: String?): String {
-    if (rawName.isNullOrBlank()) return "Cosmetic Offer"
-    var clean = rawName
-    clean = clean.replace(Regex("(?i)\\[virtual\\]"), "")
-    clean = clean.replace(Regex("(?i)^\\s*\\d+\\s*x\\s*"), "")
-    clean = clean.replace(Regex("(?i)\\s+for\\s+\\d+\\s*v-?bucks"), "")
-    if (clean.contains("_")) {
-        clean = clean.split("_")
-            .filter { !it.equals("outfit", ignoreCase = true) && !it.equals("emote", ignoreCase = true) && !it.equals("pickaxe", ignoreCase = true) && !it.equals("glider", ignoreCase = true) }
-            .joinToString(" ") { word -> word.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() } }
-    }
-    clean = clean.trim()
-    return if (clean.isBlank()) "Cosmetic Offer" else clean
-}
-
-private fun getShopEntryTitle(entry: ShopEntry): String {
-    if (!entry.bundle?.name.isNullOrBlank()) {
-        return cleanShopTitle(entry.bundle?.name)
-    }
-    val firstTrack = entry.tracks?.firstOrNull()
-    if (firstTrack != null && !firstTrack.title.isNullOrBlank()) {
-        val artist = if (!firstTrack.artist.isNullOrBlank()) " - ${firstTrack.artist}" else ""
-        return "${firstTrack.title}$artist"
-    }
-    val allItems = getItemsForEntry(entry)
-    val firstItemName = allItems.firstOrNull { !it.name.isNullOrBlank() }?.name
-    if (!firstItemName.isNullOrBlank()) {
-        return cleanShopTitle(firstItemName)
-    }
-    if (!entry.layout?.name.isNullOrBlank()) {
-        return cleanShopTitle(entry.layout?.name)
-    }
-    return cleanShopTitle(entry.devName)
-}
-
-private fun getShopEntryImage(entry: ShopEntry): String? {
-    // 1. Prioritize Bundle Image (for bundles)
-    if (!entry.bundle?.image.isNullOrBlank()) return entry.bundle?.image
-
-    // 2. Prioritize Modern Asset References (NewDisplayAsset)
-    // 2a. Check for direct render images list
-    val renderImageUrl = entry.newDisplayAsset?.renderImages?.firstOrNull()?.image
-    if (!renderImageUrl.isNullOrBlank()) return renderImageUrl
-    
-    // 2b. Check for material instance images (Legacy fallback)
-    val materialImg = entry.newDisplayAsset?.materialInstances?.firstOrNull()?.images?.get("OfferImage") ?:
-                      entry.newDisplayAsset?.materialInstances?.firstOrNull()?.images?.get("Background")
-    if (!materialImg.isNullOrBlank()) return materialImg
-
-    // 3. Specialized Jam Track Art (if no bundle image)
-    val trackAlbumArt = entry.tracks?.firstOrNull()?.albumArt
-    if (!trackAlbumArt.isNullOrBlank()) return trackAlbumArt
-
-    // 4. Resolve by specific Cosmetic ID if referenced in NewDisplayAsset
-    val allItems = getItemsForEntry(entry)
-    val referencedCosmeticId = entry.newDisplayAsset?.cosmeticId
-    if (!referencedCosmeticId.isNullOrBlank()) {
-        val referencedItem = allItems.find { it.id.equals(referencedCosmeticId, ignoreCase = true) }
-        if (referencedItem != null) {
-            val resolved = resolveIncludedItemImage(referencedItem)
-            if (!resolved.isNullOrBlank()) return resolved
-        }
-    }
-
-    // 5. Fallback to the first item's resolved image
-    val firstItem = allItems.firstOrNull()
-    if (firstItem != null) {
-        val resolved = resolveIncludedItemImage(firstItem)
-        if (!resolved.isNullOrBlank()) return resolved
-    }
-
-    return firstItem?.images?.featured ?: 
-           firstItem?.images?.large ?: 
-           firstItem?.images?.icon ?: 
-           firstItem?.images?.smallIcon ?:
-           "https://fortnite-api.com/images/cosmetics/br/${firstItem?.id}/icon.png"
-}
-
-fun resolveIncludedItemImage(item: com.dhyper.fncompanion.data.models.CosmeticItem): String? {
-    val images = item.images ?: return null
-    val id = item.id.lowercase()
-    val type = item.type?.value?.lowercase() ?: ""
-    
-    return when {
-        // Vehicles: prioritize large renders as requested
-        id.startsWith("car") || id.startsWith("id_") || type.contains("car") || 
-        type.contains("wheel") || type.contains("boost") || type.contains("trail") || type.contains("decal") -> {
-            images.large ?: images.small ?: images.featured ?: images.decal ?: images.icon ?: images.smallIcon
-        }
-        
-        // Jam Tracks: prioritize cover art
-        id.startsWith("sid_") || type.contains("track") -> {
-            images.coverart ?: images.albumArt ?: images.other?.albumArt ?: images.large ?: images.small ?: images.icon
-        }
-        
-        // Lego items: prioritize lego-specific assets
-        id.startsWith("jbsid") || type.contains("lego") -> {
-            images.legoLarge ?: images.legoSmall ?: images.lego?.large ?: images.lego?.small ?: images.lego?.icon ?: images.large ?: images.small ?: images.icon
-        }
-        
-        // Standard BR and others: strictly prioritize icon and smallIcon for detailed cards
-        else -> {
-            images.icon ?: images.smallIcon ?: images.featured ?: images.largeIcon ?: images.large ?: images.small
-        }
-    }
-}
-
-fun getItemsForEntry(entry: ShopEntry): List<com.dhyper.fncompanion.data.models.CosmeticItem> {
-    val itemMap = mutableMapOf<String, com.dhyper.fncompanion.data.models.CosmeticItem>()
-    val orderedIds = mutableListOf<String>()
-
-    fun processList(list: List<com.dhyper.fncompanion.data.models.CosmeticItem>?) {
-        list?.forEach { item ->
-            if (item.id.isBlank()) return@forEach
-            if (!itemMap.containsKey(item.id)) {
-                orderedIds.add(item.id)
-            }
-            val existing = itemMap[item.id]
-            // Ensure we pick the object that actually has the image and metadata
-            if (existing == null || (existing.images == null && item.images != null)) {
-                itemMap[item.id] = item
-            }
-        }
-    }
-
-    // Process specific lists first to get better objects
-    processList(entry.brItems)
-    processList(entry.cars)
-    processList(entry.vehicles)
-    processList(entry.instruments)
-    processList(entry.items)
-
-    // Map and add tracks
-    entry.tracks?.forEach { t ->
-        val trackMap = t.track as? Map<*, *>
-        val apiCosmeticId = trackMap?.get("id")?.toString()
-        val sidFromDevName = Regex("""sid_[a-zA-Z0-9_]+""").find(t.devName ?: "")?.value
-        val idField = t.id ?: ""
-        val realId = when {
-            !apiCosmeticId.isNullOrBlank() -> apiCosmeticId
-            !sidFromDevName.isNullOrBlank() -> sidFromDevName
-            !idField.startsWith("v2:/") -> idField
-            else -> idField
-        }
-        
-        if (!itemMap.containsKey(realId)) {
-            orderedIds.add(realId)
-        }
-        
-        val title = trackMap?.get("title")?.toString() ?: t.title ?: t.devName ?: "Track"
-        val artist = trackMap?.get("artist")?.toString() ?: t.artist ?: "Unknown Artist"
-        val album = trackMap?.get("album")?.toString() ?: t.album
-        val albumArt = t.albumArt
-        val albumName = if (album.isNullOrBlank() || album.contains("unknown", ignoreCase = true)) "" else " from $album"
-
-        itemMap[realId] = com.dhyper.fncompanion.data.models.CosmeticItem(
-            id = realId, name = title, description = "Jam Track by $artist$albumName",
-            type = com.dhyper.fncompanion.data.models.CosmeticType("Track", "Jam Track"),
-            rarity = com.dhyper.fncompanion.data.models.CosmeticRarity("Festival", "Festival"),
-            series = null, images = com.dhyper.fncompanion.data.models.CosmeticImages(albumArt, albumArt, albumArt, null, null, albumArt),
-            variants = null, introduction = null, set = null, added = null, 
-            previewUrl = trackMap?.get("previewUrl")?.toString() ?: t.previewUrl, 
-            artist = artist, album = album, 
-            bpm = (trackMap?.get("bpm") as? Number)?.toInt() ?: t.bpm, 
-            duration = (trackMap?.get("duration") as? Number)?.toInt() ?: t.duration
-        )
-    }
-
-    return orderedIds.mapNotNull { itemMap[it] }
-}
-
-@Composable
-fun ShopCategoryHeader(
-    category: String,
-    isCollapsible: Boolean = false,
-    isExpanded: Boolean = true,
-    onToggle: () -> Unit = {}
-) {
-    val isModeHeader = category.contains("Racing", ignoreCase = true) || 
-                      category.contains("Festival", ignoreCase = true) || 
-                      category.contains("LEGO", ignoreCase = true) ||
-                      category.equals("Jam Tracks", ignoreCase = true) ||
-                      category.equals("Vehicles", ignoreCase = true)
-    
-    Column(
-        modifier = Modifier
-            .padding(top = 24.dp, bottom = 12.dp)
-            .then(if (isCollapsible) Modifier.clickable { onToggle() } else Modifier)
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Text(
-                text = category.uppercase(),
-                style = if (isModeHeader) MaterialTheme.typography.headlineSmall else MaterialTheme.typography.titleMedium,
-                color = if (isModeHeader) SleekEmerald else SleekCyan,
-                fontWeight = FontWeight.Black,
-                letterSpacing = 1.sp
-            )
-            
-            if (isCollapsible) {
-                Icon(
-                    imageVector = if (isExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                    contentDescription = if (isExpanded) "Collapse" else "Expand",
-                    tint = SleekEmerald,
-                    modifier = Modifier.size(24.dp)
-                )
-            }
-        }
-        
-        Spacer(modifier = Modifier.height(4.dp))
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(if (isModeHeader) 3.dp else 2.dp)
-                .background(Brush.horizontalGradient(listOf(if (isModeHeader) SleekEmerald else SleekCyan, Color.Transparent)))
-        )
     }
 }
 
@@ -846,6 +627,228 @@ fun ShopItemCard(
                 }
             }
         }
+    }
+}
+
+private fun cleanShopTitle(rawName: String?): String {
+    if (rawName.isNullOrBlank()) return "Cosmetic Offer"
+    var clean = rawName
+    clean = clean.replace(Regex("(?i)\\[virtual\\]"), "")
+    clean = clean.replace(Regex("(?i)^\\s*\\d+\\s*x\\s*"), "")
+    clean = clean.replace(Regex("(?i)\\s+for\\s+\\d+\\s*v-?bucks"), "")
+    if (clean.contains("_")) {
+        clean = clean.split("_")
+            .filter { !it.equals("outfit", ignoreCase = true) && !it.equals("emote", ignoreCase = true) && !it.equals("pickaxe", ignoreCase = true) && !it.equals("glider", ignoreCase = true) }
+            .joinToString(" ") { word -> word.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() } }
+    }
+    clean = clean.trim()
+    return if (clean.isBlank()) "Cosmetic Offer" else clean
+}
+
+private fun getShopEntryTitle(entry: ShopEntry): String {
+    if (!entry.bundle?.name.isNullOrBlank()) {
+        return cleanShopTitle(entry.bundle?.name)
+    }
+    val firstTrack = entry.tracks?.firstOrNull()
+    if (firstTrack != null && !firstTrack.title.isNullOrBlank()) {
+        val artist = if (!firstTrack.artist.isNullOrBlank()) " - ${firstTrack.artist}" else ""
+        return "${firstTrack.title}$artist"
+    }
+    val allItems = getItemsForEntry(entry)
+    val firstItemName = allItems.firstOrNull { !it.name.isNullOrBlank() }?.name
+    if (!firstItemName.isNullOrBlank()) {
+        return cleanShopTitle(firstItemName)
+    }
+    if (!entry.layout?.name.isNullOrBlank()) {
+        return cleanShopTitle(entry.layout?.name)
+    }
+    return cleanShopTitle(entry.devName)
+}
+
+private fun getShopEntryImage(entry: ShopEntry): String? {
+    // 1. Prioritize Bundle Image (for bundles)
+    if (!entry.bundle?.image.isNullOrBlank()) return entry.bundle?.image
+
+    // 2. Prioritize Modern Asset References (NewDisplayAsset)
+    // 2a. Check for direct render images list
+    val renderImageUrl = entry.newDisplayAsset?.renderImages?.firstOrNull()?.image
+    if (!renderImageUrl.isNullOrBlank()) return renderImageUrl
+    
+    // 2b. Check for material instance images (Legacy fallback)
+    val materialImg = entry.newDisplayAsset?.materialInstances?.firstOrNull()?.images?.get("OfferImage") ?:
+                      entry.newDisplayAsset?.materialInstances?.firstOrNull()?.images?.get("Background")
+    if (!materialImg.isNullOrBlank()) return materialImg
+
+    // 3. Specialized Jam Track Art (if no bundle image)
+    val trackAlbumArt = entry.tracks?.firstOrNull()?.albumArt
+    if (!trackAlbumArt.isNullOrBlank()) return trackAlbumArt
+
+    // 4. Resolve by specific Cosmetic ID if referenced in NewDisplayAsset
+    val allItems = getItemsForEntry(entry)
+    val referencedCosmeticId = entry.newDisplayAsset?.cosmeticId
+    if (!referencedCosmeticId.isNullOrBlank()) {
+        val referencedItem = allItems.find { it.id.equals(referencedCosmeticId, ignoreCase = true) }
+        if (referencedItem != null) {
+            val resolved = resolveIncludedItemImage(referencedItem)
+            if (!resolved.isNullOrBlank()) return resolved
+        }
+    }
+
+    // 5. Fallback to the first item's resolved image
+    val firstItem = allItems.firstOrNull()
+    if (firstItem != null) {
+        val resolved = resolveIncludedItemImage(firstItem)
+        if (!resolved.isNullOrBlank()) return resolved
+    }
+
+    return firstItem?.images?.featured ?: 
+           firstItem?.images?.large ?: 
+           firstItem?.images?.icon ?: 
+           firstItem?.images?.smallIcon ?:
+           "https://fortnite-api.com/images/cosmetics/br/${firstItem?.id}/icon.png"
+}
+
+fun resolveIncludedItemImage(item: com.dhyper.fncompanion.data.models.CosmeticItem): String? {
+    val images = item.images ?: return null
+    val id = item.id.lowercase()
+    val type = item.type?.value?.lowercase() ?: ""
+    
+    return when {
+        // Vehicles: prioritize large renders
+        id.startsWith("car") || id.startsWith("id_") || type.contains("car") || 
+        type.contains("wheel") || type.contains("boost") || type.contains("trail") || type.contains("decal") -> {
+            images.large ?: images.small ?: images.featured ?: images.decal ?: images.icon ?: images.smallIcon
+        }
+        
+        // Jam Tracks: prioritize cover art
+        id.startsWith("sid_") || type.contains("track") -> {
+            images.coverart ?: images.albumArt ?: images.other?.albumArt ?: images.large ?: images.small ?: images.icon
+        }
+        
+        // Lego items: prioritize lego-specific assets
+        id.startsWith("jbsid") || type.contains("lego") -> {
+            images.legoLarge ?: images.legoSmall ?: images.lego?.large ?: images.lego?.small ?: images.lego?.icon ?: images.large ?: images.small ?: images.icon
+        }
+        
+        // Standard BR and others: strictly prioritize icon and smallIcon for detailed cards
+        else -> {
+            images.icon ?: images.smallIcon ?: images.featured ?: images.largeIcon ?: images.large ?: images.small
+        }
+    }
+}
+
+fun getItemsForEntry(entry: ShopEntry): List<com.dhyper.fncompanion.data.models.CosmeticItem> {
+    val itemMap = mutableMapOf<String, com.dhyper.fncompanion.data.models.CosmeticItem>()
+    val orderedIds = mutableListOf<String>()
+
+    fun processList(list: List<com.dhyper.fncompanion.data.models.CosmeticItem>?) {
+        list?.forEach { item ->
+            if (item.id.isBlank()) return@forEach
+            if (!itemMap.containsKey(item.id)) {
+                orderedIds.add(item.id)
+            }
+            val existing = itemMap[item.id]
+            // Ensure we pick the object that actually has the image and metadata
+            if (existing == null || (existing.images == null && item.images != null)) {
+                itemMap[item.id] = item
+            }
+        }
+    }
+
+    // Process specific lists first to get better objects
+    processList(entry.brItems)
+    processList(entry.cars)
+    processList(entry.vehicles)
+    processList(entry.instruments)
+    processList(entry.items)
+
+    // Map and add tracks
+    entry.tracks?.forEach { t ->
+        val trackMap = t.track as? Map<*, *>
+        val apiCosmeticId = trackMap?.get("id")?.toString()
+        val sidFromDevName = Regex("""sid_[a-zA-Z0-9_]+""").find(t.devName ?: "")?.value
+        val idField = t.id ?: ""
+        val realId = when {
+            !apiCosmeticId.isNullOrBlank() -> apiCosmeticId
+            !sidFromDevName.isNullOrBlank() -> sidFromDevName
+            !idField.startsWith("v2:/") -> idField
+            else -> idField
+        }
+        
+        if (!itemMap.containsKey(realId)) {
+            orderedIds.add(realId)
+        }
+        
+        val title = trackMap?.get("title")?.toString() ?: t.title ?: t.devName ?: "Track"
+        val artist = trackMap?.get("artist")?.toString() ?: t.artist ?: "Unknown Artist"
+        val album = trackMap?.get("album")?.toString() ?: t.album
+        val albumArt = t.albumArt
+        val albumName = if (album.isNullOrBlank() || album.contains("unknown", ignoreCase = true)) "" else " from $album"
+
+        itemMap[realId] = com.dhyper.fncompanion.data.models.CosmeticItem(
+            id = realId, name = title, description = "Jam Track by $artist$albumName",
+            type = com.dhyper.fncompanion.data.models.CosmeticType("Track", "Jam Track"),
+            rarity = com.dhyper.fncompanion.data.models.CosmeticRarity("Festival", "Festival"),
+            series = null, images = com.dhyper.fncompanion.data.models.CosmeticImages(albumArt, albumArt, albumArt, null, null, albumArt),
+            variants = null, introduction = null, set = null, added = null, 
+            previewUrl = trackMap?.get("previewUrl")?.toString() ?: t.previewUrl, 
+            artist = artist, album = album, 
+            bpm = (trackMap?.get("bpm") as? Number)?.toInt() ?: t.bpm, 
+            duration = (trackMap?.get("duration") as? Number)?.toInt() ?: t.duration
+        )
+    }
+
+    return orderedIds.mapNotNull { itemMap[it] }
+}
+
+@Composable
+fun ShopCategoryHeader(
+    category: String,
+    isCollapsible: Boolean = false,
+    isExpanded: Boolean = true,
+    onToggle: () -> Unit = {}
+) {
+    val isModeHeader = category.contains("Racing", ignoreCase = true) || 
+                      category.contains("Festival", ignoreCase = true) || 
+                      category.contains("LEGO", ignoreCase = true) ||
+                      category.equals("Jam Tracks", ignoreCase = true) ||
+                      category.equals("Vehicles", ignoreCase = true)
+    
+    Column(
+        modifier = Modifier
+            .padding(top = 24.dp, bottom = 12.dp)
+            .then(if (isCollapsible) Modifier.clickable { onToggle() } else Modifier)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(
+                text = category.uppercase(),
+                style = if (isModeHeader) MaterialTheme.typography.headlineSmall else MaterialTheme.typography.titleMedium,
+                color = if (isModeHeader) SleekEmerald else SleekCyan,
+                fontWeight = FontWeight.Black,
+                letterSpacing = 1.sp
+            )
+            
+            if (isCollapsible) {
+                Icon(
+                    imageVector = if (isExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                    contentDescription = if (isExpanded) "Collapse" else "Expand",
+                    tint = SleekEmerald,
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+        }
+        
+        Spacer(modifier = Modifier.height(4.dp))
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(if (isModeHeader) 3.dp else 2.dp)
+                .background(Brush.horizontalGradient(listOf(if (isModeHeader) SleekEmerald else SleekCyan, Color.Transparent)))
+        )
     }
 }
 

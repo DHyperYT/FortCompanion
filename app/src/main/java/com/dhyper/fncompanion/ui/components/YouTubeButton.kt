@@ -28,12 +28,25 @@ fun YouTubeButton(
     Button(
         onClick = {
             val url = if (!videoId.isNullOrEmpty()) {
-                "https://www.youtube.com/watch?v=$videoId"
+                // Use vnd.youtube scheme to force opening in YouTube app and starting playback
+                "vnd.youtube:$videoId"
             } else {
                 "https://www.youtube.com/results?search_query=${java.net.URLEncoder.encode(query, "UTF-8")}"
             }
+            
             val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
-            context.startActivity(intent)
+            
+            // Fallback for vnd.youtube if the app is not installed
+            if (!videoId.isNullOrEmpty()) {
+                try {
+                    context.startActivity(intent)
+                } catch (e: Exception) {
+                    val webIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://www.youtube.com/watch?v=$videoId"))
+                    context.startActivity(webIntent)
+                }
+            } else {
+                context.startActivity(intent)
+            }
         },
         modifier = modifier.fillMaxWidth().height(48.dp),
         shape = RoundedCornerShape(12.dp),
