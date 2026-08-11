@@ -1,6 +1,6 @@
 # Fortnite Companion
 
-Fortnite Companion is a feature-rich companion app for Fortnite that lets you authenticate and manage your Epic Games accounts, switch between multiple accounts, maintain persistent sessions, and securely import/export your account credentials. View your Battle Royale locker, item shop, player stats, maps, STW data powered by FortniteDB, AES keys, and all cosmetics in the game. Create per-account or universal wishlists, receive shop and wishlist notifications, generate exchange codes for quick Epic Games or Fortnite Mobile sign-ins, and listen to Jam Tracks and Music Packs directly through YouTube.
+Fortnite Companion is a feature-rich companion app for Fortnite that lets you authenticate and manage your Epic Games accounts, switch between multiple accounts, maintain persistent sessions, and securely import/export your account credentials. View your Battle Royale locker, item shop, player stats, maps, STW data powered by FortniteDB, AES keys, and all cosmetics in the game. Create per-account or universal wishlists, receive shop and wishlist notifications, generate exchange codes for quick Epic Games or Fortnite Mobile sign-ins, generate images of your BR locker,  and listen to Jam Tracks and Music Packs directly through YouTube.
 
 ## Security & Privacy
 
