@@ -323,34 +323,100 @@ fun ShopScreen(
         val videoId by cosmeticsViewModel.selectedVideoId.collectAsState()
         val isSearchingVideo by cosmeticsViewModel.isSearchingVideo.collectAsState()
 
+        val allItemsForEntry = remember(entry) { getItemsForEntry(entry) }
+        val firstItemRaw = allItemsForEntry.firstOrNull()
+        val cosmeticsState = cosmeticsViewModel.uiState.collectAsState().value as? com.dhyper.fncompanion.ui.viewmodels.CosmeticsUiState.Success
+        
+        val firstItem = remember(firstItemRaw, cosmeticsState) {
+            if (firstItemRaw == null) return@remember null
+            cosmeticsState?.allItems?.find { it.id.equals(firstItemRaw.id, ignoreCase = true) } ?: firstItemRaw
+        }
+
+        LaunchedEffect(entry.offerId ?: entry.devName) {
+            if (firstItem != null) {
+                val isTrack = firstItem.id.startsWith("sid_", ignoreCase = true) || 
+                             firstItem.type?.displayValue?.contains("Track", ignoreCase = true) == true
+                val isMusicPack = firstItem.id.startsWith("MusicPack_", ignoreCase = true)
+                if (isTrack || isMusicPack) {
+                    cosmeticsViewModel.searchYouTubeForItem(firstItem)
+                }
+            }
+        }
+
         ModalBottomSheet(
             onDismissRequest = { selectedEntryForDetail = null },
             sheetState = rememberModalBottomSheetState(),
-            containerColor = MaterialTheme.colorScheme.surface
+            containerColor = SleekSurface
         ) {
-            ShopItemDetailSheet(
-                entry = entry,
-                wishlistIds = successState?.wishlistIds ?: emptySet(),
-                ownedIds = successState?.ownedIds ?: emptySet(),
-                videoId = videoId,
-                isSearchingVideo = isSearchingVideo,
-                onWishlistToggle = { item -> viewModel.toggleWishlist(item) },
-                onCosmeticClick = { cosmetic -> selectedCosmeticDetail = cosmetic },
-                onClose = { selectedEntryForDetail = null }
-            )
+            if (firstItem != null) {
+                val entryTitle = getShopEntryTitle(entry)
+                val isRealBundle = entry.bundle != null || allItemsForEntry.size > 1 || entryTitle.contains("Bundle", ignoreCase = true)
+                
+                val displayItem = if (isRealBundle) {
+                    val rarityName = firstItem.rarity?.value ?: firstItem.series?.value ?: if (!entry.tracks.isNullOrEmpty()) "Festival" else "Common"
+                    val shopImg = getShopEntryImage(entry)
+                    com.dhyper.fncompanion.data.models.CosmeticItem(
+                        id = entry.offerId ?: entry.devName ?: "bundle",
+                        name = entryTitle,
+                        description = entry.bundle?.info ?: firstItem.description ?: "",
+                        type = com.dhyper.fncompanion.data.models.CosmeticType("Bundle", "Bundle"),
+                        rarity = com.dhyper.fncompanion.data.models.CosmeticRarity(rarityName, rarityName),
+                        series = firstItem.series,
+                        images = com.dhyper.fncompanion.data.models.CosmeticImages(
+                            smallIcon = shopImg,
+                            featured = shopImg,
+                            background = null,
+                            full_background = null,
+                            icon = shopImg
+                        ),
+                        variants = null, introduction = firstItem.introduction, set = firstItem.set, added = firstItem.added,
+                        artist = firstItem.artist, bpm = firstItem.bpm, duration = firstItem.duration
+                    )
+                } else firstItem
+
+                val isFullyOwned = allItemsForEntry.all { successState?.ownedIds?.contains(it.id.lowercase()) ?: false }
+                val price = entry.finalPrice ?: entry.regularPrice ?: 0
+
+                CosmeticDetailSheet(
+                    item = displayItem,
+                    isOwned = isFullyOwned,
+                    isWishlisted = successState?.wishlistIds?.contains(firstItem.id) ?: false,
+                    videoId = videoId,
+                    isSearchingVideo = isSearchingVideo,
+                    price = price,
+                    includedItems = allItemsForEntry,
+                    onWishlistToggle = { viewModel.toggleWishlist(firstItem) },
+                    onSetClick = { _ ->
+                        selectedSet = firstItem.set
+                        selectedEntryForDetail = null
+                    },
+                    onCosmeticClick = { cosmetic -> 
+                        selectedCosmeticDetail = cosmetic
+                        selectedEntryForDetail = null 
+                    },
+                    onClose = { selectedEntryForDetail = null }
+                )
+            }
         }
     }
 
     // Individual Cosmetic Detail Modal
-    selectedCosmeticDetail?.let { item ->
+    selectedCosmeticDetail?.let { itemRaw ->
         val successState = uiState as? ShopUiState.Success
         val videoId by cosmeticsViewModel.selectedVideoId.collectAsState()
         val isSearchingVideo by cosmeticsViewModel.isSearchingVideo.collectAsState()
+        val cosmeticsState = cosmeticsViewModel.uiState.collectAsState().value as? com.dhyper.fncompanion.ui.viewmodels.CosmeticsUiState.Success
+        
+        val item = remember(itemRaw, cosmeticsState) {
+            cosmeticsState?.allItems?.find { it.id.equals(itemRaw.id, ignoreCase = true) } ?: itemRaw
+        }
 
         // Trigger search in background when detail sheet opens
         LaunchedEffect(item.id) {
-            val isTrack = item.id.startsWith("sid_", ignoreCase = true)
-            if (isTrack) {
+            val isTrack = item.id.startsWith("sid_", ignoreCase = true) || 
+                         item.type?.displayValue?.contains("Track", ignoreCase = true) == true
+            val isMusicPack = item.id.startsWith("MusicPack_", ignoreCase = true)
+            if (isTrack || isMusicPack) {
                 cosmeticsViewModel.searchYouTubeForItem(item)
             }
         }
@@ -849,252 +915,5 @@ fun ShopCategoryHeader(
                 .height(if (isModeHeader) 3.dp else 2.dp)
                 .background(Brush.horizontalGradient(listOf(if (isModeHeader) SleekEmerald else SleekCyan, Color.Transparent)))
         )
-    }
-}
-
-@Composable
-fun DetailRow(label: String, value: String) {
-    Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-        Text(label, modifier = Modifier.width(100.dp), color = SleekTextMuted, fontSize = 13.sp)
-        Text(value, color = SleekTextPrimary, fontSize = 13.sp)
-    }
-}
-
-@Composable
-fun ShopItemDetailSheet(
-    entry: ShopEntry,
-    wishlistIds: Set<String> = emptySet(),
-    ownedIds: Set<String> = emptySet(),
-    videoId: String? = null,
-    isSearchingVideo: Boolean = false,
-    onWishlistToggle: ((com.dhyper.fncompanion.data.models.CosmeticItem) -> Unit)? = null,
-    onCosmeticClick: (com.dhyper.fncompanion.data.models.CosmeticItem) -> Unit,
-    onClose: () -> Unit
-) {
-    val itemsList = remember(entry) { getItemsForEntry(entry) }
-    val firstItem = itemsList.firstOrNull()
-    val isOwned = itemsList.isNotEmpty() && itemsList.all { ownedIds.contains(it.id.lowercase()) }
-    val title = getShopEntryTitle(entry)
-    val imageUrl = getShopEntryImage(entry)
-    
-    val isRealBundle = entry.bundle != null || itemsList.size > 1 || title.contains("Bundle", ignoreCase = true)
-    
-    val rarityName = if (isRealBundle && !entry.bundle?.info.isNullOrBlank()) {
-        entry.bundle?.info!!
-    } else {
-        firstItem?.rarity?.value ?: firstItem?.series?.value ?: if (!entry.tracks.isNullOrEmpty()) "Festival" else "Common"
-    }
-    
-    val rarityColor = if (isRealBundle) SleekPrimary else getRarityColor(rarityName)
-    val price = entry.finalPrice ?: entry.regularPrice ?: 0
-
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(SleekSurface)
-            .padding(16.dp)
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(240.dp)
-                .clip(RoundedCornerShape(16.dp))
-                .border(1.dp, SleekSurfaceBorder, RoundedCornerShape(16.dp))
-                .background(
-                    Brush.verticalGradient(
-                        colors = listOf(rarityColor.copy(alpha = 0.4f), SleekSurfaceVariant)
-                    )
-                )
-        ) {
-            val detailIcon = if (isRealBundle && !entry.bundle?.image.isNullOrBlank()) {
-                entry.bundle?.image
-            } else {
-                imageUrl
-            }
-                             
-            if (!detailIcon.isNullOrEmpty()) {
-                AsyncImage(
-                    model = detailIcon,
-                    contentDescription = title,
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Fit
-                )
-            }
-            
-            if (!isOwned && firstItem != null && onWishlistToggle != null && !isRealBundle) {
-                IconButton(
-                    onClick = { onWishlistToggle(firstItem) },
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(12.dp)
-                        .background(Color.Black.copy(alpha = 0.5f), CircleShape)
-                ) {
-                    val isWishlisted = wishlistIds.any { it.equals(firstItem.id, ignoreCase = true) }
-                    Icon(
-                        imageVector = if (isWishlisted) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                        contentDescription = "Wishlist",
-                        tint = if (isWishlisted) Color.Red else Color.White
-                    )
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        Text(text = title, style = MaterialTheme.typography.headlineMedium, color = SleekTextPrimary, fontWeight = FontWeight.Bold)
-
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 6.dp)) {
-            Text(
-                text = rarityName.uppercase(),
-                color = if (isRealBundle) Color.White else if (getRarityTextColor(rarityColor) == Color.White) Color.White else rarityColor,
-                fontWeight = FontWeight.Bold,
-                fontSize = 14.sp,
-                modifier = if (isRealBundle) Modifier.background(SleekPrimary, RoundedCornerShape(4.dp)).padding(horizontal = 6.dp, vertical = 2.dp) else Modifier
-            )
-            if (!isRealBundle) {
-                firstItem?.type?.displayValue?.let { typeVal ->
-                    Text(" • ", color = SleekTextMuted)
-                    Text(typeVal, color = SleekTextSecondary, fontSize = 14.sp)
-                }
-            }
-        }
-
-        if (!isRealBundle) {
-            firstItem?.description?.let { desc ->
-                if (desc.isNotBlank()) {
-                    Text(text = desc, style = MaterialTheme.typography.bodyMedium, color = SleekTextSecondary, modifier = Modifier.padding(vertical = 8.dp))
-                }
-            }
-        } else {
-            // For bundles, we could show a generic bundle description if available, 
-            // but the API doesn't usually provide one beyond the 'info' field.
-            val bundleDesc = if (!entry.bundle?.info.isNullOrBlank()) "Fortnite Bundle containing ${itemsList.size} items." else ""
-            if (bundleDesc.isNotBlank()) {
-                Text(text = bundleDesc, style = MaterialTheme.typography.bodyMedium, color = SleekTextSecondary, modifier = Modifier.padding(vertical = 8.dp))
-            }
-        }
-
-        val isTrack = firstItem?.id?.startsWith("sid_", true) == true || firstItem?.type?.displayValue?.contains("Track", true) == true
-        val isMusicPack = firstItem?.id?.startsWith("MusicPack_", true) == true
-
-        // --- AUDIO/VIDEO ---
-        if ((isTrack || isMusicPack) && firstItem?.id?.startsWith("JBSID_", true) == false) {
-            if (isTrack && firstItem != null) {
-                firstItem.previewUrl?.let { url ->
-                    Spacer(modifier = Modifier.height(12.dp))
-                    JamTrackPlayer(previewUrl = url)
-                    Spacer(modifier = Modifier.height(12.dp))
-                }
-            }
-            val artist = firstItem?.artist ?: ""
-            val query = when {
-                isTrack && artist.contains("Epic Games", ignoreCase = true) -> "Fortnite ${firstItem?.name} Jam Track -emote"
-                isTrack -> "$artist ${firstItem?.name} official audio"
-                else -> "Fortnite ${firstItem?.name} Music Pack"
-            }
-            if (isSearchingVideo) {
-                Box(modifier = Modifier.fillMaxWidth().height(48.dp), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(color = SleekCyan, modifier = Modifier.size(24.dp))
-                }
-            } else {
-                YouTubeButton(query = query, videoId = videoId)
-            }
-            Spacer(modifier = Modifier.height(16.dp))
-        }
-
-        // --- STYLES / VARIANTS ---
-        if (itemsList.size == 1 && !itemsList.first().variants.isNullOrEmpty()) {
-            val item = itemsList.first()
-            if (!item.id.startsWith("JBSID_", ignoreCase = true)) {
-                Spacer(modifier = Modifier.height(16.dp))
-                Text(text = "AVAILABLE STYLES", style = MaterialTheme.typography.titleMedium, color = SleekTextPrimary, fontWeight = FontWeight.Black)
-                Spacer(modifier = Modifier.height(8.dp))
-                item.variants?.forEach { variant ->
-                    if (!variant.options.isNullOrEmpty()) {
-                        Text(text = variant.type?.uppercase() ?: "VARIANT", fontSize = 11.sp, color = SleekCyan, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 4.dp))
-                        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), contentPadding = PaddingValues(bottom = 12.dp)) {
-                            items(variant.options) { option ->
-                                Card(
-                                    modifier = Modifier.size(80.dp).border(1.dp, SleekSurfaceBorder, RoundedCornerShape(10.dp)),
-                                    shape = RoundedCornerShape(10.dp),
-                                    colors = CardDefaults.cardColors(containerColor = SleekSurfaceVariant)
-                                ) {
-                                    Box(contentAlignment = Alignment.Center) {
-                                        if (!option.image.isNullOrEmpty()) {
-                                            AsyncImage(model = option.image, contentDescription = option.name, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
-                                        }
-                                        Box(modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().background(Color.Black.copy(alpha = 0.6f)).padding(vertical = 2.dp)) {
-                                            Text(text = option.name ?: "Style", color = Color.White, fontSize = 9.sp, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth(), maxLines = 1)
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        if (itemsList.size > 1) {
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(text = "Included Items (${itemsList.size}):", style = MaterialTheme.typography.titleMedium, color = SleekTextPrimary, fontWeight = FontWeight.Bold)
-            Spacer(modifier = Modifier.height(6.dp))
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(itemsList) { item ->
-                    val itemImg = resolveIncludedItemImage(item)
-                    val isItemOwned = ownedIds.contains(item.id.lowercase())
-                    val grayScaleMatrix = ColorMatrix().apply { setToSaturation(0f) }
-                    val colorFilter = if (isItemOwned) ColorFilter.colorMatrix(grayScaleMatrix) else null
-                    Card(
-                        modifier = Modifier.width(110.dp).border(1.dp, if(isItemOwned) Color.Gray.copy(alpha = 0.3f) else SleekSurfaceBorder, RoundedCornerShape(8.dp)).clickable { onCosmeticClick(item) },
-                        shape = RoundedCornerShape(8.dp),
-                        colors = CardDefaults.cardColors(containerColor = if(isItemOwned) SleekSurfaceVariant.copy(alpha = 0.5f) else SleekSurfaceVariant)
-                    ) {
-                        Column(modifier = Modifier.padding(6.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                            Box(modifier = Modifier.size(70.dp).background(SleekSurface)) {
-                                if (!itemImg.isNullOrEmpty()) {
-                                    AsyncImage(model = itemImg, contentDescription = item.name, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Fit, colorFilter = colorFilter)
-                                }
-                                if (isItemOwned) {
-                                    Box(modifier = Modifier.align(Alignment.BottomCenter).background(Color.Black.copy(alpha = 0.7f)).fillMaxWidth()) {
-                                        Text("OWNED", color = Color.White, fontSize = 8.sp, fontWeight = FontWeight.Black, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth().padding(vertical = 1.dp))
-                                    }
-                                }
-                            }
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(text = cleanShopTitle(item.name), fontSize = 10.sp, color = if(isItemOwned) SleekTextMuted else SleekTextPrimary, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
-                        }
-                    }
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                if (isOwned) {
-                    Icon(Icons.Default.CheckCircle, contentDescription = null, tint = SleekEmerald, modifier = Modifier.size(24.dp))
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(text = "OWNED", style = MaterialTheme.typography.titleLarge, color = SleekEmerald, fontWeight = FontWeight.Black)
-                } else {
-                    Box(modifier = Modifier.size(24.dp).background(FortniteGold, CircleShape), contentAlignment = Alignment.Center) {
-                        Text("V", color = Color.Black, fontSize = 14.sp, fontWeight = FontWeight.Black)
-                    }
-                    Spacer(modifier = Modifier.width(8.dp))
-                    val ownedCount = itemsList.count { ownedIds.contains(it.id.lowercase()) }
-                    val hasDiscount = isRealBundle && ownedCount > 0
-                    Column {
-                        Text(text = "$price V-Bucks", style = MaterialTheme.typography.titleLarge, color = if (hasDiscount) SleekEmerald else FortniteGold, fontWeight = FontWeight.Bold)
-                        if (hasDiscount) {
-                            Text(text = "Reduced Price (Owned $ownedCount/${itemsList.size})", fontSize = 10.sp, color = SleekEmerald, fontWeight = FontWeight.Bold)
-                        }
-                    }
-                }
-            }
-            Button(onClick = onClose, colors = ButtonDefaults.buttonColors(containerColor = SleekPrimary), shape = RoundedCornerShape(10.dp)) {
-                Text("Close", color = Color.White, fontWeight = FontWeight.Bold)
-            }
-        }
     }
 }

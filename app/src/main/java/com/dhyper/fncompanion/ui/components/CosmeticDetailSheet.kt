@@ -20,6 +20,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
@@ -35,8 +36,10 @@ fun CosmeticDetailSheet(
     videoId: String?,
     isSearchingVideo: Boolean,
     price: Int? = null,
+    includedItems: List<CosmeticItem>? = null,
     onWishlistToggle: () -> Unit,
     onSetClick: (String) -> Unit,
+    onCosmeticClick: ((CosmeticItem) -> Unit)? = null,
     onClose: () -> Unit
 ) {
     val rarityColor = getRarityColor(item.rarity?.value ?: "")
@@ -218,6 +221,59 @@ fun CosmeticDetailSheet(
             }
         }
         CosmeticDetailRow("Added", item.added?.substringBefore("T") ?: "Unknown")
+
+        if (includedItems != null && includedItems.size > 1) {
+            Spacer(modifier = Modifier.height(16.dp))
+            Text(
+                text = "INCLUDED ITEMS (${includedItems.size})",
+                style = MaterialTheme.typography.titleMedium,
+                color = SleekTextPrimary,
+                fontWeight = FontWeight.Black
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                contentPadding = PaddingValues(bottom = 12.dp)
+            ) {
+                items(includedItems) { subItem ->
+                    Card(
+                        modifier = Modifier
+                            .width(100.dp)
+                            .border(1.dp, SleekSurfaceBorder, RoundedCornerShape(10.dp))
+                            .clickable { onCosmeticClick?.invoke(subItem) },
+                        shape = RoundedCornerShape(10.dp),
+                        colors = CardDefaults.cardColors(containerColor = SleekSurfaceVariant)
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(6.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Box(modifier = Modifier.size(70.dp).background(SleekSurface)) {
+                                val subIcon = subItem.images?.icon ?: subItem.images?.smallIcon ?: subItem.images?.featured
+                                if (!subIcon.isNullOrEmpty()) {
+                                    AsyncImage(
+                                        model = subIcon,
+                                        contentDescription = subItem.name,
+                                        modifier = Modifier.fillMaxSize(),
+                                        contentScale = ContentScale.Fit
+                                    )
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = subItem.name,
+                                fontSize = 10.sp,
+                                color = SleekTextPrimary,
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                textAlign = TextAlign.Center
+                            )
+                        }
+                    }
+                }
+            }
+        }
 
         if (price != null && !isOwned) {
             Spacer(modifier = Modifier.height(16.dp))
