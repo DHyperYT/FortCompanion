@@ -76,14 +76,18 @@ data class ParsedLockerItem(
     val description: String? = null,
     val rarity: String,
     val iconUrl: String? = null,
+    val largeIconUrl: String? = null,
     val isFavorite: Boolean = false,
     val isArchived: Boolean = false,
     val quantity: Int = 1,
     val introduction: CosmeticIntro? = null,
     val set: CosmeticSet? = null,
+    val variants: List<CosmeticVariant>? = null,
     val added: String? = null,
     val previewUrl: String? = null,
-    val artist: String? = null
+    val artist: String? = null,
+    val bpm: Int? = null,
+    val duration: Int? = null
 )
 
 enum class LockerCategory {

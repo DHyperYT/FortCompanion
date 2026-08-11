@@ -15,6 +15,7 @@ import com.dhyper.fncompanion.data.db.SettingsDao
 import com.dhyper.fncompanion.data.db.SettingsEntity
 import com.dhyper.fncompanion.data.repository.AuthRepository
 import com.dhyper.fncompanion.data.models.AuthState
+import com.dhyper.fncompanion.worker.NotificationScheduler
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -161,10 +162,19 @@ class SettingsViewModel(
         }
     }
 
-    fun updateNotifications(enabled: Boolean) {
+    fun updateNotifications(context: Context, enabled: Boolean) {
         viewModelScope.launch {
             val current = settingsDao.getSettingsDirect() ?: SettingsEntity()
             settingsDao.saveSettings(current.copy(notificationsEnabled = enabled))
+            NotificationScheduler.schedule(context)
+        }
+    }
+
+    fun updateNotificationTime(context: Context, hour: Int, minute: Int) {
+        viewModelScope.launch {
+            val current = settingsDao.getSettingsDirect() ?: SettingsEntity()
+            settingsDao.saveSettings(current.copy(notificationHour = hour, notificationMinute = minute))
+            NotificationScheduler.schedule(context)
         }
     }
 

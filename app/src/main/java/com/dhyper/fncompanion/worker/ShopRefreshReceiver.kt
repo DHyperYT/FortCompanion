@@ -7,17 +7,26 @@ import android.content.Context
 import android.content.Intent
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import java.util.Calendar
 import java.util.TimeZone
 
 class ShopRefreshReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action == Intent.ACTION_BOOT_COMPLETED || intent.action == "com.dhyper.fncompanion.ACTION_SHOP_REFRESH") {
-            // 1. Trigger the actual check
-            val request = OneTimeWorkRequestBuilder<ShopCheckWorker>().build()
-            WorkManager.getInstance(context).enqueue(request)
+            // 1. Trigger the actual check only if enabled
+            val db = com.dhyper.fncompanion.data.db.AppDatabase.getDatabase(context)
+            CoroutineScope(Dispatchers.IO).launch {
+                val settings = db.settingsDao().getSettingsDirect()
+                if (settings?.notificationsEnabled != false) {
+                    val request = OneTimeWorkRequestBuilder<ShopCheckWorker>().build()
+                    WorkManager.getInstance(context).enqueue(request)
+                }
+            }
             
-            // 2. Schedule the next alarm
+            // 2. Schedule the next alarm regardless, so it can be re-enabled later
             scheduleNextAlarm(context)
         }
     }

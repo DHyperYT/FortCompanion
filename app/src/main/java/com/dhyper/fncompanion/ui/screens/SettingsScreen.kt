@@ -9,6 +9,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -30,6 +31,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import java.util.Locale
 import coil.compose.AsyncImage
 import com.dhyper.fncompanion.BuildConfig
 import com.dhyper.fncompanion.data.models.AuthState
@@ -309,8 +311,29 @@ fun SettingsScreen(
                     label = "Notifications",
                     subtitle = "Receive shop and wishlist alerts",
                     checked = settings?.notificationsEnabled ?: true,
-                    onCheckedChange = { settingsViewModel.updateNotifications(it) }
+                    onCheckedChange = { settingsViewModel.updateNotifications(context, it) }
                 )
+
+                if (settings?.notificationsEnabled != false) {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    
+                    PreferenceRow(
+                        label = "Alert Time",
+                        value = String.format(Locale.getDefault(), "%02d:%02d", settings?.notificationHour ?: 0, settings?.notificationMinute ?: 1),
+                        onClick = {
+                            val timePicker = android.app.TimePickerDialog(
+                                context,
+                                { _, hour, minute ->
+                                    settingsViewModel.updateNotificationTime(context, hour, minute)
+                                },
+                                settings?.notificationHour ?: 0,
+                                settings?.notificationMinute ?: 1,
+                                true // 24h format
+                            )
+                            timePicker.show()
+                        }
+                    )
+                }
 
                 Spacer(modifier = Modifier.height(16.dp))
 
@@ -442,7 +465,7 @@ fun SettingsScreen(
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     val countdown by settingsViewModel.tokenExpiryCountdown.collectAsState()
-                    val lastRefresh = java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault())
+                    val lastRefresh = java.text.SimpleDateFormat("HH:mm:ss", Locale.getDefault())
                         .format(java.util.Date(active.lastRefreshTimeMs))
 
                     StatusRow("Active Account", active.displayName)
@@ -603,6 +626,28 @@ fun PreferenceDropdown(
                     )
                 }
             }
+        }
+    }
+}
+
+@Composable
+fun PreferenceRow(
+    label: String,
+    value: String,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onClick() }
+            .padding(vertical = 4.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(label, fontWeight = FontWeight.Bold, color = SleekTextPrimary, fontSize = 14.sp)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(value, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Black)
+            Icon(Icons.Default.ChevronRight, null, tint = SleekTextMuted)
         }
     }
 }

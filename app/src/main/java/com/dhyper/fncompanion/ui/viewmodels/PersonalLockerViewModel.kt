@@ -19,8 +19,7 @@ import kotlinx.coroutines.launch
 enum class LockerSortOption(val displayName: String) {
     FAVORITES_FIRST("Favorites First"),
     NAME_ASC("Name (A-Z)"),
-    RARITY_DESC("Rarity (High to Low)"),
-    CATEGORY("Category")
+    RARITY_DESC("Rarity (High to Low)")
 }
 
 sealed class LockerUiState {
@@ -78,8 +77,9 @@ class PersonalLockerViewModel(
                     val defaultSort = LockerSortOption.RARITY_DESC
                     _uiState.value = LockerUiState.Success(
                         allItems = items,
-                        filteredItems = filterAndSort(items, null, false, "", defaultSort),
+                        filteredItems = filterAndSort(items, LockerCategory.OUTFIT, false, "", defaultSort),
                         vbucksBalance = vbucks,
+                        selectedCategory = LockerCategory.OUTFIT,
                         sortOption = defaultSort
                     )
                 },
@@ -209,7 +209,12 @@ class PersonalLockerViewModel(
             val matchQuery = query.isBlank() || 
                              item.name.contains(query, ignoreCase = true) ||
                              item.artist?.contains(query, ignoreCase = true) == true
-            matchCat && matchFav && matchQuery
+            
+            // Filter out "Rare" car bodies and wheels
+            val isRareCarOrWheel = (item.category == LockerCategory.CAR || item.category == LockerCategory.WHEELS) && 
+                                   item.rarity.equals("Rare", ignoreCase = true)
+            
+            matchCat && matchFav && matchQuery && !isRareCarOrWheel
         }
 
         return when (sortOption) {
@@ -222,7 +227,6 @@ class PersonalLockerViewModel(
                 .thenBy { it.rarity }
                 .thenBy { it.name }
             )
-            LockerSortOption.CATEGORY -> filtered.sortedBy { it.category.name }
         }
     }
 

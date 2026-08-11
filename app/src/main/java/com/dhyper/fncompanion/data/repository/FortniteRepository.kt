@@ -153,6 +153,7 @@ class FortniteRepository {
                             rarity = com.dhyper.fncompanion.data.models.CosmeticRarity("Festival", "Festival"),
                             series = null,
                             images = com.dhyper.fncompanion.data.models.CosmeticImages(albumArt, albumArt, albumArt, null, null, albumArt),
+                            variants = null,
                             introduction = null,
                             set = null,
                             added = null,
@@ -179,6 +180,7 @@ class FortniteRepository {
                             rarity = com.dhyper.fncompanion.data.models.CosmeticRarity("Common", "Common"),
                             series = null,
                             images = b.images,
+                            variants = null,
                             introduction = null,
                             set = null,
                             added = null
@@ -188,7 +190,7 @@ class FortniteRepository {
             }
 
             val results = awaitAll(deferredBr, deferredTracks, deferredCars, deferredInstruments, deferredLego, deferredBanners)
-            val combined = results.flatten()
+            val combined = results.flatten().distinctBy { it.id }
             cachedFullCosmetics = combined
             Result.success(combined)
         } catch (e: Exception) {

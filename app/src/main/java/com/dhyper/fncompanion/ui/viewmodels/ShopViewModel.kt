@@ -27,7 +27,8 @@ sealed class ShopUiState {
         val wishlistIds: Set<String> = emptySet(),
         val individualPrices: Map<String, Int> = emptyMap(),
         val skinSetPrices: Map<String, Pair<Int, Set<String>>> = emptyMap(),
-        val shopItemIds: Set<String> = emptySet()
+        val shopItemIds: Set<String> = emptySet(),
+        val isJamTracksExpanded: Boolean = false
     ) : ShopUiState()
     data class Error(val message: String) : ShopUiState()
 }
@@ -53,6 +54,8 @@ class ShopViewModel(
     private val _wishlistIds = MutableStateFlow<Set<String>>(emptySet())
     val wishlistIds: StateFlow<Set<String>> = _wishlistIds.asStateFlow()
 
+    private val _isJamTracksExpanded = MutableStateFlow(false)
+
     private var currentShopData: ShopData? = null
 
     @OptIn(kotlinx.coroutines.FlowPreview::class)
@@ -64,7 +67,7 @@ class ShopViewModel(
         observeAccountChanges()
         
         // Main UI State Pipeline
-        combine(debouncedSearchQuery, _selectedCategory, _wishlistIds, _ownedIds) { query, cat, wishlist, owned ->
+        combine(debouncedSearchQuery, _selectedCategory, _wishlistIds, _ownedIds, _isJamTracksExpanded) { query, cat, wishlist, owned, expanded ->
             val data = currentShopData ?: return@combine null
             val allEntries = data.entries ?: emptyList()
             
@@ -73,32 +76,7 @@ class ShopViewModel(
             val allShopIds = mutableSetOf<String>()
 
             allEntries.forEach { entry ->
-                val trackItems = entry.tracks?.map { t ->
-                    val trackMap = t.track as? Map<*, *>
-                    val apiCosmeticId = trackMap?.get("id")?.toString()
-                    val sidFromDevName = Regex("""sid_[a-zA-Z0-9_]+""").find(t.devName ?: "")?.value
-                    val idField = t.id ?: ""
-                    
-                    val realId = when {
-                        !apiCosmeticId.isNullOrBlank() -> apiCosmeticId
-                        !sidFromDevName.isNullOrBlank() -> sidFromDevName
-                        !idField.startsWith("v2:/") -> idField
-                        else -> idField
-                    }
-                    
-                    com.dhyper.fncompanion.data.models.CosmeticItem(
-                        id = realId,
-                        name = t.title ?: t.devName ?: "Track",
-                        description = "", type = null, rarity = null, series = null, images = null, introduction = null, set = null, added = null
-                    )
-                } ?: emptyList()
-
-                val items = (entry.items ?: emptyList()) + 
-                           (entry.brItems ?: emptyList()) + 
-                           (entry.cars ?: emptyList()) + 
-                           (entry.vehicles ?: emptyList()) + 
-                           (entry.instruments ?: emptyList()) +
-                           trackItems
+                val items = getItemsForEntryInternal(entry)
                 
                 items.forEach { allShopIds.add(it.id.lowercase()) }
 
@@ -122,7 +100,8 @@ class ShopViewModel(
                 wishlistIds = wishlist,
                 individualPrices = indPrices,
                 skinSetPrices = setPrices,
-                shopItemIds = allShopIds
+                shopItemIds = allShopIds,
+                isJamTracksExpanded = expanded
             )
         }.filterNotNull()
          .flowOn(kotlinx.coroutines.Dispatchers.Default)
@@ -264,42 +243,154 @@ class ShopViewModel(
 
     private fun getShopEntryTitleInternal(entry: ShopEntry): String {
         if (!entry.bundle?.name.isNullOrBlank()) return entry.bundle?.name!!
-        val allItems = (entry.items ?: emptyList()) + (entry.brItems ?: emptyList())
+        
+        val allItems = getItemsForEntryInternal(entry)
         val firstItemName = allItems.firstOrNull { !it.name.isNullOrBlank() }?.name
         return firstItemName ?: entry.devName ?: "Cosmetic"
     }
 
-    private fun sortEntries(entries: List<ShopEntry>): List<ShopEntry> {
-        return entries.sortedWith(
-            compareBy<ShopEntry> { entry ->
-                val sectionName = entry.section?.name ?: ""
-                val lowerSectionName = sectionName.lowercase()
-                val layoutCategory = entry.layout?.category?.lowercase() ?: ""
-                val entryCategories = entry.categories?.map { it.lowercase() } ?: emptyList()
-                
-                // Specific Detection for sections
-                val isJamTrackSection = lowerSectionName.contains("jam tracks") || 
-                                        lowerSectionName.contains("festival")
-                                 
-                val isVehicleSection = lowerSectionName.contains("racing") || 
-                                      lowerSectionName.contains("car") || 
-                                      lowerSectionName.contains("vehicle") || 
-                                      entryCategories.contains("cars") ||
-                                      layoutCategory.contains("car")
-                
-                val priority = when {
-                    isVehicleSection -> 2 // Vehicles -> Absolute Bottom
-                    isJamTrackSection -> 1 // Jam Tracks -> Just above vehicles
-                    lowerSectionName.contains("lego") || layoutCategory.contains("juno") -> 3 // LEGO -> Middle
-                    else -> 0 // Battle Royale & Featured -> Top
-                }
+    private fun getItemsForEntryInternal(entry: ShopEntry): List<com.dhyper.fncompanion.data.models.CosmeticItem> {
+        val itemMap = mutableMapOf<String, com.dhyper.fncompanion.data.models.CosmeticItem>()
+        val orderedIds = mutableListOf<String>()
 
-                priority
+        fun processList(list: List<com.dhyper.fncompanion.data.models.CosmeticItem>?) {
+            list?.forEach { item ->
+                if (item.id.isBlank()) return@forEach
+                if (!itemMap.containsKey(item.id)) {
+                    orderedIds.add(item.id)
+                }
+                val existing = itemMap[item.id]
+                // Prefer the object with images/metadata
+                if (existing == null || (existing.images == null && item.images != null)) {
+                    itemMap[item.id] = item
+                }
             }
-            .thenBy { it.section?.index ?: Int.MAX_VALUE }
-            .thenBy { it.layout?.index ?: Int.MAX_VALUE }
-            .thenBy { it.devName ?: "" }
-        )
+        }
+
+        processList(entry.brItems)
+        processList(entry.cars)
+        processList(entry.vehicles)
+        processList(entry.instruments)
+        processList(entry.items)
+
+        entry.tracks?.forEach { t ->
+            val trackMap = t.track as? Map<*, *>
+            val apiCosmeticId = trackMap?.get("id")?.toString()
+            val sidFromDevName = Regex("""sid_[a-zA-Z0-9_]+""").find(t.devName ?: "")?.value
+            val idField = t.id ?: ""
+            val realId = when {
+                !apiCosmeticId.isNullOrBlank() -> apiCosmeticId
+                !sidFromDevName.isNullOrBlank() -> sidFromDevName
+                !idField.startsWith("v2:/") -> idField
+                else -> idField
+            }
+            if (!itemMap.containsKey(realId)) {
+                orderedIds.add(realId)
+            }
+            val albumArt = t.albumArt
+            val title = trackMap?.get("title")?.toString() ?: t.title ?: t.devName ?: "Track"
+            val artist = trackMap?.get("artist")?.toString() ?: t.artist ?: "Unknown Artist"
+
+            itemMap[realId] = com.dhyper.fncompanion.data.models.CosmeticItem(
+                id = realId, name = title, description = "Jam Track by $artist",
+                type = com.dhyper.fncompanion.data.models.CosmeticType("Track", "Jam Track"),
+                rarity = com.dhyper.fncompanion.data.models.CosmeticRarity("Festival", "Festival"),
+                series = null, images = com.dhyper.fncompanion.data.models.CosmeticImages(albumArt, albumArt, albumArt, null, null, albumArt),
+                variants = null, introduction = null, set = null, added = null,
+                artist = artist
+            )
+        }
+
+        return orderedIds.mapNotNull { itemMap[it] }
+    }
+
+    private fun sortEntries(entries: List<ShopEntry>): List<ShopEntry> {
+        val sectionOrder = mutableListOf<String>()
+        val sectionsMap = mutableMapOf<String, MutableList<ShopEntry>>()
+
+        fun getSectionId(entry: ShopEntry): String {
+            // Respect layout.id primarily as the logical section identity
+            return entry.layout?.id ?: entry.section?.id ?: entry.section?.name ?: "default"
+        }
+
+        entries.forEach { entry ->
+            val sid = getSectionId(entry)
+            if (!sectionsMap.containsKey(sid)) {
+                sectionOrder.add(sid)
+                sectionsMap[sid] = mutableListOf()
+            }
+            sectionsMap[sid]!!.add(entry)
+        }
+
+        fun isJamTrackOffer(entry: ShopEntry): Boolean {
+            return !entry.tracks.isNullOrEmpty() || entry.layout?.id == "JT080726" || entry.section?.name?.contains("Jam Tracks", true) == true
+        }
+
+        fun isVehicleOnlyOffer(entry: ShopEntry): Boolean {
+            // Vehicle only means has cars and no BR items, tracks, or instruments
+            return !entry.cars.isNullOrEmpty() && 
+                   entry.brItems.isNullOrEmpty() && 
+                   entry.tracks.isNullOrEmpty() && 
+                   entry.instruments.isNullOrEmpty()
+        }
+
+        fun isSpecialOffer(entry: ShopEntry): Boolean {
+            return entry.section?.name?.contains("Special Offers", true) == true || 
+                   entry.layout?.name?.contains("Special Offers", true) == true
+        }
+
+        val normalSectionOrder = mutableListOf<String>()
+        val vehicleOnlyEntries = mutableListOf<ShopEntry>()
+        val specialOfferEntries = mutableListOf<ShopEntry>()
+        val jamTrackEntries = mutableListOf<ShopEntry>()
+
+        sectionOrder.forEach { sid ->
+            val group = sectionsMap[sid]!!
+            
+            val isJamTrack = group.all { isJamTrackOffer(it) }
+            val isSpecialOffer = !isJamTrack && group.all { isSpecialOffer(it) }
+            val isPureVehicle = !isJamTrack && !isSpecialOffer && group.all { isVehicleOnlyOffer(it) }
+
+            when {
+                isJamTrack -> jamTrackEntries.addAll(group)
+                isSpecialOffer -> specialOfferEntries.addAll(group)
+                isPureVehicle -> vehicleOnlyEntries.addAll(group)
+                else -> normalSectionOrder.add(sid)
+            }
+        }
+
+        val result = mutableListOf<ShopEntry>()
+        
+        // 1. Add Normal/Mixed sections in their original order
+        normalSectionOrder.forEach { sid ->
+            result.addAll(sectionsMap[sid]!!)
+        }
+        
+        // 2. Add Combined Vehicles section
+        if (vehicleOnlyEntries.isNotEmpty()) {
+            val vehicleSection = com.dhyper.fncompanion.data.models.ShopSectionMetadata(
+                id = "combined_vehicles", name = "Vehicles", index = null, landingPriority = null
+            )
+            result.addAll(vehicleOnlyEntries.map { it.copy(section = vehicleSection) })
+        }
+        
+        // 3. Add Combined Special Offers section (above Jam Tracks)
+        if (specialOfferEntries.isNotEmpty()) {
+            val specialSection = com.dhyper.fncompanion.data.models.ShopSectionMetadata(
+                id = "combined_special_offers", name = "Special Offers", index = null, landingPriority = null
+            )
+            result.addAll(specialOfferEntries.map { it.copy(section = specialSection) })
+        }
+        
+        // 4. Add Combined Jam Tracks section (at the very bottom)
+        if (jamTrackEntries.isNotEmpty()) {
+            val jamTrackSection = com.dhyper.fncompanion.data.models.ShopSectionMetadata(
+                id = "combined_jam_tracks", name = "Jam Tracks", index = null, landingPriority = null
+            )
+            result.addAll(jamTrackEntries.map { it.copy(section = jamTrackSection) })
+        }
+        
+        return result
     }
 
     fun setCategory(category: String) {
@@ -308,6 +399,10 @@ class ShopViewModel(
 
     fun setSearchQuery(query: String) {
         _searchQuery.value = query
+    }
+
+    fun toggleJamTracks() {
+        _isJamTracksExpanded.value = !_isJamTracksExpanded.value
     }
 
     fun toggleWishlist(item: com.dhyper.fncompanion.data.models.CosmeticItem) {
@@ -362,7 +457,7 @@ class ShopViewModel(
                           (entry.vehicles ?: emptyList()) + 
                           (entry.instruments ?: emptyList()) +
                           trackIds.map { id -> 
-                              com.dhyper.fncompanion.data.models.CosmeticItem(id = id, name = "", description = null, type = null, rarity = null, series = null, images = null, introduction = null, set = null, added = null)
+                              com.dhyper.fncompanion.data.models.CosmeticItem(id = id, name = "", description = null, type = null, rarity = null, series = null, images = null, variants = null, introduction = null, set = null, added = null)
                           }
             val title = getShopEntryTitleInternal(entry)
             val skin = allItems.find { it.type?.value?.equals("outfit", ignoreCase = true) == true }
@@ -375,6 +470,7 @@ class ShopViewModel(
                 "Outfit" -> allItems.any { it.type?.displayValue?.contains("Outfit", ignoreCase = true) == true || it.id.startsWith("CID_", ignoreCase = true) || it.id.startsWith("Character_", ignoreCase = true) }
                 "Back Bling" -> allItems.any { it.type?.displayValue?.contains("Back Bling", ignoreCase = true) == true || it.id.startsWith("BID_", ignoreCase = true) || it.id.startsWith("Backpack_", ignoreCase = true) || it.id.startsWith("PetID_", ignoreCase = true) || it.id.startsWith("PetCarrier_", ignoreCase = true) || it.id.contains("AthenaPet", ignoreCase = true) }
                 "Pickaxe" -> allItems.any { it.type?.displayValue?.contains("Pickaxe", ignoreCase = true) == true || it.id.startsWith("Pickaxe_", ignoreCase = true) }
+                "Buried" -> allItems.any { it.type?.displayValue?.contains("Buried", ignoreCase = true) == true }
                 "Glider" -> allItems.any { it.type?.displayValue?.contains("Glider", ignoreCase = true) == true || it.id.startsWith("Glider_", ignoreCase = true) }
                 "Emote" -> allItems.any { it.type?.displayValue?.contains("Emote", ignoreCase = true) == true || it.id.startsWith("EID_", ignoreCase = true) || it.id.startsWith("Dance_", ignoreCase = true) }
                 "Wrap" -> allItems.any { it.id.startsWith("Wrap_", ignoreCase = true) }

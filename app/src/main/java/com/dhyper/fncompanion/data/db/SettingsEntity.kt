@@ -10,5 +10,7 @@ data class SettingsEntity(
     val firstLaunchHandled: Boolean = false,
     val useUniversalWishlist: Boolean = false,
     val accentColor: String = "Cyan", // "Cyan", "Primary", "Emerald", "Gold"
-    val notificationsEnabled: Boolean = true
+    val notificationsEnabled: Boolean = true,
+    val notificationHour: Int = 0,
+    val notificationMinute: Int = 1
 )

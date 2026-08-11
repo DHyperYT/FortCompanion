@@ -2,6 +2,8 @@ package com.dhyper.fncompanion.ui.screens
 
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
@@ -348,8 +350,15 @@ fun CosmeticDetailSheet(
                 .clip(RoundedCornerShape(16.dp))
                 .background(Brush.verticalGradient(listOf(rarityColor.copy(alpha = 0.4f), SleekSurfaceVariant)))
         ) {
+            val detailIcon = item.images?.large ?: 
+                             item.images?.legoLarge ?:
+                             item.images?.featured ?: 
+                             item.images?.icon ?: 
+                             item.images?.smallIcon ?:
+                             item.images?.small
+                             
             AsyncImage(
-                model = item.images?.featured ?: item.images?.icon ?: item.images?.smallIcon,
+                model = detailIcon,
                 contentDescription = item.name,
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Fit
@@ -385,7 +394,7 @@ fun CosmeticDetailSheet(
         val isMusicPack = item.id.startsWith("MusicPack_", ignoreCase = true)
 
         // --- AUDIO/VIDEO ---
-        if (isTrack || isMusicPack) {
+        if ((isTrack || isMusicPack) && item.id.startsWith("CID_", ignoreCase = true) == false && !item.id.startsWith("JBSID_", ignoreCase = true)) {
             // 1. Prioritize 30s Official Preview (for tracks)
             if (isTrack) {
                 item.previewUrl?.let { url ->
@@ -414,6 +423,70 @@ fun CosmeticDetailSheet(
             }
         }
 
+        // --- STYLES / VARIANTS ---
+        if (!item.variants.isNullOrEmpty()) {
+            Spacer(modifier = Modifier.height(16.dp))
+            Text(
+                text = "AVAILABLE STYLES",
+                style = MaterialTheme.typography.titleMedium,
+                color = SleekTextPrimary,
+                fontWeight = FontWeight.Black
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            item.variants.forEach { variant ->
+                if (!variant.options.isNullOrEmpty()) {
+                    Text(
+                        text = variant.type?.uppercase() ?: "VARIANT",
+                        fontSize = 11.sp,
+                        color = SleekCyan,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(bottom = 4.dp)
+                    )
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        contentPadding = PaddingValues(bottom = 12.dp)
+                    ) {
+                        items(variant.options) { option ->
+                            Card(
+                                modifier = Modifier
+                                    .size(80.dp)
+                                    .border(1.dp, SleekSurfaceBorder, RoundedCornerShape(10.dp)),
+                                shape = RoundedCornerShape(10.dp),
+                                colors = CardDefaults.cardColors(containerColor = SleekSurfaceVariant)
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    if (!option.image.isNullOrEmpty()) {
+                                        AsyncImage(
+                                            model = option.image,
+                                            contentDescription = option.name,
+                                            modifier = Modifier.fillMaxSize(),
+                                            contentScale = ContentScale.Fit
+                                        )
+                                    }
+                                    Box(
+                                        modifier = Modifier
+                                            .align(Alignment.BottomCenter)
+                                            .fillMaxWidth()
+                                            .background(Color.Black.copy(alpha = 0.6f))
+                                            .padding(vertical = 2.dp)
+                                    ) {
+                                        Text(
+                                            text = option.name ?: "Style",
+                                            color = Color.White,
+                                            fontSize = 9.sp,
+                                            textAlign = TextAlign.Center,
+                                            modifier = Modifier.fillMaxWidth(),
+                                            maxLines = 1
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = SleekSurfaceBorder)
 
         CosmeticDetailRow("Item ID", item.id)
@@ -424,7 +497,7 @@ fun CosmeticDetailSheet(
             item.duration?.let { 
                 val mins = it / 60
                 val secs = it % 60
-                CosmeticDetailRow("Duration", String.format("%d:%02d", mins, secs))
+                CosmeticDetailRow("Duration", String.format(java.util.Locale.US, "%d:%02d", mins, secs))
             }
         }
 
@@ -558,15 +631,21 @@ fun CosmeticBrowserCard(
                             else Brush.verticalGradient(listOf(rarityColor.copy(alpha = 0.4f), Color.Transparent))
                         )
                 ) {
-                    val iconToLoad = item.images?.icon 
-                        ?: item.images?.largeIcon
-                        ?: item.images?.smallIcon 
-                        ?: item.images?.featured
-                        ?: item.images?.icon_background
-                        ?: item.images?.other?.get("background")
-                        ?: item.images?.lego?.get("wide")
-                        ?: item.images?.lego?.get("large")
-                        ?: item.images?.background
+                    val iconToLoad = when {
+                        item.type?.value?.contains("lego", true) == true || item.id.startsWith("JBSID_", true) -> 
+                            item.images?.legoSmall ?: item.images?.lego?.small ?: item.images?.lego?.large ?: item.images?.lego?.icon ?: item.images?.large ?: item.images?.small ?: item.images?.icon
+                        item.type?.value?.contains("track", true) == true || item.id.startsWith("sid_", true) -> 
+                            item.images?.coverart ?: item.images?.albumArt ?: item.images?.other?.albumArt ?: item.images?.featured
+                        item.type?.value?.contains("car", true) == true || item.type?.value?.contains("wheel", true) == true || 
+                        item.type?.value?.contains("boost", true) == true || item.type?.value?.contains("trail", true) == true ->
+                            item.images?.featured ?: item.images?.decal ?: item.images?.large ?: item.images?.icon ?: item.images?.smallIcon
+                        item.type?.value?.contains("instrument", true) == true || item.id.startsWith("Sparks_", true) ||
+                        item.type?.value?.contains("guitar", true) == true || item.type?.value?.contains("bass", true) == true ||
+                        item.type?.value?.contains("drum", true) == true || item.type?.value?.contains("mic", true) == true ->
+                            item.images?.large ?: item.images?.small ?: item.images?.featured ?: item.images?.icon
+                        else -> 
+                            item.images?.icon ?: item.images?.smallIcon ?: item.images?.largeIcon ?: item.images?.featured
+                    } ?: item.images?.icon_background ?: item.images?.other?.background ?: item.images?.background ?: item.images?.full_background
 
                     AsyncImage(
                         model = coil.request.ImageRequest.Builder(androidx.compose.ui.platform.LocalContext.current)

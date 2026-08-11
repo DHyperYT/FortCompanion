@@ -311,7 +311,6 @@ fun PersonalLockerScreen(
 
                     // Category Chips
                     val categories = listOf(
-                        null to "All",
                         LockerCategory.OUTFIT to "Outfits",
                         LockerCategory.BACK_BLING to "Back Blings",
                         LockerCategory.PICKAXE to "Pickaxes",
@@ -555,7 +554,7 @@ fun PersonalLockerScreen(
                                     description = item.description,
                                     artist = item.artist,
                                     type = if (isMusicPack) com.dhyper.fncompanion.data.models.CosmeticType("Music", "Music Pack") else null,
-                                    rarity = null, series = null, images = null, introduction = null, set = null, added = null
+                                    rarity = null, series = null, images = null, variants = null, introduction = null, set = null, added = null
                                 )
                                 cosmeticsViewModel.searchYouTubeForItem(dummy)
                             }
@@ -712,10 +711,7 @@ fun LockerItemCard(
                 val iconToLoad = item.iconUrl ?: "" 
                 
                 AsyncImage(
-                    model = coil.request.ImageRequest.Builder(androidx.compose.ui.platform.LocalContext.current)
-                        .data(iconToLoad)
-                        .crossfade(true)
-                        .build(),
+                    model = iconToLoad,
                     contentDescription = item.name,
                     modifier = Modifier.fillMaxSize().padding(if (item.category == LockerCategory.OUTFIT) 0.dp else 4.dp),
                     contentScale = ContentScale.Fit
@@ -800,9 +796,10 @@ fun LockerDetailSheet(
                 ),
             contentAlignment = Alignment.Center
         ) {
-            if (!item.iconUrl.isNullOrEmpty()) {
+            val detailIcon = item.largeIconUrl ?: item.iconUrl
+            if (!detailIcon.isNullOrEmpty()) {
                 AsyncImage(
-                    model = item.iconUrl,
+                    model = detailIcon,
                     contentDescription = item.name,
                     modifier = Modifier.fillMaxSize().padding(8.dp),
                     contentScale = ContentScale.Fit
@@ -871,7 +868,7 @@ fun LockerDetailSheet(
         val isTrack = item.category == LockerCategory.JAM_TRACK || item.templateId.contains("sid_", ignoreCase = true)
         val isMusicPack = item.category == LockerCategory.MUSIC || item.templateId.contains("MusicPack_", ignoreCase = true)
         
-        if (isTrack || isMusicPack) {
+        if ((isTrack || isMusicPack) && item.category != LockerCategory.LEGO_BUILD && item.category != LockerCategory.LEGO_DECOR) {
             // 1. Prioritize 30s Official Preview (for tracks)
             if (isTrack) {
                 item.previewUrl?.let { url ->
@@ -900,6 +897,70 @@ fun LockerDetailSheet(
             }
         }
 
+        // --- STYLES / VARIANTS ---
+        if (!item.variants.isNullOrEmpty()) {
+            Spacer(modifier = Modifier.height(16.dp))
+            Text(
+                text = "AVAILABLE STYLES",
+                style = MaterialTheme.typography.titleMedium,
+                color = SleekTextPrimary,
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            item.variants.forEach { variant ->
+                if (!variant.options.isNullOrEmpty()) {
+                    Text(
+                        text = variant.type?.uppercase() ?: "VARIANT",
+                        fontSize = 11.sp,
+                        color = SleekCyan,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(bottom = 4.dp)
+                    )
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        contentPadding = PaddingValues(bottom = 12.dp)
+                    ) {
+                        items(variant.options) { option ->
+                            Card(
+                                modifier = Modifier
+                                    .size(70.dp)
+                                    .border(1.dp, SleekSurfaceBorder, RoundedCornerShape(8.dp)),
+                                shape = RoundedCornerShape(8.dp),
+                                colors = CardDefaults.cardColors(containerColor = SleekSurfaceVariant)
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    if (!option.image.isNullOrEmpty()) {
+                                        AsyncImage(
+                                            model = option.image,
+                                            contentDescription = option.name,
+                                            modifier = Modifier.fillMaxSize(),
+                                            contentScale = ContentScale.Fit
+                                        )
+                                    }
+                                    Box(
+                                        modifier = Modifier
+                                            .align(Alignment.BottomCenter)
+                                            .fillMaxWidth()
+                                            .background(Color.Black.copy(alpha = 0.6f))
+                                            .padding(vertical = 2.dp)
+                                    ) {
+                                        Text(
+                                            text = option.name ?: "Style",
+                                            color = Color.White,
+                                            fontSize = 8.sp,
+                                            textAlign = TextAlign.Center,
+                                            modifier = Modifier.fillMaxWidth(),
+                                            maxLines = 1
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         Spacer(modifier = Modifier.height(16.dp))
 
         Card(
@@ -910,11 +971,14 @@ fun LockerDetailSheet(
             Column(modifier = Modifier.padding(12.dp)) {
                 LockerDetailRow("Item ID", item.cosmeticId)
                 
-                // Track metadata for locker too
-                if (item.category == LockerCategory.JAM_TRACK || item.templateId.contains("sid_", ignoreCase = true)) {
-                    // Note: We'd need to extend ParsedLockerItem to store BPM/Duration
-                    // for full native support, but for now we rely on the preview player
-                    // being present if the URL was mapped.
+                // Track metadata for locker
+                if (isTrack) {
+                    item.bpm?.let { LockerDetailRow("BPM", it.toString()) }
+                    item.duration?.let { 
+                        val mins = it / 60
+                        val secs = it % 60
+                        LockerDetailRow("Duration", String.format(java.util.Locale.US, "%d:%02d", mins, secs))
+                    }
                 }
 
                 item.introduction?.let {

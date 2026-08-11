@@ -124,7 +124,7 @@ object LockerImageGenerator {
             }
             canvas.drawRoundRect(cardRect, 24f * scale, 24f * scale, borderPaint)
 
-            // 4. Icon (Maximized)
+            // 4. Icon (Maximized with robust fallback)
             if (!item.iconUrl.isNullOrEmpty()) {
                 val request = ImageRequest.Builder(context)
                     .data(item.iconUrl)
@@ -136,13 +136,12 @@ object LockerImageGenerator {
                 if (result is SuccessResult) {
                     val iconBitmap = (result.drawable as android.graphics.drawable.BitmapDrawable).bitmap
                     
-                    // Destination: Fill card but leave small gap for border + bottom overlay
-                    // No artificial padding, let drawBitmapCentered handle ratio
+                    val padding = (6 * scale).toInt()
                     val iconDest = Rect(
-                        left + (6 * scale).toInt(), 
-                        top + (6 * scale).toInt(), 
-                        right - (6 * scale).toInt(), 
-                        bottom - (6 * scale).toInt()
+                        left + padding, 
+                        top + padding, 
+                        right - padding, 
+                        bottom - padding
                     )
                     drawBitmapCentered(canvas, iconBitmap, iconDest, paint)
                 }

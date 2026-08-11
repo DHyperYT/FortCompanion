@@ -30,9 +30,12 @@ class ShopCheckWorker(
         val accounts = authDao.getAllAccounts().first()
         if (accounts.isEmpty()) return Result.success()
 
-        // 2. Check universal wishlist setting
+        // 2. Check settings
         val settings = settingsDao.getSettingsDirect()
         val isUniversal = settings?.useUniversalWishlist == true
+        val notificationsEnabled = settings?.notificationsEnabled ?: true
+
+        if (!notificationsEnabled && !isManualTest) return Result.success()
 
         // 3. Fetch the shop once
         val shopResult = repository.fetchItemShop()

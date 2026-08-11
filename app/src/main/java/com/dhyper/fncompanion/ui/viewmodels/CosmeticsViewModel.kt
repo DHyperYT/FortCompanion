@@ -15,8 +15,7 @@ import kotlinx.coroutines.launch
 enum class CosmeticSortOption(val displayName: String) {
     NAME_ASC("Name (A-Z)"),
     ADDED_DESC("Date Added (New)"),
-    RARITY_DESC("Rarity (High-Low)"),
-    TYPE("Type")
+    RARITY_DESC("Rarity (High-Low)")
 }
 
 sealed class CosmeticsUiState {
@@ -157,33 +156,23 @@ class CosmeticsViewModel(
             when (sort) {
                 CosmeticSortOption.NAME_ASC -> list.sortedBy { it.name }
                 CosmeticSortOption.ADDED_DESC -> {
-                    list.sortedWith { a, b ->
-                        val dateA = a.added ?: ""
-                        val dateB = b.added ?: ""
-                        val isFallbackDate = dateA.startsWith("2019-11-20") && dateB.startsWith("2019-11-20")
-                        if (!isFallbackDate) {
-                            val dateCmp = dateB.compareTo(dateA)
-                            if (dateCmp != 0) return@sortedWith dateCmp
+                    list.sortedWith(
+                        compareByDescending<CosmeticItem> { it.added ?: "" }
+                        .thenByDescending { extractNumericFromId(it.id) }
+                        .thenByDescending { 
+                            SeasonUtils.getGlobalSeasonNumber(
+                                it.introduction?.chapter?.toIntOrNull() ?: 1, 
+                                it.introduction?.season?.toIntOrNull() ?: 1
+                            )
                         }
-                        val numA = extractNumericFromId(a.id)
-                        val numB = extractNumericFromId(b.id)
-                        if (numA > 0 && numB > 0) {
-                            val numCmp = numB.compareTo(numA)
-                            if (numCmp != 0) return@sortedWith numCmp
-                        }
-                        val globalA = SeasonUtils.getGlobalSeasonNumber(a.introduction?.chapter?.toIntOrNull() ?: 1, a.introduction?.season?.toIntOrNull() ?: 1)
-                        val globalB = SeasonUtils.getGlobalSeasonNumber(b.introduction?.chapter?.toIntOrNull() ?: 1, b.introduction?.season?.toIntOrNull() ?: 1)
-                        val seasonCmp = globalB.compareTo(globalA)
-                        if (seasonCmp != 0) return@sortedWith seasonCmp
-                        a.name.compareTo(b.name)
-                    }
+                        .thenBy { it.name }
+                    )
                 }
                 CosmeticSortOption.RARITY_DESC -> list.sortedWith(
                     compareByDescending<CosmeticItem> { getRarityRank(it.series?.value ?: it.rarity?.value) }
                     .thenBy { it.series?.value ?: it.rarity?.value }
                     .thenBy { it.name }
                 )
-                CosmeticSortOption.TYPE -> list.sortedBy { it.type?.displayValue ?: "" }
             }
         }
 

@@ -111,7 +111,15 @@ data class ShopBanner(
 @JsonClass(generateAdapter = true)
 data class NewDisplayAsset(
     val id: String?,
-    val materialInstances: List<MaterialInstance>?
+    val cosmeticId: String? = null,
+    val materialInstances: List<MaterialInstance>?,
+    val renderImages: List<RenderImage>? = null
+)
+
+@JsonClass(generateAdapter = true)
+data class RenderImage(
+    val image: String?,
+    val productTag: String? = null
 )
 
 @JsonClass(generateAdapter = true)
@@ -129,6 +137,7 @@ data class CosmeticItem(
     val rarity: CosmeticRarity?,
     val series: CosmeticSeries?,
     val images: CosmeticImages?,
+    val variants: List<CosmeticVariant>?,
     val introduction: CosmeticIntro?,
     val set: CosmeticSet?,
     val added: String?,
@@ -137,6 +146,21 @@ data class CosmeticItem(
     val album: String? = null,
     val bpm: Int? = null,
     val duration: Int? = null
+)
+
+@JsonClass(generateAdapter = true)
+data class CosmeticVariant(
+    val channel: String?,
+    val type: String?,
+    val options: List<CosmeticVariantOption>?
+)
+
+@JsonClass(generateAdapter = true)
+data class CosmeticVariantOption(
+    val tag: String?,
+    val name: String?,
+    val image: String?,
+    val unlock: String?
 )
 
 @JsonClass(generateAdapter = true)
@@ -167,14 +191,40 @@ data class CosmeticSeries(
 @JsonClass(generateAdapter = true)
 data class CosmeticImages(
     val smallIcon: String?,
-    val icon: String?,
     val largeIcon: String? = null,
     val featured: String?,
     val background: String?,
     val full_background: String?,
     val icon_background: String? = null,
-    val other: Map<String, String>? = null,
-    val lego: Map<String, String>? = null
+    val other: OtherImages? = null,
+    val lego: LegoImages? = null,
+    // Top-level fallbacks (Modern API keys - /v2/cosmetics/instruments, /v2/cosmetics/lego/kits, /v2/cosmetics/cars)
+    val small: String? = null,
+    val large: String? = null,
+    val legoSmall: String? = null,
+    val legoLarge: String? = null,
+    val legoWide: String? = null,
+    val coverart: String? = null,
+    val decal: String? = null,
+    val albumArt: String? = null,
+    val albumArtLarge: String? = null,
+    // Direct fallbacks for various endpoints
+    val icon: String? = null
+)
+
+@JsonClass(generateAdapter = true)
+data class LegoImages(
+    val small: String?,
+    val large: String?,
+    val wide: String?,
+    val icon: String? = null
+)
+
+@JsonClass(generateAdapter = true)
+data class OtherImages(
+    @Json(name = "albumArt") val albumArt: String?,
+    val background: String?,
+    val icon: String?
 )
 
 @JsonClass(generateAdapter = true)

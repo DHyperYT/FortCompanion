@@ -140,12 +140,42 @@ class EpicAccountRepository {
                         val rawRarity = apiDetails?.series?.value ?: apiDetails?.rarity?.value ?: determineRarity(itemData.templateId, itemData.attributes)
                         val rarity = normalizeRarity(rawRarity)
 
-                    val iconUrl = apiDetails?.images?.icon
-                        ?: apiDetails?.images?.smallIcon
-                        ?: apiDetails?.images?.featured
-                        ?: apiDetails?.images?.icon_background
-                        ?: apiDetails?.images?.other?.get("background")
-                        ?: apiDetails?.images?.background
+                        val iconUrl = when (category) {
+                            LockerCategory.LEGO_BUILD, LockerCategory.LEGO_DECOR -> 
+                                apiDetails?.images?.legoSmall ?: 
+                                apiDetails?.images?.lego?.small ?: 
+                                apiDetails?.images?.lego?.large ?: 
+                                apiDetails?.images?.lego?.icon ?: 
+                                apiDetails?.images?.large ?:
+                                apiDetails?.images?.small ?:
+                                apiDetails?.images?.icon
+                            LockerCategory.JAM_TRACK -> 
+                                apiDetails?.images?.coverart ?: 
+                                apiDetails?.images?.albumArt ?: 
+                                apiDetails?.images?.other?.albumArt ?: 
+                                apiDetails?.images?.featured
+                            LockerCategory.CAR, LockerCategory.WHEELS, LockerCategory.CAR_TRAIL, LockerCategory.CAR_BOOST, LockerCategory.CAR_DECAL ->
+                                apiDetails?.images?.featured ?: 
+                                apiDetails?.images?.decal ?:
+                                apiDetails?.images?.large ?:
+                                apiDetails?.images?.icon ?: 
+                                apiDetails?.images?.smallIcon
+                            LockerCategory.GUITAR, LockerCategory.BASS, LockerCategory.DRUMS, LockerCategory.KEYTAR, LockerCategory.MIC ->
+                                apiDetails?.images?.large ?:
+                                apiDetails?.images?.small ?:
+                                apiDetails?.images?.featured ?:
+                                apiDetails?.images?.icon
+                            else -> 
+                                apiDetails?.images?.icon ?: 
+                                apiDetails?.images?.smallIcon ?: 
+                                apiDetails?.images?.featured
+                        } ?: apiDetails?.images?.icon_background ?: apiDetails?.images?.other?.background ?: apiDetails?.images?.background ?: apiDetails?.images?.full_background
+
+                        val largeIconUrl = apiDetails?.images?.large ?: 
+                                          apiDetails?.images?.featured ?: 
+                                          apiDetails?.images?.icon_background ?: 
+                                          apiDetails?.images?.full_background ?: 
+                                          iconUrl
 
                     val existing = groupedMap[itemData.templateId]
                         if (existing != null) {
@@ -164,14 +194,18 @@ class EpicAccountRepository {
                                 description = description,
                                 rarity = rarity,
                                 iconUrl = iconUrl,
+                                largeIconUrl = largeIconUrl,
                                 isFavorite = isFav,
                                 isArchived = isArchived,
                                 quantity = itemData.quantity,
                                 introduction = apiDetails?.introduction,
                                 set = apiDetails?.set,
+                                variants = apiDetails?.variants,
                                 added = apiDetails?.added,
                                 previewUrl = apiDetails?.previewUrl,
-                                artist = apiDetails?.artist
+                                artist = apiDetails?.artist,
+                                bpm = apiDetails?.bpm,
+                                duration = apiDetails?.duration
                             )
                         }
                     }
