@@ -7,40 +7,39 @@ import android.content.Context
 import android.content.Intent
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
+import com.dhyper.fncompanion.data.db.AppDatabase
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import java.util.Calendar
 
-class ShopRefreshReceiver : BroadcastReceiver() {
+class VBucksAlertReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
-        if (intent.action == Intent.ACTION_BOOT_COMPLETED || intent.action == "com.dhyper.fncompanion.ACTION_SHOP_REFRESH") {
-            // 1. Trigger the actual check
-            val request = OneTimeWorkRequestBuilder<ShopCheckWorker>().build()
+        if (intent.action == Intent.ACTION_BOOT_COMPLETED || intent.action == "com.dhyper.fncompanion.ACTION_VBUCKS_CHECK") {
+            val request = OneTimeWorkRequestBuilder<VBucksCheckWorker>().build()
             WorkManager.getInstance(context).enqueue(request)
             
-            // 2. Schedule the next alarm
             scheduleNextAlarm(context)
         }
     }
 
     companion object {
         fun scheduleNextAlarm(context: Context) {
-            val db = com.dhyper.fncompanion.data.db.AppDatabase.getDatabase(context)
+            val db = AppDatabase.getDatabase(context)
             val scope = CoroutineScope(Dispatchers.IO)
-
+            
             scope.launch {
                 val settings = db.settingsDao().getSettingsDirect() ?: return@launch
-                if (!settings.notificationsEnabled) return@launch
+                if (!settings.vbucksAlertsEnabled) return@launch
 
                 val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-                val intent = Intent(context, ShopRefreshReceiver::class.java).apply {
-                    action = "com.dhyper.fncompanion.ACTION_SHOP_REFRESH"
+                val intent = Intent(context, VBucksAlertReceiver::class.java).apply {
+                    action = "com.dhyper.fncompanion.ACTION_VBUCKS_CHECK"
                 }
-
+                
                 val pendingIntent = PendingIntent.getBroadcast(
                     context,
-                    1001,
+                    2001,
                     intent,
                     PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
                 )
@@ -61,7 +60,6 @@ class ShopRefreshReceiver : BroadcastReceiver() {
                     }
                 }
 
-                // use exact alarm to ensure it fires even if app is swiped away
                 try {
                     alarmManager.setExactAndAllowWhileIdle(
                         AlarmManager.RTC_WAKEUP,
@@ -69,7 +67,6 @@ class ShopRefreshReceiver : BroadcastReceiver() {
                         pendingIntent
                     )
                 } catch (e: SecurityException) {
-                    // Fallback for devices that don't allow exact alarms without permission
                     alarmManager.setAndAllowWhileIdle(
                         AlarmManager.RTC_WAKEUP,
                         calendar.timeInMillis,

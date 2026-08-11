@@ -14,6 +14,9 @@ interface WishlistDao {
     @Query("SELECT * FROM cosmetic_wishlist ORDER BY addedAtMs DESC")
     fun getUniversalWishlist(): Flow<List<WishlistEntity>>
 
+    @Query("SELECT * FROM cosmetic_wishlist")
+    suspend fun getAllWishlistDirect(): List<WishlistEntity>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun addToWishlist(item: WishlistEntity)
 

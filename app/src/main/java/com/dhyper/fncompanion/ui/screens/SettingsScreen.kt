@@ -1,5 +1,6 @@
 package com.dhyper.fncompanion.ui.screens
 
+import android.app.TimePickerDialog
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -9,7 +10,6 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -31,7 +31,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import java.util.Locale
 import coil.compose.AsyncImage
 import com.dhyper.fncompanion.BuildConfig
 import com.dhyper.fncompanion.data.models.AuthState
@@ -40,6 +39,7 @@ import com.dhyper.fncompanion.ui.viewmodels.AuthViewModel
 import com.dhyper.fncompanion.ui.viewmodels.SettingsViewModel
 import com.dhyper.fncompanion.ui.viewmodels.StatsViewModel
 import com.dhyper.fncompanion.ui.viewmodels.UpdateState
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -55,6 +55,7 @@ fun SettingsScreen(
     val isApiKeyVisible by settingsViewModel.isApiKeyVisible.collectAsState()
     val currentApiKey by statsViewModel.apiKey.collectAsState()
     val settings by settingsViewModel.settings.collectAsState(initial = null)
+    val scope = rememberCoroutineScope()
     
     var apiKeyInput by remember { mutableStateOf("") }
     var showDeleteConfirm by remember { mutableStateOf<String?>(null) }
@@ -65,6 +66,22 @@ fun SettingsScreen(
     
     var importedFileContent by remember { mutableStateOf<String?>(null) }
 
+    val timePicker = TimePickerDialog(
+        context,
+        { _, hour, min ->
+            val time = String.format("%02d:%02d", hour, min)
+            settingsViewModel.updateVBucksAlertTime(time)
+            scope.launch {
+                kotlinx.coroutines.delay(300)
+                com.dhyper.fncompanion.worker.VBucksAlertReceiver.scheduleNextAlarm(context)
+                com.dhyper.fncompanion.worker.ShopRefreshReceiver.scheduleNextAlarm(context)
+            }
+        },
+        settings?.vbucksAlertTime?.split(":")?.getOrNull(0)?.toIntOrNull() ?: 0,
+        settings?.vbucksAlertTime?.split(":")?.getOrNull(1)?.toIntOrNull() ?: 0,
+        true
+    )
+
     val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/plain")) { uri ->
         uri?.let {
             settingsViewModel.exportAccounts(backupPassword) { result ->
@@ -72,7 +89,7 @@ fun SettingsScreen(
                     context.contentResolver.openOutputStream(it)?.use { stream ->
                         stream.write(data.toByteArray())
                     }
-                    Toast.makeText(context, "Accounts exported successfully!", Toast.LENGTH_LONG).show()
+                    Toast.makeText(context, "App data exported successfully!", Toast.LENGTH_LONG).show()
                 }.onFailure { err ->
                     Toast.makeText(context, "Export failed: ${err.localizedMessage}", Toast.LENGTH_LONG).show()
                 }
@@ -306,33 +323,49 @@ fun SettingsScreen(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Notifications
+                // Wishlist Notifications
                 PreferenceSwitch(
-                    label = "Notifications",
+                    label = "Wishlist Notifications",
                     subtitle = "Receive shop and wishlist alerts",
                     checked = settings?.notificationsEnabled ?: true,
-                    onCheckedChange = { settingsViewModel.updateNotifications(context, it) }
+                    onCheckedChange = { enabled ->
+                        settingsViewModel.updateNotifications(enabled)
+                        scope.launch {
+                            kotlinx.coroutines.delay(300)
+                            com.dhyper.fncompanion.worker.ShopRefreshReceiver.scheduleNextAlarm(context)
+                        }
+                    }
                 )
 
-                if (settings?.notificationsEnabled != false) {
-                    Spacer(modifier = Modifier.height(16.dp))
-                    
-                    PreferenceRow(
-                        label = "Alert Time",
-                        value = String.format(Locale.getDefault(), "%02d:%02d", settings?.notificationHour ?: 0, settings?.notificationMinute ?: 1),
-                        onClick = {
-                            val timePicker = android.app.TimePickerDialog(
-                                context,
-                                { _, hour, minute ->
-                                    settingsViewModel.updateNotificationTime(context, hour, minute)
-                                },
-                                settings?.notificationHour ?: 0,
-                                settings?.notificationMinute ?: 1,
-                                true // 24h format
-                            )
-                            timePicker.show()
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // V-Bucks Alerts
+                PreferenceSwitch(
+                    label = "V-Bucks Alerts",
+                    subtitle = "Check for StW V-Bucks missions daily",
+                    checked = settings?.vbucksAlertsEnabled ?: false,
+                    onCheckedChange = { enabled ->
+                        settingsViewModel.updateVBucksAlerts(enabled)
+                        scope.launch {
+                            kotlinx.coroutines.delay(300)
+                            com.dhyper.fncompanion.worker.VBucksAlertReceiver.scheduleNextAlarm(context)
                         }
-                    )
+                    }
+                )
+                
+                if (settings?.vbucksAlertsEnabled == true || settings?.notificationsEnabled == true) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Button(
+                        onClick = { timePicker.show() },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(containerColor = SleekSurface),
+                        shape = RoundedCornerShape(12.dp),
+                        border = BorderStroke(1.dp, SleekSurfaceBorder)
+                    ) {
+                        Icon(Icons.Default.Alarm, null, tint = SleekCyan, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(10.dp))
+                        Text("Alert Time: ${settings?.vbucksAlertTime}", color = SleekTextPrimary, fontWeight = FontWeight.Bold)
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
@@ -385,7 +418,7 @@ fun SettingsScreen(
                 ) {
                     Icon(Icons.Default.IosShare, null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(10.dp))
-                    Text("Export Accounts (Secure)", fontWeight = FontWeight.Bold)
+                    Text("Export All App Data", fontWeight = FontWeight.Bold)
                 }
                 Spacer(modifier = Modifier.height(12.dp))
                 OutlinedButton(
@@ -398,7 +431,7 @@ fun SettingsScreen(
                 ) {
                     Icon(Icons.Default.FileDownload, null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(10.dp))
-                    Text("Import Accounts", fontWeight = FontWeight.Bold)
+                    Text("Import", fontWeight = FontWeight.Bold)
                 }
             }
         }
@@ -465,7 +498,7 @@ fun SettingsScreen(
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     val countdown by settingsViewModel.tokenExpiryCountdown.collectAsState()
-                    val lastRefresh = java.text.SimpleDateFormat("HH:mm:ss", Locale.getDefault())
+                    val lastRefresh = java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault())
                         .format(java.util.Date(active.lastRefreshTimeMs))
 
                     StatusRow("Active Account", active.displayName)
@@ -516,7 +549,7 @@ fun SettingsScreen(
                 Button(
                     onClick = {
                         if (isExporting) {
-                            exportLauncher.launch("fortnite_accounts_backup.bin")
+                            exportLauncher.launch("fortnite_app_data_backup.bin")
                         } else {
                             importedFileContent?.let { data ->
                                 settingsViewModel.importAccounts(data, backupPassword) { result ->
@@ -626,28 +659,6 @@ fun PreferenceDropdown(
                     )
                 }
             }
-        }
-    }
-}
-
-@Composable
-fun PreferenceRow(
-    label: String,
-    value: String,
-    onClick: () -> Unit
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { onClick() }
-            .padding(vertical = 4.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(label, fontWeight = FontWeight.Bold, color = SleekTextPrimary, fontSize = 14.sp)
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(value, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Black)
-            Icon(Icons.Default.ChevronRight, null, tint = SleekTextMuted)
         }
     }
 }

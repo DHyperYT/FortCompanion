@@ -13,9 +13,9 @@ import com.dhyper.fncompanion.data.db.AuthDao
 import com.dhyper.fncompanion.data.db.AuthEntity
 import com.dhyper.fncompanion.data.db.SettingsDao
 import com.dhyper.fncompanion.data.db.SettingsEntity
+import com.dhyper.fncompanion.data.db.WishlistDao
 import com.dhyper.fncompanion.data.repository.AuthRepository
 import com.dhyper.fncompanion.data.models.AuthState
-import com.dhyper.fncompanion.worker.NotificationScheduler
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -35,7 +35,8 @@ sealed class UpdateState {
 class SettingsViewModel(
     private val authRepository: AuthRepository,
     private val authDao: AuthDao,
-    private val settingsDao: SettingsDao
+    private val settingsDao: SettingsDao,
+    private val wishlistDao: WishlistDao
 ) : ViewModel() {
 
     private val _allAccounts = MutableStateFlow<List<AuthEntity>>(emptyList())
@@ -136,7 +137,10 @@ class SettingsViewModel(
     private fun observeSettings() {
         viewModelScope.launch {
             settingsDao.getSettings().collect {
-                // Settings updated
+                // Reschedule alarms when settings change
+                // We need a context here, but ViewModels shouldn't hold context.
+                // However, we can use the application context if we change SettingsViewModel to AndroidViewModel
+                // or just rely on the UI calling it (which is already done).
             }
         }
     }
@@ -162,19 +166,24 @@ class SettingsViewModel(
         }
     }
 
-    fun updateNotifications(context: Context, enabled: Boolean) {
+    fun updateNotifications(enabled: Boolean) {
         viewModelScope.launch {
             val current = settingsDao.getSettingsDirect() ?: SettingsEntity()
             settingsDao.saveSettings(current.copy(notificationsEnabled = enabled))
-            NotificationScheduler.schedule(context)
         }
     }
 
-    fun updateNotificationTime(context: Context, hour: Int, minute: Int) {
+    fun updateVBucksAlerts(enabled: Boolean) {
         viewModelScope.launch {
             val current = settingsDao.getSettingsDirect() ?: SettingsEntity()
-            settingsDao.saveSettings(current.copy(notificationHour = hour, notificationMinute = minute))
-            NotificationScheduler.schedule(context)
+            settingsDao.saveSettings(current.copy(vbucksAlertsEnabled = enabled))
+        }
+    }
+
+    fun updateVBucksAlertTime(time: String) {
+        viewModelScope.launch {
+            val current = settingsDao.getSettingsDirect() ?: SettingsEntity()
+            settingsDao.saveSettings(current.copy(vbucksAlertTime = time))
         }
     }
 
@@ -199,14 +208,14 @@ class SettingsViewModel(
 
     fun exportAccounts(password: String, onResult: (Result<String>) -> Unit) {
         viewModelScope.launch {
-            val result = authRepository.exportAccounts(password.toCharArray())
+            val result = authRepository.exportAppData(password.toCharArray(), settingsDao, wishlistDao)
             onResult(result)
         }
     }
 
     fun importAccounts(encryptedData: String, password: String, onResult: (Result<Int>) -> Unit) {
         viewModelScope.launch {
-            val result = authRepository.importAccounts(encryptedData, password.toCharArray())
+            val result = authRepository.importAppData(encryptedData, password.toCharArray(), settingsDao, wishlistDao)
             onResult(result)
         }
     }

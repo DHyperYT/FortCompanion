@@ -38,6 +38,13 @@
             </intent-filter>
         </receiver>
 
+        <receiver android:name=".worker.VBucksAlertReceiver" android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="com.dhyper.fncompanion.ACTION_VBUCKS_CHECK" />
+            </intent-filter>
+        </receiver>
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="com.dhyper.fncompanion.fileprovider"

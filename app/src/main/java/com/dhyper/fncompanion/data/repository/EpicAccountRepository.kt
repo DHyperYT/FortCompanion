@@ -200,10 +200,10 @@ class EpicAccountRepository {
                                 quantity = itemData.quantity,
                                 introduction = apiDetails?.introduction,
                                 set = apiDetails?.set,
-                                variants = apiDetails?.variants,
                                 added = apiDetails?.added,
                                 previewUrl = apiDetails?.previewUrl,
                                 artist = apiDetails?.artist,
+                                variants = apiDetails?.variants,
                                 bpm = apiDetails?.bpm,
                                 duration = apiDetails?.duration
                             )
@@ -381,7 +381,7 @@ class EpicAccountRepository {
                         val normalizedTid = rawId.lowercase()
                         
                         // Priority search for the most accurate mapping
-                        val mapping = challengeLookup[normalizedTid] ?: 
+                        val mapping = challengeLookup[normalizedTid] ?:
                                      challengeLookup[normalizedTid.removePrefix("athena_")] ?:
                                      challengeLookup[normalizedTid.replace("athena_", "")] ?:
                                      challengeLookup["quest_" + normalizedTid.removePrefix("athena_")] ?:
@@ -635,7 +635,7 @@ class EpicAccountRepository {
                     val pl = (missionData["difficulty"] as? Number)?.toDouble() ?: 1.0
                     
                     // Parse Modifiers
-                    val mods = (missionData["missionModifiers"] as? List<*>)?.map { 
+                    val mods = (missionData["missionModifiers"] as? List<*>)?.map {
                         it.toString().substringAfterLast(":").replace(Regex("([a-z])([A-Z])"), "$1 $2")
                     } ?: emptyList()
 

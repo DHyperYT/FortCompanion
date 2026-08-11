@@ -11,6 +11,7 @@ data class SettingsEntity(
     val useUniversalWishlist: Boolean = false,
     val accentColor: String = "Cyan", // "Cyan", "Primary", "Emerald", "Gold"
     val notificationsEnabled: Boolean = true,
-    val notificationHour: Int = 0,
-    val notificationMinute: Int = 1
+    val vbucksAlertsEnabled: Boolean = false,
+    val vbucksAlertTime: String = "00:00",
+    val lastVBucksMissionId: String? = null
 )

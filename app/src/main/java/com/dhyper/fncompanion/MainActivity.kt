@@ -50,9 +50,9 @@ import com.dhyper.fncompanion.data.db.AppDatabase
 import com.dhyper.fncompanion.data.db.SettingsEntity
 import com.dhyper.fncompanion.data.models.AuthState
 import com.dhyper.fncompanion.data.repository.AuthRepository
-import com.dhyper.fncompanion.worker.NotificationScheduler
 import com.dhyper.fncompanion.worker.ShopCheckWorker
 import com.dhyper.fncompanion.worker.ShopRefreshReceiver
+import com.dhyper.fncompanion.worker.VBucksAlertReceiver
 import java.util.Calendar
 import java.util.TimeZone
 import java.util.concurrent.TimeUnit
@@ -85,8 +85,9 @@ class MainActivity : FragmentActivity() {
         super.onCreate(savedInstanceState)
         val db = AppDatabase.getDatabase(this)
         enableEdgeToEdge()
-        NotificationScheduler.schedule(this)
+        scheduleShopWorker()
         ShopRefreshReceiver.scheduleNextAlarm(this)
+        VBucksAlertReceiver.scheduleNextAlarm(this)
         requestNotificationPermission()
         setContent {
             val currentSettings by db.settingsDao().getSettings().collectAsState(initial = null)
@@ -96,6 +97,37 @@ class MainActivity : FragmentActivity() {
                 FortniteCompanionApp(currentSettings)
             }
         }
+    }
+
+    private fun scheduleShopWorker() {
+        val constraints = Constraints.Builder()
+            .setRequiredNetworkType(NetworkType.CONNECTED)
+            .build()
+
+        val now = System.currentTimeMillis()
+        val calendar = Calendar.getInstance(TimeZone.getTimeZone("UTC"))
+        calendar.set(Calendar.HOUR_OF_DAY, 0)
+        calendar.set(Calendar.MINUTE, 1)
+        calendar.set(Calendar.SECOND, 0)
+        calendar.set(Calendar.MILLISECOND, 0)
+
+        var nextReset = calendar.timeInMillis
+        if (nextReset <= now) {
+            calendar.add(Calendar.DAY_OF_YEAR, 1)
+            nextReset = calendar.timeInMillis
+        }
+        val initialDelay = nextReset - now
+
+        val request = PeriodicWorkRequestBuilder<ShopCheckWorker>(24, TimeUnit.HOURS)
+            .setConstraints(constraints)
+            .setInitialDelay(initialDelay, TimeUnit.MILLISECONDS)
+            .build()
+
+        WorkManager.getInstance(this).enqueueUniquePeriodicWork(
+            "ShopCheckWork",
+            androidx.work.ExistingPeriodicWorkPolicy.KEEP,
+            request
+        )
     }
 
     private fun requestNotificationPermission() {
@@ -134,6 +166,10 @@ fun FortniteCompanionApp(settings: SettingsEntity?) {
         com.dhyper.fncompanion.data.api.ApiClient.init(authRepository, context)
     }
 
+    LaunchedEffect(settings?.vbucksAlertsEnabled, settings?.vbucksAlertTime) {
+        VBucksAlertReceiver.scheduleNextAlarm(context)
+    }
+
     val authViewModel: AuthViewModel = viewModel(factory = object : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST") override fun <T : ViewModel> create(modelClass: Class<T>): T = AuthViewModel(authRepository) as T
     })
@@ -155,7 +191,7 @@ fun FortniteCompanionApp(settings: SettingsEntity?) {
         @Suppress("UNCHECKED_CAST") override fun <T : ViewModel> create(modelClass: Class<T>): T = CosmeticsViewModel(authRepo = authRepository, wishlistDao = db.wishlistDao(), settingsDao = db.settingsDao()) as T
     })
     val settingsViewModel: SettingsViewModel = viewModel(factory = object : ViewModelProvider.Factory {
-        @Suppress("UNCHECKED_CAST") override fun <T : ViewModel> create(modelClass: Class<T>): T = SettingsViewModel(authRepository = authRepository, authDao = db.authDao(), settingsDao = db.settingsDao()) as T
+        @Suppress("UNCHECKED_CAST") override fun <T : ViewModel> create(modelClass: Class<T>): T = SettingsViewModel(authRepository = authRepository, authDao = db.authDao(), settingsDao = db.settingsDao(), wishlistDao = db.wishlistDao()) as T
     })
 
     val brExtendedViewModel: BrExtendedViewModel = viewModel()

@@ -6,6 +6,9 @@ import com.dhyper.fncompanion.data.db.AuthDao
 import com.dhyper.fncompanion.data.db.AuthEntity
 import com.dhyper.fncompanion.data.db.PastSeasonEntity
 import com.dhyper.fncompanion.data.db.RecentSearchEntity
+import com.dhyper.fncompanion.data.db.SettingsDao
+import com.dhyper.fncompanion.data.db.WishlistDao
+import com.dhyper.fncompanion.data.models.AppDataBackup
 import com.dhyper.fncompanion.ui.utils.SecurityManager
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.Types
@@ -376,19 +379,47 @@ class AuthRepository(private val authDao: AuthDao) {
         authDao.clearAllSessions()
     }
 
-    suspend fun exportAccounts(password: CharArray): Result<String> {
-        val accounts = authDao.getAllAccounts().first().map { decryptSession(it)!! }
-        val type = Types.newParameterizedType(List::class.java, AuthEntity::class.java)
-        val json = moshi.adapter<List<AuthEntity>>(type).toJson(accounts)
-        return Result.success(SecurityManager.encryptWithPassword(json, password))
+    suspend fun exportAppData(password: CharArray, settingsDao: SettingsDao, wishlistDao: WishlistDao): Result<String> {
+        return try {
+            val accounts = authDao.getAllAccounts().first().map { decryptSession(it)!! }
+            val settings = settingsDao.getSettingsDirect()
+            val wishlist = wishlistDao.getAllWishlistDirect()
+            
+            val backup = AppDataBackup(accounts, settings, wishlist)
+            val json = moshi.adapter(AppDataBackup::class.java).toJson(backup)
+            Result.success(SecurityManager.encryptWithPassword(json, password))
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
     }
 
-    suspend fun importAccounts(encryptedData: String, password: CharArray): Result<Int> {
-        val json = SecurityManager.decryptWithPassword(encryptedData, password) ?: return Result.failure(Exception("Bad password"))
-        val type = Types.newParameterizedType(List::class.java, AuthEntity::class.java)
-        val accounts = moshi.adapter<List<AuthEntity>>(type).fromJson(json) ?: emptyList()
-        accounts.forEach { authDao.upsertAuthSession(encryptSession(it)) }
-        return Result.success(accounts.size)
+    suspend fun importAppData(encryptedData: String, password: CharArray, settingsDao: SettingsDao, wishlistDao: WishlistDao): Result<Int> {
+        return try {
+            val json = SecurityManager.decryptWithPassword(encryptedData, password) ?: return Result.failure(Exception("Bad password"))
+            
+            // Try parsing as new AppDataBackup format first
+            val backup = try {
+                moshi.adapter(AppDataBackup::class.java).fromJson(json)
+            } catch (e: Exception) {
+                // Fallback for old format (List<AuthEntity>)
+                val type = Types.newParameterizedType(List::class.java, AuthEntity::class.java)
+                val oldAccounts = moshi.adapter<List<AuthEntity>>(type).fromJson(json)
+                AppDataBackup(accounts = oldAccounts ?: emptyList())
+            } ?: return Result.failure(Exception("Failed to parse backup data"))
+
+            // Restore accounts
+            backup.accounts.forEach { authDao.upsertAuthSession(encryptSession(it)) }
+            
+            // Restore settings (API key etc)
+            backup.settings?.let { settingsDao.saveSettings(it) }
+            
+            // Restore wishlist
+            backup.wishlist.forEach { wishlistDao.addToWishlist(it) }
+
+            Result.success(backup.accounts.size)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
     }
 
     // Pass-throughs

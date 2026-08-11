@@ -11,6 +11,9 @@ import com.dhyper.fncompanion.data.models.ShopData
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.Dispatchers
+import org.jsoup.Jsoup
 import retrofit2.HttpException
 import java.io.IOException
 
@@ -206,6 +209,42 @@ class FortniteRepository {
             } else {
                 Result.failure(Exception("Failed to fetch AES keys: ${response.status}"))
             }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun checkForVBucksAlert(): Result<String?> = withContext(Dispatchers.IO) {
+        try {
+            val doc = Jsoup.connect("https://fortnitedb.com/").get()
+            
+            // Find the "V-Bucks Missions" block
+            val vbucksSection = doc.select("div.new_block_block").firstOrNull { element ->
+                element.select("h5").text().contains("V-Bucks Missions", ignoreCase = true)
+            }
+
+            if (vbucksSection == null) {
+                return@withContext Result.failure(Exception("Could not find V-Bucks Missions section on FortniteDB"))
+            }
+
+            val sectionText = vbucksSection.text()
+            if (sectionText.contains("No V-Bucks Missions today", ignoreCase = true)) {
+                return@withContext Result.success(null)
+            }
+
+            // Extract mission IDs from table rows
+            val alertIds = vbucksSection.select("tr[data-alertid]").mapNotNull { 
+                it.attr("data-alertid").takeIf { id -> id.isNotBlank() }
+            }.sorted()
+
+            if (alertIds.isEmpty()) {
+                // If section exists but no rows found, and it doesn't say "No V-Bucks Missions",
+                // it might be a parsing error or a structural change.
+                return@withContext Result.failure(Exception("V-Bucks section found but no alert IDs extracted"))
+            }
+
+            // Return a combined ID string
+            Result.success(alertIds.joinToString(","))
         } catch (e: Exception) {
             Result.failure(e)
         }

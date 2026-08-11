@@ -82,10 +82,10 @@ data class ParsedLockerItem(
     val quantity: Int = 1,
     val introduction: CosmeticIntro? = null,
     val set: CosmeticSet? = null,
-    val variants: List<CosmeticVariant>? = null,
     val added: String? = null,
     val previewUrl: String? = null,
     val artist: String? = null,
+    val variants: List<CosmeticVariant>? = null,
     val bpm: Int? = null,
     val duration: Int? = null
 )
