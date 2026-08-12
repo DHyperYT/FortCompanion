@@ -48,4 +48,13 @@ interface FortnitePublicApi {
 
     @GET("v2/aes")
     suspend fun getAes(): com.dhyper.fncompanion.data.models.AesResponse
+
+    @GET("v2/cosmetics/br/search")
+    suspend fun searchBRCosmetic(@Query("id") id: String): com.dhyper.fncompanion.data.models.SingleCosmeticResponse
+
+    @GET("v2/cosmetics/tracks/search")
+    suspend fun searchTrack(@Query("id") id: String): com.dhyper.fncompanion.data.models.SingleCosmeticResponse
+
+    @GET("v2/cosmetics/br/new")
+    suspend fun getNewCosmetics(): com.dhyper.fncompanion.data.models.AllCosmeticsResponse
 }

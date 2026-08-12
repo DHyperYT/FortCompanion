@@ -201,6 +201,36 @@ class FortniteRepository {
         }
     }
 
+    suspend fun fetchDetailedCosmetic(id: String): Result<CosmeticItem?> = withContext(Dispatchers.IO) {
+        try {
+            val response = when {
+                id.startsWith("sid_", true) -> api.searchTrack(id)
+                else -> api.searchBRCosmetic(id)
+            }
+            
+            if (response.status == 200 && response.data != null) {
+                Result.success(response.data)
+            } else {
+                Result.failure(Exception("Failed to fetch details: ${response.status}"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun fetchNewCosmetics(): Result<List<CosmeticItem>> = withContext(Dispatchers.IO) {
+        try {
+            val response = api.getNewCosmetics()
+            if (response.status == 200 && response.data != null) {
+                Result.success(response.data)
+            } else {
+                Result.failure(Exception("Failed to fetch new cosmetics: ${response.status}"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
     suspend fun fetchAes(): Result<com.dhyper.fncompanion.data.models.AesData> {
         return try {
             val response = api.getAes()

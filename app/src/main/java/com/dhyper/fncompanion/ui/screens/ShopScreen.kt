@@ -257,6 +257,8 @@ fun ShopScreen(
     }
 
     // Detail Modal BottomSheet
+    val detailedItem by cosmeticsViewModel.detailedItem.collectAsState()
+    
     selectedEntryForDetail?.let { entry ->
         val successState = uiState as? ShopUiState.Success
         val videoId by cosmeticsViewModel.selectedVideoId.collectAsState()
@@ -267,8 +269,9 @@ fun ShopScreen(
         }
         val firstItemRaw = allItemsForEntry.firstOrNull()
         
-        val firstItem = remember(firstItemRaw, cosmeticsState) {
+        val firstItem = remember(firstItemRaw, cosmeticsState, detailedItem) {
             if (firstItemRaw == null) return@remember null
+            if (detailedItem?.id == firstItemRaw.id) return@remember detailedItem
             cosmeticsState?.allItems?.find { it.id.equals(firstItemRaw.id, ignoreCase = true) } ?: firstItemRaw
         }
 
@@ -317,7 +320,7 @@ fun ShopScreen(
                     )
                 } else firstItem
 
-                val isFullyOwned = allItemsForEntry.all { successState?.ownedIds?.contains(it.id.lowercase()) ?: false }
+                    val isFullyOwned = allItemsForEntry.all { successState?.ownedIds?.contains(it.id.lowercase()) ?: false }
                 val price = entry.finalPrice ?: entry.regularPrice ?: 0
 
                 CosmeticDetailSheet(

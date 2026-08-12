@@ -21,6 +21,7 @@ import com.dhyper.fncompanion.ui.theme.SleekTextPrimary
 fun YouTubeButton(
     query: String,
     videoId: String? = null,
+    label: String? = null,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -55,7 +56,7 @@ fun YouTubeButton(
         Icon(Icons.Default.PlayCircle, contentDescription = null, tint = Color.White)
         Spacer(modifier = Modifier.width(8.dp))
         Text(
-            if (videoId != null) "Watch on YouTube" else "Search on YouTube",
+            text = label ?: if (videoId != null) "Watch on YouTube" else "Search on YouTube",
             color = Color.White,
             fontWeight = FontWeight.Black,
             fontSize = 14.sp
