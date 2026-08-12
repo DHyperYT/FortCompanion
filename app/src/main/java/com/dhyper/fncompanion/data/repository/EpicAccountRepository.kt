@@ -6,6 +6,9 @@ import com.dhyper.fncompanion.data.models.CosmeticItem
 import com.dhyper.fncompanion.data.models.LockerCategory
 import com.dhyper.fncompanion.data.models.ParsedLockerItem
 import com.dhyper.fncompanion.data.models.PastSeasonData
+import com.dhyper.fncompanion.data.models.StwHomebaseData
+import com.dhyper.fncompanion.data.models.StwResearchStatus
+import com.dhyper.fncompanion.data.models.FortStats
 import com.dhyper.fncompanion.data.models.StwHero
 import com.dhyper.fncompanion.data.models.StwHeroLoadout
 import com.dhyper.fncompanion.data.models.StwMissionAlert
@@ -532,6 +535,89 @@ class EpicAccountRepository {
     }
 
     // --- SAVE THE WORLD (STW) LOGIC ---
+
+    suspend fun fetchStwHomebaseData(
+        accessToken: String,
+        accountId: String
+    ): Result<StwHomebaseData> {
+        return try {
+            val response = api.queryMcpProfile(
+                bearerToken = "Bearer $accessToken",
+                accountId = accountId,
+                profileId = "campaign"
+            )
+            val profile = response.profileChanges?.firstOrNull()?.profile ?: return Result.failure<StwHomebaseData>(Exception("Failed to fetch STW profile"))
+            val stats = profile.stats?.attributes ?: emptyMap()
+            val items = profile.items ?: emptyMap()
+
+            // 1. Core Resources
+            var vbucks = 0L
+            var gold = 0L
+            var xray = 0L
+            
+            items.values.forEach { item ->
+                val tid = item.templateId.lowercase()
+                when {
+                    tid.contains("mtx_currency") || tid.contains("mtxpurchasable") -> vbucks += item.quantity
+                    tid.contains("currency_gold") -> gold += item.quantity
+                    tid.contains("xraytickets") -> xray += item.quantity
+                }
+            }
+
+            // 2. F.O.R.T. Stats (from Research and Survivors)
+            val fort = parseNumberAttr(stats["fortitude"]) ?: 0
+            val off = parseNumberAttr(stats["offense"]) ?: 0
+            val res = parseNumberAttr(stats["resistance"]) ?: 0
+            val tech = parseNumberAttr(stats["technology"]) ?: 0
+            
+            // Research Levels
+            val rFort = parseNumberAttr(stats["fortitude_level"]) ?: 0
+            val rOff = parseNumberAttr(stats["offense_level"]) ?: 0
+            val rRes = parseNumberAttr(stats["resistance_level"]) ?: 0
+            val rTech = parseNumberAttr(stats["technology_level"]) ?: 0
+            
+            // Research Points Status
+            val researchPoints = parseNumberAttr(stats["research_points"]) ?: 0
+            // Simple check: if points are > 33000 (standard cap), it's likely capped
+            val isCapped = researchPoints >= 33000 
+
+            // 3. Power Level Calculation (Basic approximation)
+            val basePL = (fort + off + res + tech).toDouble() / 15.0 // Rough estimation factor
+            
+            // 4. Daily Quests Count
+            val dailyQuests = items.values.count { 
+                it.templateId.contains("Quest:Daily", ignoreCase = true) && 
+                (it.attributes?.get("quest_state")?.toString() ?: "") != "Claimed"
+            }
+
+            val data = StwHomebaseData(
+                powerLevel = basePL.coerceIn(1.0, 145.0),
+                commanderLevel = parseNumberAttr(stats["accountLevel"]) ?: 1,
+                vbucks = vbucks,
+                xrayTickets = xray,
+                gold = gold,
+                dailyQuestsCount = dailyQuests,
+                researchStatus = StwResearchStatus(
+                    fortitude = rFort,
+                    offense = rOff,
+                    resistance = rRes,
+                    technology = rTech,
+                    totalPoints = researchPoints.toLong(),
+                    isCapped = isCapped
+                ),
+                fortStats = FortStats(
+                    fortitude = fort,
+                    offense = off,
+                    resistance = res,
+                    technology = tech
+                )
+            )
+
+            Result.success(data)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
 
     suspend fun fetchStwLoadouts(
         accessToken: String,

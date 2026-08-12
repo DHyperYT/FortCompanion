@@ -483,6 +483,34 @@ data class ChallengeDefinition(
     val type: String?
 )
 
+// --- STW DASHBOARD MODELS ---
+data class StwHomebaseData(
+    val powerLevel: Double,
+    val commanderLevel: Int,
+    val vbucks: Long,
+    val xrayTickets: Long,
+    val gold: Long,
+    val dailyQuestsCount: Int,
+    val researchStatus: StwResearchStatus,
+    val fortStats: FortStats
+)
+
+data class StwResearchStatus(
+    val fortitude: Int,
+    val offense: Int,
+    val resistance: Int,
+    val technology: Int,
+    val totalPoints: Long,
+    val isCapped: Boolean
+)
+
+data class FortStats(
+    val fortitude: Int,
+    val offense: Int,
+    val resistance: Int,
+    val technology: Int
+)
+
 // --- AES MODELS ---
 @JsonClass(generateAdapter = true)
 data class AesResponse(

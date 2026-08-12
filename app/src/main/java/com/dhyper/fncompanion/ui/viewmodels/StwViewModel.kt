@@ -27,8 +27,31 @@ class StwViewModel(
     private val _uiState = MutableStateFlow<StwUiState>(StwUiState.Loading)
     val uiState: StateFlow<StwUiState> = _uiState.asStateFlow()
 
+    private val _homebaseData = MutableStateFlow<com.dhyper.fncompanion.data.models.StwHomebaseData?>(null)
+    val homebaseData: StateFlow<com.dhyper.fncompanion.data.models.StwHomebaseData?> = _homebaseData.asStateFlow()
+
     init {
         loadStwData()
+    }
+
+    fun loadHomebaseData() {
+        viewModelScope.launch {
+            _uiState.value = StwUiState.Loading
+            val sessionResult = authRepo.ensureActiveSession()
+            val session = sessionResult.getOrNull()
+            if (session == null) {
+                _uiState.value = StwUiState.Unauthenticated
+                return@launch
+            }
+
+            val result = epicAccountRepo.fetchStwHomebaseData(session.accessToken, session.accountId)
+            if (result.isSuccess) {
+                _homebaseData.value = result.getOrNull()
+                _uiState.value = StwUiState.Success(emptyList()) 
+            } else {
+                _uiState.value = StwUiState.Error(result.exceptionOrNull()?.message ?: "Failed to fetch homebase data")
+            }
+        }
     }
 
     fun loadStwData() {

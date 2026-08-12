@@ -51,7 +51,8 @@ fun SettingsScreen(
     statsViewModel: StatsViewModel,
     settingsViewModel: SettingsViewModel,
     onAddAccount: () -> Unit,
-    onNavigateToDiagnostic: () -> Unit
+    onNavigateToDiagnostic: () -> Unit,
+    onNavigateToStwHomebase: () -> Unit
 ) {
     val context = LocalContext.current
     val allAccounts by settingsViewModel.allAccounts.collectAsState()
@@ -517,6 +518,19 @@ fun SettingsScreen(
             Icon(Icons.Default.BugReport, null, tint = FortniteGold)
             Spacer(Modifier.width(10.dp))
             Text("Auth Diagnostics", color = SleekTextPrimary, fontWeight = FontWeight.Bold)
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Button(
+            onClick = onNavigateToStwHomebase,
+            modifier = Modifier.fillMaxWidth(),
+            colors = ButtonDefaults.buttonColors(containerColor = SleekSurfaceVariant),
+            shape = RoundedCornerShape(12.dp)
+        ) {
+            Icon(Icons.Default.Home, null, tint = SleekCyan)
+            Spacer(Modifier.width(10.dp))
+            Text("STW Homebase (Beta)", color = SleekTextPrimary, fontWeight = FontWeight.Bold)
         }
 
         Spacer(modifier = Modifier.height(40.dp))
