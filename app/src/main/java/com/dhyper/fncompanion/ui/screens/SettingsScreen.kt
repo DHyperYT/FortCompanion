@@ -75,7 +75,8 @@ fun SettingsScreen(
             val time = String.format("%02d:%02d", hour, min)
             settingsViewModel.updateVBucksAlertTime(time)
             scope.launch {
-                kotlinx.coroutines.delay(300)
+                // Give the DB a moment to save the new time
+                kotlinx.coroutines.delay(500)
                 com.dhyper.fncompanion.worker.VBucksAlertReceiver.scheduleNextAlarm(context)
                 com.dhyper.fncompanion.worker.ShopRefreshReceiver.scheduleNextAlarm(context)
             }
@@ -333,10 +334,7 @@ fun SettingsScreen(
                     checked = settings?.notificationsEnabled ?: true,
                     onCheckedChange = { enabled ->
                         settingsViewModel.updateNotifications(enabled)
-                        scope.launch {
-                            kotlinx.coroutines.delay(300)
-                            com.dhyper.fncompanion.worker.ShopRefreshReceiver.scheduleNextAlarm(context)
-                        }
+                        com.dhyper.fncompanion.worker.ShopRefreshReceiver.scheduleNextAlarm(context, enabled)
                     }
                 )
 
@@ -349,10 +347,7 @@ fun SettingsScreen(
                     checked = settings?.vbucksAlertsEnabled ?: false,
                     onCheckedChange = { enabled ->
                         settingsViewModel.updateVBucksAlerts(enabled)
-                        scope.launch {
-                            kotlinx.coroutines.delay(300)
-                            com.dhyper.fncompanion.worker.VBucksAlertReceiver.scheduleNextAlarm(context)
-                        }
+                        com.dhyper.fncompanion.worker.VBucksAlertReceiver.scheduleNextAlarm(context, enabled)
                     }
                 )
                 

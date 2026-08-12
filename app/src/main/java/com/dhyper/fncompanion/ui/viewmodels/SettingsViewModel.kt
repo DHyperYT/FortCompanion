@@ -176,7 +176,13 @@ class SettingsViewModel(
     fun updateVBucksAlerts(enabled: Boolean) {
         viewModelScope.launch {
             val current = settingsDao.getSettingsDirect() ?: SettingsEntity()
-            settingsDao.saveSettings(current.copy(vbucksAlertsEnabled = enabled))
+            // Reset lastVBucksMissionId when enabling so it alerts immediately if missions are found
+            val newSettings = if (enabled) {
+                current.copy(vbucksAlertsEnabled = true, lastVBucksMissionId = null)
+            } else {
+                current.copy(vbucksAlertsEnabled = false)
+            }
+            settingsDao.saveSettings(newSettings)
         }
     }
 

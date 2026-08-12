@@ -26,13 +26,13 @@ class ShopRefreshReceiver : BroadcastReceiver() {
     }
 
     companion object {
-        fun scheduleNextAlarm(context: Context) {
+        fun scheduleNextAlarm(context: Context, forceEnabled: Boolean? = null) {
             val db = com.dhyper.fncompanion.data.db.AppDatabase.getDatabase(context)
             val scope = CoroutineScope(Dispatchers.IO)
 
             scope.launch {
                 val settings = db.settingsDao().getSettingsDirect() ?: return@launch
-                if (!settings.notificationsEnabled) return@launch
+                val isEnabled = forceEnabled ?: settings.notificationsEnabled
 
                 val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
                 val intent = Intent(context, ShopRefreshReceiver::class.java).apply {
@@ -45,6 +45,12 @@ class ShopRefreshReceiver : BroadcastReceiver() {
                     intent,
                     PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
                 )
+
+                if (!isEnabled) {
+                    android.util.Log.d("ShopRefreshReceiver", "Shop alerts disabled. Canceling alarm.")
+                    alarmManager.cancel(pendingIntent)
+                    return@launch
+                }
 
                 val timeParts = settings.vbucksAlertTime.split(":")
                 val hour = timeParts.getOrNull(0)?.toIntOrNull() ?: 0
