@@ -349,7 +349,7 @@ class ShopViewModel(
                 type = com.dhyper.fncompanion.data.models.CosmeticType("Track", "Jam Track"),
                 rarity = com.dhyper.fncompanion.data.models.CosmeticRarity("Festival", "Festival"),
                 series = null, images = com.dhyper.fncompanion.data.models.CosmeticImages(albumArt, albumArt, albumArt, null, null, albumArt),
-                variants = null, introduction = null, set = null, added = null,
+                variants = null, introduction = t.introduction, set = t.set, added = t.added,
                 artist = artist
             )
         }
@@ -526,7 +526,7 @@ class ShopViewModel(
                 "Backblings" -> allItems.any { it.type?.displayValue?.contains("Back Bling", ignoreCase = true) == true || it.id.startsWith("BID_", ignoreCase = true) || it.id.startsWith("Backpack_", ignoreCase = true) || it.id.startsWith("PetID_", ignoreCase = true) || it.id.startsWith("PetCarrier_", ignoreCase = true) || it.id.contains("AthenaPet", ignoreCase = true) }
                 "Pickaxes" -> allItems.any { it.type?.displayValue?.contains("Pickaxe", ignoreCase = true) == true || it.id.startsWith("Pickaxe_", ignoreCase = true) || it.id.startsWith("Pickaxe_ID_", ignoreCase = true) }
                 "Buried" -> allItems.any { it.type?.displayValue?.contains("Buried", ignoreCase = true) == true }
-                "Gliders" -> allItems.any { it.type?.displayValue?.contains("Glider", ignoreCase = true) == true || it.id.startsWith("Glider_", ignoreCase = true) || it.id.startsWith("Glider_ID_", ignoreCase = true) }
+                "Gliders" -> allItems.any { it.type?.displayValue?.contains("Glider", ignoreCase = true) == true || it.id.startsWith("Glider_", ignoreCase = true) || it.id.startsWith("Glider_ID_", ignoreCase = true) || it.id.startsWith("Umbrella_", ignoreCase = true) || it.id.endsWith("_Umbrella", ignoreCase = true) || it.id.equals("FounderGlider", ignoreCase = true) || it.id.equals("FounderUmbrella", ignoreCase = true) }
                 "Emotes" -> allItems.any { it.type?.displayValue?.contains("Emote", ignoreCase = true) == true || it.id.startsWith("EID_", ignoreCase = true) || it.id.startsWith("Dance_", ignoreCase = true) }
                 "Wraps" -> allItems.any { it.id.startsWith("Wrap_", ignoreCase = true) }
                 "Contrails" -> allItems.any { it.id.startsWith("Contrail_", ignoreCase = true) || it.id.startsWith("Trails_ID_", ignoreCase = true) || it.id.startsWith("ID_DriftTrail_", ignoreCase = true) }
@@ -543,7 +543,7 @@ class ShopViewModel(
                                            it.id.startsWith("ID_DriftTrail_", ignoreCase = true) || it.id.startsWith("ID_Booster_", ignoreCase = true) }
                 "Banners" -> allItems.any { it.id.startsWith("BR", ignoreCase = true) || it.id.startsWith("Banner", ignoreCase = true) || 
                              it.id.startsWith("OtherBanner", ignoreCase = true) || it.id.startsWith("OT", ignoreCase = true) ||
-                             it.id.startsWith("InfluencerBanner", ignoreCase = true) || it.id.startsWith("Founder", ignoreCase = true) ||
+                             it.id.startsWith("InfluencerBanner", ignoreCase = true) || it.id.startsWith("FounderTier", ignoreCase = true) ||
                              it.id.startsWith("StandardBanner", ignoreCase = true) || it.id.startsWith("Achievement", ignoreCase = true) ||
                              it.id.startsWith("SurvivalBanner", ignoreCase = true) || it.id.startsWith("Newsletter", ignoreCase = true) ||
                              it.id.startsWith("Winter", ignoreCase = true) || it.id.startsWith("Wargames", ignoreCase = true) ||

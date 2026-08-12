@@ -175,7 +175,22 @@ fun CosmeticDetailSheet(
                 fontWeight = FontWeight.Bold
             )
             Text(" • ", color = SleekTextMuted)
-            Text(item.type?.displayValue ?: "Other", color = SleekTextSecondary)
+            
+            val isBanner = item.id.startsWith("BR", true) || item.id.startsWith("Banner", true) || 
+                          item.id.startsWith("OtherBanner", true) || item.id.startsWith("OT", true) ||
+                          item.id.startsWith("InfluencerBanner", true) || item.id.startsWith("FounderTier", true) ||
+                          item.id.startsWith("StandardBanner", true) || item.id.startsWith("Achievement", true) ||
+                          item.id.startsWith("SurvivalBanner", true) || item.id.startsWith("Newsletter", true) ||
+                          item.id.startsWith("Winter", true) || item.id.startsWith("Wargames", true) ||
+                          item.id.startsWith("Endurance", true) || item.id.startsWith("Starlight", true) ||
+                          item.id.startsWith("S8", true)
+
+            val displayType = when {
+                item.type?.displayValue != null -> item.type.displayValue
+                isBanner -> "Banner"
+                else -> "Other"
+            }
+            Text(displayType, color = SleekTextSecondary)
         }
 
         item.description?.let {
@@ -575,7 +590,26 @@ fun resolveCosmeticIcon(item: CosmeticItem): String? {
     val id = item.id.lowercase()
     val type = item.type?.value?.lowercase() ?: ""
     
+    val isBanner = id.startsWith("br") || id.startsWith("banner") || 
+                  id.startsWith("otherbanner") || id.startsWith("ot") ||
+                  id.startsWith("influencerbanner") || id.startsWith("foundertier") ||
+                  id.startsWith("standardbanner") || id.startsWith("achievement") ||
+                  id.startsWith("survivalbanner") || id.startsWith("newsletter") ||
+                  id.startsWith("winter") || id.startsWith("wargames") ||
+                  id.startsWith("endurance") || id.startsWith("starlight") ||
+                  id.startsWith("s8") || type.contains("banner")
+
     return when {
+        // Loading Screens
+        id.startsWith("lsid_") || id.startsWith("loadingscreen_") || type.contains("loadingscreen") -> {
+            images.large ?: images.featured ?: images.icon ?: images.smallIcon ?: images.small
+        }
+
+        // Banners
+        isBanner -> {
+            images.icon ?: images.smallIcon ?: images.featured ?: images.large ?: images.small
+        }
+
         // Vehicles: prioritize standard icons (like BR locker)
         id.startsWith("car") || id.startsWith("id_") || id.startsWith("body_") || type.contains("car") || 
         type.contains("wheel") || type.contains("boost") || type.contains("trail") || type.contains("decal") ||

@@ -157,9 +157,9 @@ class FortniteRepository {
                             series = null,
                             images = com.dhyper.fncompanion.data.models.CosmeticImages(albumArt, albumArt, albumArt, null, null, albumArt),
                             variants = null,
-                            introduction = null,
-                            set = null,
-                            added = null,
+                            introduction = t.introduction,
+                            set = t.set,
+                            added = t.added,
                             previewUrl = previewUrl,
                             artist = artist,
                             album = album,
@@ -184,9 +184,9 @@ class FortniteRepository {
                             series = null,
                             images = b.images,
                             variants = null,
-                            introduction = null,
-                            set = null,
-                            added = null
+                            introduction = b.introduction,
+                            set = b.set,
+                            added = b.added
                         )
                     } ?: emptyList()
                 } catch (e: Exception) { emptyList() }

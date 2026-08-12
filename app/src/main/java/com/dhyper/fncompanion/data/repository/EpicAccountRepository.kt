@@ -860,7 +860,7 @@ class EpicAccountRepository {
 
     private fun cleanCosmeticName(templateId: String): String {
         val raw = templateId.substringAfter(":", templateId)
-        val cleaned = raw.replace(Regex("(?i)^(Athena|Item|Cosmetic|Character|Backpack|Pickaxe|Glider|Dance|Wrap|Contrail|MusicPack|Pet|PetCarrier|LSID|LoadingScreen|Companion|Emoticon|Spray|Sidekick|SID|BR|Banner|OtherBanner|OT|InfluencerBanner|Founder|StandardBanner|Achievement|SurvivalBanner|Newsletter|Winter|Wargames|Endurance|Starlight|S8|Shoes|CarBody|ID_Body|CarSkin|ID_Skin|Wheel|ID_Wheel|ID_DriftTrail|ID_Booster|Sparks|JBSID|JBPID)_?"), "")
+        val cleaned = raw.replace(Regex("(?i)^(Athena|Item|Cosmetic|Character|Backpack|Pickaxe|Glider|Dance|Wrap|Contrail|MusicPack|Pet|PetCarrier|LSID|LoadingScreen|Companion|Emoticon|Spray|Sidekick|SID|BR|Banner|OtherBanner|OT|InfluencerBanner|FounderTier|StandardBanner|Achievement|SurvivalBanner|Newsletter|Winter|Wargames|Endurance|Starlight|S8|Mayday|Shoes|CarBody|ID_Body|CarSkin|ID_Skin|Wheel|ID_Wheel|ID_DriftTrail|ID_Booster|Sparks|JBSID|JBPID)_?"), "")
             .replace(Regex("(?i)athenacharacter_?"), "")
             .replace(Regex("(?i)athenabackpack_?"), "")
             .replace(Regex("(?i)athenapickaxe_?"), "")
@@ -901,12 +901,12 @@ class EpicAccountRepository {
             // Banners (BR or Banner or OtherBanner or OT etc.)
             idPart.startsWith("BR", ignoreCase = true) || idPart.startsWith("Banner", ignoreCase = true) || 
             idPart.startsWith("OtherBanner", ignoreCase = true) || idPart.startsWith("OT", ignoreCase = true) ||
-            idPart.startsWith("InfluencerBanner", ignoreCase = true) || idPart.startsWith("Founder", ignoreCase = true) ||
+            idPart.startsWith("InfluencerBanner", ignoreCase = true) || idPart.startsWith("FounderTier", ignoreCase = true) ||
             idPart.startsWith("StandardBanner", ignoreCase = true) || idPart.startsWith("Achievement", ignoreCase = true) ||
             idPart.startsWith("SurvivalBanner", ignoreCase = true) || idPart.startsWith("Newsletter", ignoreCase = true) ||
             idPart.startsWith("Winter", ignoreCase = true) || idPart.startsWith("Wargames", ignoreCase = true) ||
             idPart.startsWith("Endurance", ignoreCase = true) || idPart.startsWith("Starlight", ignoreCase = true) ||
-            idPart.startsWith("S8", ignoreCase = true) -> LockerCategory.BANNER
+            idPart.startsWith("S8", ignoreCase = true) || idPart.startsWith("Mayday", ignoreCase = true) -> LockerCategory.BANNER
             
             // Kicks (Shoes_)
             idPart.startsWith("Shoes_", ignoreCase = true) -> LockerCategory.KICKS
@@ -952,7 +952,10 @@ class EpicAccountRepository {
             idPart.startsWith("Pickaxe_", ignoreCase = true) || idPart.startsWith("Pickaxe_ID_", ignoreCase = true) || templateId.contains("AthenaPickaxe", ignoreCase = true) -> LockerCategory.PICKAXE
             
             // Gliders
-            idPart.startsWith("Glider_", ignoreCase = true) || idPart.startsWith("Glider_ID_", ignoreCase = true) || templateId.contains("AthenaGlider", ignoreCase = true) -> LockerCategory.GLIDER
+            idPart.startsWith("Glider_", ignoreCase = true) || idPart.startsWith("Glider_ID_", ignoreCase = true) || 
+            idPart.startsWith("Umbrella_", ignoreCase = true) || idPart.endsWith("_Umbrella", ignoreCase = true) ||
+            idPart.equals("FounderGlider", ignoreCase = true) || idPart.equals("FounderUmbrella", ignoreCase = true) ||
+            templateId.contains("AthenaGlider", ignoreCase = true) -> LockerCategory.GLIDER
             
             // Emotes
             idPart.startsWith("EID_", ignoreCase = true) || idPart.startsWith("Dance_", ignoreCase = true) || templateId.contains("AthenaDance", ignoreCase = true) -> LockerCategory.EMOTE

@@ -61,7 +61,10 @@ data class JamTrackItem(
     val duration: Int?,
     val genre: String?,
     val previewUrl: String? = null,
-    val track: Map<String, Any?>? = null // Some responses nest this
+    val track: Map<String, Any?>? = null, // Some responses nest this
+    val set: CosmeticSet? = null,
+    val introduction: CosmeticIntro? = null,
+    val added: String? = null
 )
 
 @JsonClass(generateAdapter = true)
@@ -401,7 +404,10 @@ data class TrackData(
     val title: String? = null,
     val bpm: Int? = null,
     val duration: Int? = null,
-    val previewUrl: String? = null
+    val previewUrl: String? = null,
+    val set: CosmeticSet? = null,
+    val introduction: CosmeticIntro? = null,
+    val added: String? = null
 )
 
 @JsonClass(generateAdapter = true)
@@ -417,7 +423,10 @@ data class BannerData(
     val name: String?,
     val description: String?,
     val category: String?,
-    val images: CosmeticImages?
+    val images: CosmeticImages?,
+    val set: CosmeticSet? = null,
+    val introduction: CosmeticIntro? = null,
+    val added: String? = null
 )
 
 @JsonClass(generateAdapter = true)
