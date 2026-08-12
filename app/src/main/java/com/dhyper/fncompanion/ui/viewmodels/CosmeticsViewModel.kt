@@ -123,7 +123,14 @@ class CosmeticsViewModel(
                               !item.id.contains("reactfx", ignoreCase = true) && 
                               !item.id.contains("vtid", ignoreCase = true)
                 "Jam Tracks" -> item.id.startsWith("sid_", ignoreCase = true)
-                "Banners" -> item.id.startsWith("BRS", ignoreCase = true) || item.id.startsWith("Banner_", ignoreCase = true) || item.id.startsWith("OtherBanner", ignoreCase = true)
+                "Banners" -> item.id.startsWith("BR", ignoreCase = true) || item.id.startsWith("Banner", ignoreCase = true) || 
+                             item.id.startsWith("OtherBanner", ignoreCase = true) || item.id.startsWith("OT", ignoreCase = true) ||
+                             item.id.startsWith("InfluencerBanner", ignoreCase = true) || item.id.startsWith("Founder", ignoreCase = true) ||
+                             item.id.startsWith("StandardBanner", ignoreCase = true) || item.id.startsWith("Achievement", ignoreCase = true) ||
+                             item.id.startsWith("SurvivalBanner", ignoreCase = true) || item.id.startsWith("Newsletter", ignoreCase = true) ||
+                             item.id.startsWith("Winter", ignoreCase = true) || item.id.startsWith("Wargames", ignoreCase = true) ||
+                             item.id.startsWith("Endurance", ignoreCase = true) || item.id.startsWith("Starlight", ignoreCase = true) ||
+                             item.id.startsWith("S8", ignoreCase = true)
                 "Kicks" -> item.id.startsWith("Shoes_", ignoreCase = true)
                 "Car Bodies" -> item.id.startsWith("CarBody_", ignoreCase = true) || item.id.startsWith("ID_Body_", ignoreCase = true) || 
                                  item.id.startsWith("Body_", ignoreCase = true)

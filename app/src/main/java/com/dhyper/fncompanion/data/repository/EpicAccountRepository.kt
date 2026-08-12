@@ -860,7 +860,7 @@ class EpicAccountRepository {
 
     private fun cleanCosmeticName(templateId: String): String {
         val raw = templateId.substringAfter(":", templateId)
-        val cleaned = raw.replace(Regex("(?i)^(Athena|Item|Cosmetic|Character|Backpack|Pickaxe|Glider|Dance|Wrap|Contrail|MusicPack|Pet|PetCarrier|LSID|LoadingScreen|Companion|Emoticon|Spray|Sidekick|SID|BRS|Banner|Shoes|CarBody|ID_Body|CarSkin|ID_Skin|Wheel|ID_Wheel|ID_DriftTrail|ID_Booster|Sparks|JBSID|JBPID)_?"), "")
+        val cleaned = raw.replace(Regex("(?i)^(Athena|Item|Cosmetic|Character|Backpack|Pickaxe|Glider|Dance|Wrap|Contrail|MusicPack|Pet|PetCarrier|LSID|LoadingScreen|Companion|Emoticon|Spray|Sidekick|SID|BR|Banner|OtherBanner|OT|InfluencerBanner|Founder|StandardBanner|Achievement|SurvivalBanner|Newsletter|Winter|Wargames|Endurance|Starlight|S8|Shoes|CarBody|ID_Body|CarSkin|ID_Skin|Wheel|ID_Wheel|ID_DriftTrail|ID_Booster|Sparks|JBSID|JBPID)_?"), "")
             .replace(Regex("(?i)athenacharacter_?"), "")
             .replace(Regex("(?i)athenabackpack_?"), "")
             .replace(Regex("(?i)athenapickaxe_?"), "")
@@ -898,8 +898,15 @@ class EpicAccountRepository {
             // Jam Tracks (sid_)
             idPart.startsWith("sid_", ignoreCase = true) -> LockerCategory.JAM_TRACK
             
-            // Banners (BRS or Banner_)
-            idPart.startsWith("BRS", ignoreCase = false) || idPart.startsWith("Banner_", ignoreCase = true) -> LockerCategory.BANNER
+            // Banners (BR or Banner or OtherBanner or OT etc.)
+            idPart.startsWith("BR", ignoreCase = true) || idPart.startsWith("Banner", ignoreCase = true) || 
+            idPart.startsWith("OtherBanner", ignoreCase = true) || idPart.startsWith("OT", ignoreCase = true) ||
+            idPart.startsWith("InfluencerBanner", ignoreCase = true) || idPart.startsWith("Founder", ignoreCase = true) ||
+            idPart.startsWith("StandardBanner", ignoreCase = true) || idPart.startsWith("Achievement", ignoreCase = true) ||
+            idPart.startsWith("SurvivalBanner", ignoreCase = true) || idPart.startsWith("Newsletter", ignoreCase = true) ||
+            idPart.startsWith("Winter", ignoreCase = true) || idPart.startsWith("Wargames", ignoreCase = true) ||
+            idPart.startsWith("Endurance", ignoreCase = true) || idPart.startsWith("Starlight", ignoreCase = true) ||
+            idPart.startsWith("S8", ignoreCase = true) -> LockerCategory.BANNER
             
             // Kicks (Shoes_)
             idPart.startsWith("Shoes_", ignoreCase = true) -> LockerCategory.KICKS

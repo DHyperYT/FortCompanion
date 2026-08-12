@@ -541,7 +541,14 @@ class ShopViewModel(
                                            it.id.startsWith("CarSkin_", ignoreCase = true) || it.id.startsWith("ID_Skin_", ignoreCase = true) || 
                                            it.id.startsWith("Wheel_", ignoreCase = true) || it.id.startsWith("ID_Wheel_", ignoreCase = true) || 
                                            it.id.startsWith("ID_DriftTrail_", ignoreCase = true) || it.id.startsWith("ID_Booster_", ignoreCase = true) }
-                "Banners" -> allItems.any { it.id.startsWith("BRS", ignoreCase = true) || it.id.startsWith("Banner_", ignoreCase = true) || it.id.startsWith("OtherBanner", ignoreCase = true) }
+                "Banners" -> allItems.any { it.id.startsWith("BR", ignoreCase = true) || it.id.startsWith("Banner", ignoreCase = true) || 
+                             it.id.startsWith("OtherBanner", ignoreCase = true) || it.id.startsWith("OT", ignoreCase = true) ||
+                             it.id.startsWith("InfluencerBanner", ignoreCase = true) || it.id.startsWith("Founder", ignoreCase = true) ||
+                             it.id.startsWith("StandardBanner", ignoreCase = true) || it.id.startsWith("Achievement", ignoreCase = true) ||
+                             it.id.startsWith("SurvivalBanner", ignoreCase = true) || it.id.startsWith("Newsletter", ignoreCase = true) ||
+                             it.id.startsWith("Winter", ignoreCase = true) || it.id.startsWith("Wargames", ignoreCase = true) ||
+                             it.id.startsWith("Endurance", ignoreCase = true) || it.id.startsWith("Starlight", ignoreCase = true) ||
+                             it.id.startsWith("S8", ignoreCase = true) }
                 "Kicks" -> allItems.any { it.id.startsWith("Shoes_", ignoreCase = true) }
                 "Car Bodies" -> allItems.any { it.id.startsWith("CarBody_", ignoreCase = true) || it.id.startsWith("ID_Body_", ignoreCase = true) || it.id.startsWith("Body_", ignoreCase = true) }
                 "Car Decals" -> allItems.any { it.id.startsWith("CarSkin_", ignoreCase = true) || it.id.startsWith("ID_Skin_", ignoreCase = true) }
