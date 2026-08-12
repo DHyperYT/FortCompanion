@@ -85,7 +85,10 @@ class MainActivity : FragmentActivity() {
         super.onCreate(savedInstanceState)
         val db = AppDatabase.getDatabase(this)
         enableEdgeToEdge()
-        scheduleShopWorker()
+        
+        // Cancel legacy periodic work that was hardcoded to 3am/00:00 UTC
+        WorkManager.getInstance(this).cancelUniqueWork("ShopCheckWork")
+        
         ShopRefreshReceiver.scheduleNextAlarm(this)
         VBucksAlertReceiver.scheduleNextAlarm(this)
         requestNotificationPermission()
@@ -97,37 +100,6 @@ class MainActivity : FragmentActivity() {
                 FortniteCompanionApp(currentSettings)
             }
         }
-    }
-
-    private fun scheduleShopWorker() {
-        val constraints = Constraints.Builder()
-            .setRequiredNetworkType(NetworkType.CONNECTED)
-            .build()
-
-        val now = System.currentTimeMillis()
-        val calendar = Calendar.getInstance(TimeZone.getTimeZone("UTC"))
-        calendar.set(Calendar.HOUR_OF_DAY, 0)
-        calendar.set(Calendar.MINUTE, 1)
-        calendar.set(Calendar.SECOND, 0)
-        calendar.set(Calendar.MILLISECOND, 0)
-
-        var nextReset = calendar.timeInMillis
-        if (nextReset <= now) {
-            calendar.add(Calendar.DAY_OF_YEAR, 1)
-            nextReset = calendar.timeInMillis
-        }
-        val initialDelay = nextReset - now
-
-        val request = PeriodicWorkRequestBuilder<ShopCheckWorker>(24, TimeUnit.HOURS)
-            .setConstraints(constraints)
-            .setInitialDelay(initialDelay, TimeUnit.MILLISECONDS)
-            .build()
-
-        WorkManager.getInstance(this).enqueueUniquePeriodicWork(
-            "ShopCheckWork",
-            androidx.work.ExistingPeriodicWorkPolicy.KEEP,
-            request
-        )
     }
 
     private fun requestNotificationPermission() {
@@ -166,8 +138,9 @@ fun FortniteCompanionApp(settings: SettingsEntity?) {
         com.dhyper.fncompanion.data.api.ApiClient.init(authRepository, context)
     }
 
-    LaunchedEffect(settings?.vbucksAlertsEnabled, settings?.vbucksAlertTime) {
+    LaunchedEffect(settings?.vbucksAlertsEnabled, settings?.notificationsEnabled, settings?.vbucksAlertTime) {
         VBucksAlertReceiver.scheduleNextAlarm(context)
+        ShopRefreshReceiver.scheduleNextAlarm(context)
     }
 
     val authViewModel: AuthViewModel = viewModel(factory = object : ViewModelProvider.Factory {
