@@ -101,6 +101,7 @@ class CosmeticsViewModel(
         val filteredBase = all.filter { item ->
             val matchesCategory = when (cat) {
                 "All" -> true
+                "Unreleased" -> item.shopHistory.isNullOrEmpty()
                 "Outfits" -> item.type?.displayValue?.contains("Outfit", ignoreCase = true) == true || 
                             item.id.startsWith("CID_", ignoreCase = true) || item.id.startsWith("Character_", ignoreCase = true)
                 "Backblings" -> item.type?.displayValue?.contains("Back Bling", ignoreCase = true) == true || 
