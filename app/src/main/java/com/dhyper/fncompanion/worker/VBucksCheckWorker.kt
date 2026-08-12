@@ -12,6 +12,7 @@ import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.dhyper.fncompanion.data.db.AppDatabase
 import com.dhyper.fncompanion.data.repository.FortniteRepository
+import java.util.UUID
 
 class VBucksCheckWorker(
     appContext: Context,
@@ -28,31 +29,37 @@ class VBucksCheckWorker(
             return Result.success()
         }
 
+        // Tag the check in logs
+        val checkId = UUID.randomUUID().toString().substring(0, 8)
+        Log.i("VBucksCheckWorker", "[$checkId] Starting V-Bucks check...")
+
         val result = repository.checkForVBucksAlert()
         
         result.fold(
             onSuccess = { currentMissionId ->
                 if (currentMissionId != null) {
                     val lastNotifiedId = settings.lastVBucksMissionId
+                    
+                    // We check if the current mission set is different from the last time we notified.
+                    // If parsing failed but missions are there (fallback ID), we still notify.
                     if (currentMissionId != lastNotifiedId) {
-                        Log.i("VBucksCheckWorker", "HAS_VBUCKS: New missions detected ($currentMissionId). Notifying user.")
-                        sendNotification("V-Bucks missions are active! Check FortniteDB for details.")
+                        Log.i("VBucksCheckWorker", "[$checkId] HAS_VBUCKS: New set detected ($currentMissionId). Notifying.")
+                        sendNotification("V-Bucks missions are active! Open FortniteDB to see them.")
                         settingsDao.saveSettings(settings.copy(lastVBucksMissionId = currentMissionId))
                     } else {
-                        Log.d("VBucksCheckWorker", "HAS_VBUCKS: Missions are still the same as last notification. Skipping.")
+                        Log.i("VBucksCheckWorker", "[$checkId] HAS_VBUCKS: Already notified for this set ($currentMissionId).")
                     }
                 } else {
-                    Log.d("VBucksCheckWorker", "NO_VBUCKS: No V-Bucks missions found today.")
-                    // Optionally clear the last notified ID if no missions are found, 
-                    // or keep it to avoid re-notifying if missions reappear then disappear? 
-                    // Usually, missions change daily, so clearing it when "No Missions" is found is safe.
+                    Log.i("VBucksCheckWorker", "[$checkId] NO_VBUCKS: Confirmed no missions today.")
                     if (settings.lastVBucksMissionId != null) {
                         settingsDao.saveSettings(settings.copy(lastVBucksMissionId = null))
                     }
                 }
             },
             onFailure = { error ->
-                Log.e("VBucksCheckWorker", "ERROR: Failed to check for V-Bucks alerts: ${error.message}", error)
+                Log.e("VBucksCheckWorker", "[$checkId] ERROR: Request failed: ${error.message}")
+                // If the user wants extreme reliability, we could notify on error too, 
+                // but that might be annoying. For now, just logging clearly.
             }
         )
 

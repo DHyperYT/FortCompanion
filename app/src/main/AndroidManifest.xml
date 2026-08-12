@@ -31,14 +31,14 @@
             </intent-filter>
         </activity>
 
-        <receiver android:name=".worker.ShopRefreshReceiver" android:exported="false">
+        <receiver android:name=".worker.ShopRefreshReceiver" android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
                 <action android:name="com.dhyper.fncompanion.ACTION_SHOP_REFRESH" />
             </intent-filter>
         </receiver>
 
-        <receiver android:name=".worker.VBucksAlertReceiver" android:exported="false">
+        <receiver android:name=".worker.VBucksAlertReceiver" android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
                 <action android:name="com.dhyper.fncompanion.ACTION_VBUCKS_CHECK" />

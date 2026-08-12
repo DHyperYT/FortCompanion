@@ -5,6 +5,8 @@ import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.os.Build
+import android.util.Log
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import com.dhyper.fncompanion.data.db.AppDatabase
@@ -55,18 +57,40 @@ class VBucksAlertReceiver : BroadcastReceiver() {
                     set(Calendar.MINUTE, min)
                     set(Calendar.SECOND, 0)
                     set(Calendar.MILLISECOND, 0)
+                    
+                    // If the scheduled time is in the past for today, schedule for tomorrow.
+                    // However, we want to be careful not to skip a check if we just enabled it.
                     if (timeInMillis <= now) {
                         add(Calendar.DAY_OF_YEAR, 1)
                     }
                 }
 
+                val scheduledTime = java.text.SimpleDateFormat("HH:mm", java.util.Locale.US).format(calendar.time)
+                Log.i("VBucksAlertReceiver", "Next V-Bucks alert scheduled for: $scheduledTime (Epoch: ${calendar.timeInMillis})")
+
                 try {
-                    alarmManager.setExactAndAllowWhileIdle(
-                        AlarmManager.RTC_WAKEUP,
-                        calendar.timeInMillis,
-                        pendingIntent
-                    )
-                } catch (e: SecurityException) {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                        if (alarmManager.canScheduleExactAlarms()) {
+                            alarmManager.setExactAndAllowWhileIdle(
+                                AlarmManager.RTC_WAKEUP,
+                                calendar.timeInMillis,
+                                pendingIntent
+                            )
+                        } else {
+                            alarmManager.setAndAllowWhileIdle(
+                                AlarmManager.RTC_WAKEUP,
+                                calendar.timeInMillis,
+                                pendingIntent
+                            )
+                        }
+                    } else {
+                        alarmManager.setExactAndAllowWhileIdle(
+                            AlarmManager.RTC_WAKEUP,
+                            calendar.timeInMillis,
+                            pendingIntent
+                        )
+                    }
+                } catch (e: Exception) {
                     alarmManager.setAndAllowWhileIdle(
                         AlarmManager.RTC_WAKEUP,
                         calendar.timeInMillis,

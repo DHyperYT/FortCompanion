@@ -216,35 +216,52 @@ class FortniteRepository {
 
     suspend fun checkForVBucksAlert(): Result<String?> = withContext(Dispatchers.IO) {
         try {
-            val doc = Jsoup.connect("https://fortnitedb.com/").get()
-            
-            // Find the "V-Bucks Missions" block
-            val vbucksSection = doc.select("div.new_block_block").firstOrNull { element ->
-                element.select("h5").text().contains("V-Bucks Missions", ignoreCase = true)
+            val client = okhttp3.OkHttpClient.Builder()
+                .connectTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
+                .readTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
+                .followRedirects(true)
+                .build()
+
+            val request = okhttp3.Request.Builder()
+                .url("https://fortnitedb.com/")
+                .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+                .header("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8")
+                .header("Accept-Language", "en-US,en;q=0.9")
+                .header("Cache-Control", "no-cache")
+                .build()
+
+            val response = client.newCall(request).execute()
+            val body = response.body?.string() ?: ""
+
+            if (body.isBlank()) {
+                return@withContext Result.failure(Exception("Empty response from FortniteDB"))
             }
 
-            if (vbucksSection == null) {
-                return@withContext Result.failure(Exception("Could not find V-Bucks Missions section on FortniteDB"))
-            }
+            val doc = Jsoup.parse(body)
+            val pageText = doc.text()
 
-            val sectionText = vbucksSection.text()
-            if (sectionText.contains("No V-Bucks Missions today", ignoreCase = true)) {
+            // 1. Direct check: If the "No V-Bucks" phrase is present in the visible text, there are no missions.
+            if (pageText.contains("No V-Bucks Missions today", ignoreCase = true)) {
                 return@withContext Result.success(null)
             }
 
-            // Extract mission IDs from table rows
-            val alertIds = vbucksSection.select("tr[data-alertid]").mapNotNull { 
-                it.attr("data-alertid").takeIf { id -> id.isNotBlank() }
-            }.sorted()
-
-            if (alertIds.isEmpty()) {
-                // If section exists but no rows found, and it doesn't say "No V-Bucks Missions",
-                // it might be a parsing error or a structural change.
-                return@withContext Result.failure(Exception("V-Bucks section found but no alert IDs extracted"))
+            // 2. If the phrase is NOT there, missions are highly likely active.
+            // We try to extract IDs to avoid duplicate alerts, but fallback to a date-hash if needed.
+            val vbucksSection = doc.select("div.new_block_block").firstOrNull { element ->
+                element.select("h5, h4, div").text().contains("V-Bucks Missions", ignoreCase = true)
             }
 
-            // Return a combined ID string
-            Result.success(alertIds.joinToString(","))
+            val alertIds = vbucksSection?.select("tr[data-alertid]")?.mapNotNull { 
+                it.attr("data-alertid").takeIf { id -> id.isNotBlank() }
+            }?.sorted()
+
+            return@withContext if (!alertIds.isNullOrEmpty()) {
+                Result.success(alertIds.joinToString(","))
+            } else {
+                // Fallback ID based on the current date so it triggers once per day if parsing fails
+                val dateId = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US).format(java.util.Date())
+                Result.success("FOUND_$dateId")
+            }
         } catch (e: Exception) {
             Result.failure(e)
         }
