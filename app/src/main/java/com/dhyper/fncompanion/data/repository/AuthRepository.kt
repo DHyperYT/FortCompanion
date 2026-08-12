@@ -1,6 +1,5 @@
 package com.dhyper.fncompanion.data.repository
 
-import android.util.Log
 import com.dhyper.fncompanion.data.api.ApiClient
 import com.dhyper.fncompanion.data.db.AuthDao
 import com.dhyper.fncompanion.data.db.AuthEntity
@@ -108,14 +107,10 @@ class AuthRepository(private val authDao: AuthDao) {
             if (sessionCache.value[session.accountId] == null) {
                 sessionCache.value = sessionCache.value + (session.accountId to session)
             }
-            AuthDiagnosticsManager.logEvent(AuthEventType.TOKEN_VALID, session.accountId)
+            
             return Result.success(current)
         }
 
-        AuthDiagnosticsManager.logEvent(
-            if (now < current.expiresAtMs) AuthEventType.TOKEN_EXPIRING_SOON else AuthEventType.TOKEN_CHECK,
-            session.accountId
-        )
 
         return performTokenRenewal(session)
     }
@@ -166,7 +161,6 @@ class AuthRepository(private val authDao: AuthDao) {
         force: Boolean = false
     ): Result<AuthEntity> = refreshMutex.withLock {
         _isRefreshing.value = true
-        val startTime = System.currentTimeMillis()
         try {
             // Re-check cache after acquiring lock
             val reCheck = sessionCache.value[session.accountId]
@@ -176,21 +170,20 @@ class AuthRepository(private val authDao: AuthDao) {
 
             // 1. Try Refresh Token
             if (tryRefresh && !session.refreshToken.isNullOrBlank()) {
-                AuthDiagnosticsManager.logEvent(AuthEventType.AUTH_REQUEST_STARTED, session.accountId, "Grant: refresh_token")
+                
                 try {
                     val response = api.getAccessTokenWithRefreshToken(refreshToken = session.refreshToken)
                     val updated = applyTokenResponse(session, response)
-                    AuthDiagnosticsManager.logEvent(AuthEventType.REFRESH_SUCCEEDED, session.accountId, durationMs = System.currentTimeMillis() - startTime)
                     return@withLock Result.success(updated)
                 } catch (e: Exception) {
-                    AuthDiagnosticsManager.logEvent(AuthEventType.REFRESH_FAILED, session.accountId, e.message, getStatusCode(e))
+                    
                     if (!tryDeviceAuth) return@withLock Result.failure(e)
                 }
             }
 
             // 2. Try Device Auth Fallback
             if (tryDeviceAuth && !session.deviceId.isNullOrBlank() && !session.deviceSecret.isNullOrBlank()) {
-                AuthDiagnosticsManager.logEvent(AuthEventType.AUTH_REQUEST_STARTED, session.accountId, "Grant: device_auth")
+                
                 try {
                     val response = api.getAccessTokenWithDeviceAuth(
                         accountId = session.accountId,
@@ -198,18 +191,17 @@ class AuthRepository(private val authDao: AuthDao) {
                         secret = session.deviceSecret
                     )
                     val updated = applyTokenResponse(session, response)
-                    AuthDiagnosticsManager.logEvent(AuthEventType.DEVICE_AUTH_SUCCEEDED, session.accountId, durationMs = System.currentTimeMillis() - startTime)
                     return@withLock Result.success(updated)
                 } catch (e: Exception) {
                     val status = getStatusCode(e)
-                    AuthDiagnosticsManager.logEvent(AuthEventType.DEVICE_AUTH_FAILED, session.accountId, e.message, status)
+                    
                     
                     if (status == 400 || status == 401) {
                         val errorBody = (e as? HttpException)?.response()?.errorBody()?.string() ?: ""
                         if (errorBody.contains("device_auth_not_found") || errorBody.contains("invalid_grant")) {
                             val revoked = session.copy(deviceAuthStatus = DeviceAuthStatus.REVOKED.name)
                             authDao.upsertAuthSession(encryptSession(revoked))
-                            AuthDiagnosticsManager.logEvent(AuthEventType.SESSION_MARKED_INVALID, session.accountId, "Revoked")
+                            
                         }
                     }
                     return@withLock Result.failure(e)
@@ -223,7 +215,7 @@ class AuthRepository(private val authDao: AuthDao) {
     }
 
     private suspend fun applyTokenResponse(session: AuthEntity, response: EpicTokenResponse): AuthEntity {
-        AuthDiagnosticsManager.logEvent(AuthEventType.AUTH_TOKEN_RECEIVED, session.accountId)
+        
         
         val now = System.currentTimeMillis()
         val expiresAtMs = now + (response.expiresIn * 1000)
@@ -238,25 +230,17 @@ class AuthRepository(private val authDao: AuthDao) {
         
         // 1. Atomic Persistence
         authDao.upsertAuthSession(encryptSession(updated))
-        AuthDiagnosticsManager.logEvent(AuthEventType.AUTH_TOKEN_PERSISTED, updated.accountId)
+        
         
         // 2. Immediate Reload and Verification
         val reloadedEncrypted = authDao.getAccountByIdDirect(updated.accountId)
         val reloaded = decryptSession(reloadedEncrypted)
         
         if (reloaded != null && reloaded.expiresAtMs == updated.expiresAtMs) {
-            AuthDiagnosticsManager.logEvent(AuthEventType.AUTH_STATE_RELOADED, updated.accountId, "Expiry: ${reloaded.expiresAtMs}")
-            
             // 3. Update In-Memory Cache (Source of truth for UI and Interceptor)
             sessionCache.value = sessionCache.value + (reloaded.accountId to reloaded)
-            AuthDiagnosticsManager.logEvent(AuthEventType.AUTH_STATE_UPDATED, reloaded.accountId)
-            
-            // 4. Force Ticker to update timer
-            AuthDiagnosticsManager.logEvent(AuthEventType.AUTH_TIMER_UPDATED, reloaded.accountId)
-            
             return reloaded
         } else {
-            AuthDiagnosticsManager.logEvent(AuthEventType.AUTH_STATE_RELOADED, updated.accountId, "Persistence check FAILED")
             // Fallback to updating cache with 'updated' anyway so app remains usable
             sessionCache.value = sessionCache.value + (updated.accountId to updated)
             return updated
@@ -298,9 +282,8 @@ class AuthRepository(private val authDao: AuthDao) {
             try {
                 val deviceAuth = api.createDeviceAuth(bearerToken = "Bearer ${response.accessToken}", accountId = response.accountId)
                 session = session.copy(deviceId = deviceAuth.deviceId, deviceSecret = deviceAuth.secret)
-                AuthDiagnosticsManager.logEvent(AuthEventType.DEVICE_AUTH_SUCCEEDED, session.accountId, "Initial Login")
+                
             } catch (e: Exception) {
-                AuthDiagnosticsManager.logEvent(AuthEventType.DEVICE_AUTH_FAILED, session.accountId, "Device Auth registration failed: ${e.message}")
             }
 
             sessionCache.value = sessionCache.value + (session.accountId to session)
@@ -343,9 +326,7 @@ class AuthRepository(private val authDao: AuthDao) {
                     try {
                         val da = api.createDeviceAuth("Bearer ${response.accessToken}", response.accountId)
                         session = session.copy(deviceId = da.deviceId, deviceSecret = da.secret)
-                        AuthDiagnosticsManager.logEvent(AuthEventType.DEVICE_AUTH_SUCCEEDED, session.accountId, "Initial Login (Exchange)")
                     } catch (e: Exception) {
-                        AuthDiagnosticsManager.logEvent(AuthEventType.DEVICE_AUTH_FAILED, session.accountId, "Device Auth registration failed: ${e.message}")
                     }
                     
                     sessionCache.value = sessionCache.value + (session.accountId to session)
@@ -371,7 +352,7 @@ class AuthRepository(private val authDao: AuthDao) {
         session?.let {
             try {
                 api.killSessions("Bearer ${it.accessToken}")
-                AuthDiagnosticsManager.logEvent(AuthEventType.LOGOUT, it.accountId, "Session Killed")
+                
             } catch (e: Exception) { }
         }
         sessionCache.value = emptyMap()

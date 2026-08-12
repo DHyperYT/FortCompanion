@@ -50,8 +50,7 @@ fun SettingsScreen(
     authViewModel: AuthViewModel,
     statsViewModel: StatsViewModel,
     settingsViewModel: SettingsViewModel,
-    onAddAccount: () -> Unit,
-    onNavigateToDiagnostic: () -> Unit
+    onAddAccount: () -> Unit
 ) {
     val context = LocalContext.current
     val allAccounts by settingsViewModel.allAccounts.collectAsState()
@@ -507,17 +506,6 @@ fun SettingsScreen(
         }
 
         Spacer(modifier = Modifier.height(24.dp))
-
-        Button(
-            onClick = onNavigateToDiagnostic,
-            modifier = Modifier.fillMaxWidth(),
-            colors = ButtonDefaults.buttonColors(containerColor = SleekSurfaceVariant),
-            shape = RoundedCornerShape(12.dp)
-        ) {
-            Icon(Icons.Default.BugReport, null, tint = FortniteGold)
-            Spacer(Modifier.width(10.dp))
-            Text("Auth Diagnostics", color = SleekTextPrimary, fontWeight = FontWeight.Bold)
-        }
 
         Spacer(modifier = Modifier.height(40.dp))
     }

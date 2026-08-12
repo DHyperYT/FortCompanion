@@ -25,7 +25,6 @@ class VBucksCheckWorker(
         val settings = settingsDao.getSettingsDirect()
 
         if (settings?.vbucksAlertsEnabled != true) {
-            Log.d("VBucksCheckWorker", "V-Bucks alerts are disabled in settings.")
             return Result.success()
         }
 

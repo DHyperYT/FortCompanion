@@ -32,7 +32,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -77,7 +76,6 @@ sealed class NavRoute(val route: String, val title: String, val icon: androidx.c
     object Aes : NavRoute("aes", "AES Keys", Icons.Default.VpnKey)
     object Career : NavRoute("career", "Career", Icons.Default.History)
     object AddAccount : NavRoute("add_account", "Add Account", Icons.Default.PersonAdd)
-    object AuthDiagnostic : NavRoute("auth_diagnostic", "Auth Diagnostic", Icons.Default.BugReport)
 }
 
 class MainActivity : FragmentActivity() {
@@ -282,8 +280,7 @@ fun FortniteCompanionApp(settings: SettingsEntity?) {
                         authViewModel, 
                         statsViewModel, 
                         settingsViewModel,
-                        onAddAccount = { navController.navigate(NavRoute.AddAccount.route) },
-                        onNavigateToDiagnostic = { navController.navigate(NavRoute.AuthDiagnostic.route) }
+                        onAddAccount = { navController.navigate(NavRoute.AddAccount.route) }
                     ) 
                 }
                 composable(NavRoute.AddAccount.route) {
@@ -295,9 +292,6 @@ fun FortniteCompanionApp(settings: SettingsEntity?) {
                         forceLogin = true,
                         onLoginSuccess = { navController.popBackStack() }
                     )
-                }
-                composable(NavRoute.AuthDiagnostic.route) {
-                    AuthDiagnosticScreen(authViewModel)
                 }
             }
         }

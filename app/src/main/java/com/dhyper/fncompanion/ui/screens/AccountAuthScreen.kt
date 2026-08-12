@@ -24,7 +24,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -360,7 +359,7 @@ fun AccountAuthScreen(
                     Text(text = "Click the button below to sign in. The app will automatically connect once you finish logging into your Epic Games account.", fontSize = 13.sp, color = SleekTextSecondary, lineHeight = 18.sp)
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    Button(onClick = { showWebView = true }, colors = ButtonDefaults.buttonColors(containerColor = SleekPrimary), shape = RoundedCornerShape(10.dp), modifier = Modifier.fillMaxWidth().testTag("auth_get_code_button")) {
+                    Button(onClick = { showWebView = true }, colors = ButtonDefaults.buttonColors(containerColor = SleekPrimary), shape = RoundedCornerShape(10.dp), modifier = Modifier.fillMaxWidth()) {
                         Icon(Icons.Default.Link, null, tint = Color.White)
                         Spacer(modifier = Modifier.width(8.dp))
                         Text("Sign In with Epic Games", color = Color.White, fontWeight = FontWeight.Bold)
@@ -373,7 +372,7 @@ fun AccountAuthScreen(
                     OutlinedTextField(
                         value = exchangeCodeInput,
                         onValueChange = { exchangeCodeInput = it; viewModel.clearLoginError() },
-                        modifier = Modifier.fillMaxWidth().testTag("auth_exchange_code_input"),
+                        modifier = Modifier.fillMaxWidth(),
                         label = { Text("Exchange Code (32 hex characters)", color = SleekTextMuted) },
                         leadingIcon = { Icon(Icons.Default.Key, null, tint = SleekCyan) },
                         trailingIcon = {
@@ -405,7 +404,7 @@ fun AccountAuthScreen(
                             enabled = exchangeCodeInput.isNotBlank(),
                             colors = ButtonDefaults.buttonColors(containerColor = SleekPrimary),
                             shape = RoundedCornerShape(10.dp),
-                            modifier = Modifier.fillMaxWidth().testTag("auth_connect_button")
+                            modifier = Modifier.fillMaxWidth()
                         ) {
                             Text("Connect via Exchange Code", color = Color.White, fontWeight = FontWeight.Bold)
                         }

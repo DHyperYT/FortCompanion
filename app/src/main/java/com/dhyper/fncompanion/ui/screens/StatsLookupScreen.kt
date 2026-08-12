@@ -57,7 +57,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -108,8 +107,7 @@ fun StatsLookupScreen(
             value = searchInput,
             onValueChange = { searchInput = it },
             modifier = Modifier
-                .fillMaxWidth()
-                .testTag("stats_search_input"),
+                .fillMaxWidth(),
             placeholder = { Text("Search any Epic Display Name...", color = SleekTextMuted) },
             leadingIcon = { Icon(Icons.Default.PersonSearch, contentDescription = null, tint = SleekCyan) },
             trailingIcon = {
@@ -156,8 +154,7 @@ fun StatsLookupScreen(
                             selected = isSelected,
                             borderColor = SleekSurfaceBorder,
                             selectedBorderColor = SleekPrimary
-                        ),
-                        modifier = Modifier.testTag("stats_platform_$key")
+                        )
                     )
                 }
             }
@@ -166,8 +163,7 @@ fun StatsLookupScreen(
                 onClick = { viewModel.searchPlayer(searchInput) },
                 enabled = searchInput.isNotBlank(),
                 colors = ButtonDefaults.buttonColors(containerColor = SleekPrimary),
-                shape = RoundedCornerShape(10.dp),
-                modifier = Modifier.testTag("stats_search_button")
+                shape = RoundedCornerShape(10.dp)
             ) {
                 Icon(Icons.Default.Search, contentDescription = null, tint = Color.White)
                 Spacer(modifier = Modifier.width(4.dp))
@@ -349,8 +345,7 @@ fun StatsLookupScreen(
                             Button(
                                 onClick = { viewModel.searchPlayer(state.lastQuery) },
                                 colors = ButtonDefaults.buttonColors(containerColor = SleekPrimary),
-                                shape = RoundedCornerShape(10.dp),
-                                modifier = Modifier.testTag("stats_retry_button")
+                                shape = RoundedCornerShape(10.dp)
                             ) {
                                 Text("Retry Search", color = Color.White, fontWeight = FontWeight.Bold)
                             }
