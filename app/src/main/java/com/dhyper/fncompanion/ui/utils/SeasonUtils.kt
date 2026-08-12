@@ -39,9 +39,13 @@ object SeasonUtils {
         if (chapterStr == "2" && seasonStr?.contains("Remix", ignoreCase = true) == true) {
             return 32
         }
+        if (chapterStr == "4" && (seasonStr?.contains("OG", ignoreCase = true) == true || seasonStr == "5")) {
+            return 27
+        }
         val chapter = chapterStr?.toIntOrNull() ?: 1
         val season = when {
             seasonStr?.equals("X", ignoreCase = true) == true -> 10
+            seasonStr?.equals("OG", ignoreCase = true) == true -> 5
             else -> seasonStr?.toIntOrNull() ?: 1
         }
         return getGlobalSeasonNumber(chapter, season)

@@ -64,7 +64,7 @@ fun CosmeticsScreen(
     var selectedSet by remember { mutableStateOf<CosmeticSet?>(null) }
     
     val categories = listOf(
-        "All", "Outfits", "Emotes", "Pickaxes", "Backblings", "Gliders", 
+        "All", "Unreleased", "Outfits", "Emotes", "Pickaxes", "Backblings", "Gliders", 
         "Sidekicks", "Kicks", "Wraps", "Loading Screens", "Music Packs", "Contrails",
         "Sprays", "Emojis", "Banners",
         "Auras", "Jam Tracks", "Guitars", "Basses", "Drums", "Keytars", "Mics",

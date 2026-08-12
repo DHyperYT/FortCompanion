@@ -55,6 +55,9 @@ fun CosmeticDetailSheet(
     val context = LocalContext.current
     
     var viewerImageUrl by remember { mutableStateOf<String?>(null) }
+    var showHistoryDialog by remember { mutableStateOf(false) }
+    val history = item.shopHistory ?: emptyList()
+    val seenCount = history.size
     
     Column(
         modifier = Modifier
@@ -314,6 +317,24 @@ fun CosmeticDetailSheet(
                 Text(set.text ?: "None", color = SleekCyan, fontWeight = FontWeight.Bold, fontSize = 13.sp)
             }
         }
+
+        // --- SHOP HISTORY ---
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp).then(if(seenCount > 0) Modifier.clickable { showHistoryDialog = true } else Modifier),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("Seen", modifier = Modifier.width(100.dp), color = SleekTextMuted, fontSize = 13.sp)
+            Text(
+                if (seenCount > 0) "$seenCount times" else "Never",
+                color = if (seenCount > 0) SleekCyan else SleekTextPrimary,
+                fontWeight = if (seenCount > 0) FontWeight.Bold else FontWeight.Normal,
+                fontSize = 13.sp
+            )
+            if (seenCount > 0) {
+                Icon(Icons.Default.History, null, tint = SleekCyan, modifier = Modifier.size(16.dp).padding(start = 6.dp))
+            }
+        }
+
         CosmeticDetailRow("Added", item.added?.substringBefore("T") ?: "Unknown")
 
         if (includedItems != null && includedItems.size > 1) {
@@ -423,6 +444,65 @@ fun CosmeticDetailSheet(
                 Text("Close")
             }
         }
+    }
+
+    // --- SHOP HISTORY DIALOG ---
+    if (showHistoryDialog) {
+        val history = item.shopHistory ?: emptyList()
+        AlertDialog(
+            onDismissRequest = { showHistoryDialog = false },
+            containerColor = SleekSurfaceVariant,
+            title = {
+                Text(
+                    "Shop History",
+                    color = SleekCyan,
+                    fontWeight = FontWeight.Black,
+                    fontSize = 18.sp
+                )
+            },
+            text = {
+                Column(modifier = Modifier.fillMaxWidth().heightIn(max = 400.dp)) {
+                    Text(
+                        "${item.name} has appeared $seenCount times.",
+                        color = SleekTextPrimary,
+                        fontSize = 14.sp,
+                        modifier = Modifier.padding(bottom = 12.dp)
+                    )
+                    
+                    val scrollState = rememberScrollState()
+                    Column(modifier = Modifier.verticalScroll(scrollState)) {
+                        history.reversed().forEachIndexed { index, date ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 6.dp)
+                                    .background(SleekSurface.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
+                                    .padding(12.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = date.substringBefore("T"),
+                                    color = SleekTextPrimary,
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    text = "#${history.size - index}",
+                                    color = SleekTextMuted,
+                                    fontSize = 12.sp
+                                )
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showHistoryDialog = false }) {
+                    Text("Done", color = SleekCyan, fontWeight = FontWeight.Bold)
+                }
+            }
+        )
     }
 
     // --- FULL SCREEN IMAGE VIEWER ---

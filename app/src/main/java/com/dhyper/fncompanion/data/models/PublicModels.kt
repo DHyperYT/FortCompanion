@@ -144,6 +144,7 @@ data class CosmeticItem(
     val introduction: CosmeticIntro?,
     val set: CosmeticSet?,
     val added: String?,
+    val shopHistory: List<String>? = null,
     val previewUrl: String? = null,
     val artist: String? = null,
     val album: String? = null,
