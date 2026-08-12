@@ -64,7 +64,7 @@ fun CosmeticsScreen(
     var selectedSet by remember { mutableStateOf<CosmeticSet?>(null) }
     
     val categories = listOf(
-        "All", "Unreleased", "Outfits", "Emotes", "Pickaxes", "Backblings", "Gliders", 
+        "All", "Outfits", "Emotes", "Pickaxes", "Backblings", "Gliders", 
         "Sidekicks", "Kicks", "Wraps", "Loading Screens", "Music Packs", "Contrails",
         "Sprays", "Emojis", "Banners",
         "Auras", "Jam Tracks", "Guitars", "Basses", "Drums", "Keytars", "Mics",
@@ -214,7 +214,10 @@ fun CosmeticsScreen(
                                 isOwned = isOwned,
                                 inShop = inShop,
                                 onWishlistToggle = { viewModel.toggleWishlist(item) },
-                                onClick = { selectedCosmetic = item }
+                                onClick = { 
+                                    selectedCosmetic = item
+                                    viewModel.loadDetailedItem(item)
+                                }
                             )
                         }
                     }
@@ -231,6 +234,8 @@ fun CosmeticsScreen(
     }
 
     // Detail Modal BottomSheet
+    val detailedItem by viewModel.detailedItem.collectAsState()
+    
     selectedCosmetic?.let { item ->
         val state = uiState as? CosmeticsUiState.Success
         val videoId by viewModel.selectedVideoId.collectAsState()
@@ -246,15 +251,21 @@ fun CosmeticsScreen(
         }
 
         ModalBottomSheet(
-            onDismissRequest = { selectedCosmetic = null },
+            onDismissRequest = { 
+                selectedCosmetic = null
+                viewModel.clearDetailedItem()
+            },
             sheetState = rememberModalBottomSheetState(),
             containerColor = SleekSurface
         ) {
             val isOwned = state?.ownedIds?.contains(item.id.lowercase()) ?: false
             val isWishlisted = state?.wishlistIds?.any { it.equals(item.id, ignoreCase = true) } ?: false
             
+            // Use detailedItem if it matches the current selection, otherwise fallback to basic item
+            val itemToDisplay = if (detailedItem?.id == item.id) detailedItem!! else item
+
             CosmeticDetailSheet(
-                item = item,
+                item = itemToDisplay,
                 isOwned = isOwned,
                 isWishlisted = isWishlisted,
                 videoId = videoId,
@@ -263,8 +274,12 @@ fun CosmeticsScreen(
                 onSetClick = { 
                     selectedSet = item.set
                     selectedCosmetic = null
+                    viewModel.clearDetailedItem()
                 },
-                onClose = { selectedCosmetic = null }
+                onClose = { 
+                    selectedCosmetic = null
+                    viewModel.clearDetailedItem()
+                }
             )
         }
     }

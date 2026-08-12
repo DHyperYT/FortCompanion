@@ -144,7 +144,9 @@ data class CosmeticItem(
     val introduction: CosmeticIntro?,
     val set: CosmeticSet?,
     val added: String?,
-    val shopHistory: List<String>? = null,
+
+    val lastAppearance: String? = null,
+    val showcaseVideo: String? = null,
     val previewUrl: String? = null,
     val artist: String? = null,
     val album: String? = null,
@@ -265,6 +267,12 @@ data class NewsCategory(
     val title: String?,
     val image: String?,
     val motds: List<NewsMotd>?
+)
+
+@JsonClass(generateAdapter = true)
+data class SingleCosmeticResponse(
+    val status: Int,
+    val data: CosmeticItem?
 )
 
 @JsonClass(generateAdapter = true)

@@ -59,12 +59,17 @@ class CosmeticsViewModel(
     private val _isSearchingVideo = MutableStateFlow(false)
     val isSearchingVideo: StateFlow<Boolean> = _isSearchingVideo.asStateFlow()
 
+    private val _detailedItem = MutableStateFlow<CosmeticItem?>(null)
+    val detailedItem: StateFlow<CosmeticItem?> = _detailedItem.asStateFlow()
+
     private val _allItems = MutableStateFlow<List<CosmeticItem>>(emptyList())
     private val _ownedIds = MutableStateFlow<Set<String>>(emptySet())
     private val _wishlistIds = MutableStateFlow<Set<String>>(emptySet())
     val wishlistIds: StateFlow<Set<String>> = _wishlistIds.asStateFlow()
 
     private val _isLoading = MutableStateFlow(true)
+    private val _isDetailsLoading = MutableStateFlow(false)
+    val isDetailsLoading: StateFlow<Boolean> = _isDetailsLoading.asStateFlow()
     private val _errorMessage = MutableStateFlow<String?>(null)
 
     private val debouncedSearchQuery = _searchQuery.debounce(300)
@@ -101,7 +106,6 @@ class CosmeticsViewModel(
         val filteredBase = all.filter { item ->
             val matchesCategory = when (cat) {
                 "All" -> true
-                "Unreleased" -> item.shopHistory.isNullOrEmpty()
                 "Outfits" -> item.type?.displayValue?.contains("Outfit", ignoreCase = true) == true || 
                             item.id.startsWith("CID_", ignoreCase = true) || item.id.startsWith("Character_", ignoreCase = true)
                 "Backblings" -> item.type?.displayValue?.contains("Back Bling", ignoreCase = true) == true || 
@@ -349,6 +353,25 @@ class CosmeticsViewModel(
         return _allItems.value.filter { it.set?.value == setTag }
     }
 
+    fun loadDetailedItem(item: CosmeticItem) {
+        viewModelScope.launch {
+            _detailedItem.value = item // Use basic info first
+            _isDetailsLoading.value = true
+            
+            val result = repository.fetchDetailedCosmetic(item.id)
+            result.onSuccess { detailed ->
+                if (detailed != null) {
+                    _detailedItem.value = detailed
+                }
+            }
+            _isDetailsLoading.value = false
+        }
+    }
+
+    fun clearDetailedItem() {
+        _detailedItem.value = null
+    }
+
     private fun extractNumericFromId(id: String): Int {
         // Find any sequence of digits after a prefix or underscore (e.g., CID_001, Trails_ID_123)
         val match = Regex("""(?i)[A-Z_]+_(\d+)""").find(id)
@@ -356,6 +379,10 @@ class CosmeticsViewModel(
     }
 
     fun searchYouTubeForItem(item: CosmeticItem) {
+        if (item.showcaseVideo != null) {
+            _selectedVideoId.value = null // We don't need to search if showcase exists
+            return
+        }
         viewModelScope.launch {
             _selectedVideoId.value = null
             _isSearchingVideo.value = true

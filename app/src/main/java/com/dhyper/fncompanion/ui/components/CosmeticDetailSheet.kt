@@ -55,9 +55,6 @@ fun CosmeticDetailSheet(
     val context = LocalContext.current
     
     var viewerImageUrl by remember { mutableStateOf<String?>(null) }
-    var showHistoryDialog by remember { mutableStateOf(false) }
-    val history = item.shopHistory ?: emptyList()
-    val seenCount = history.size
     
     Column(
         modifier = Modifier
@@ -206,7 +203,9 @@ fun CosmeticDetailSheet(
         val isMusicPack = item.id.startsWith("MusicPack_", ignoreCase = true)
 
         // --- AUDIO/VIDEO ---
-        if ((isTrack || isMusicPack) && item.id.startsWith("CID_", ignoreCase = true) == false && !item.id.startsWith("JBSID_", ignoreCase = true)) {
+        val showcaseVideo = item.showcaseVideo
+        if (showcaseVideo != null || ((isTrack || isMusicPack) && item.id.startsWith("CID_", ignoreCase = true) == false && !item.id.startsWith("JBSID_", ignoreCase = true))) {
+            
             // 1. Prioritize 30s Official Preview (for tracks)
             if (isTrack) {
                 item.previewUrl?.let { url ->
@@ -216,7 +215,7 @@ fun CosmeticDetailSheet(
                 }
             }
             
-            // 2. Direct Link to YouTube
+            // 2. Direct Link to Showcase or Search
             val artist = item.artist ?: ""
             val query = when {
                 isTrack && artist.contains("Epic Games", ignoreCase = true) -> 
@@ -226,12 +225,20 @@ fun CosmeticDetailSheet(
                 else -> "Fortnite ${item.name} Music Pack"
             }
             
-            if (isSearchingVideo) {
+            if (isSearchingVideo && showcaseVideo == null) {
                 Box(modifier = Modifier.fillMaxWidth().height(48.dp), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator(color = SleekCyan, modifier = Modifier.size(24.dp))
                 }
             } else {
-                YouTubeButton(query = query, videoId = videoId)
+                // If there's a showcase video, we use it directly. 
+                // If not, we fall back to the searched videoId (if any).
+                val effectiveVideoId = showcaseVideo ?: videoId
+                
+                YouTubeButton(
+                    query = query, 
+                    videoId = effectiveVideoId,
+                    label = if (showcaseVideo != null) "Watch Showcase" else null
+                )
             }
         }
 
@@ -315,23 +322,6 @@ fun CosmeticDetailSheet(
             ) {
                 Text("Set", modifier = Modifier.width(100.dp), color = SleekTextMuted, fontSize = 13.sp)
                 Text(set.text ?: "None", color = SleekCyan, fontWeight = FontWeight.Bold, fontSize = 13.sp)
-            }
-        }
-
-        // --- SHOP HISTORY ---
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp).then(if(seenCount > 0) Modifier.clickable { showHistoryDialog = true } else Modifier),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text("Seen", modifier = Modifier.width(100.dp), color = SleekTextMuted, fontSize = 13.sp)
-            Text(
-                if (seenCount > 0) "$seenCount times" else "Never",
-                color = if (seenCount > 0) SleekCyan else SleekTextPrimary,
-                fontWeight = if (seenCount > 0) FontWeight.Bold else FontWeight.Normal,
-                fontSize = 13.sp
-            )
-            if (seenCount > 0) {
-                Icon(Icons.Default.History, null, tint = SleekCyan, modifier = Modifier.size(16.dp).padding(start = 6.dp))
             }
         }
 
@@ -444,65 +434,6 @@ fun CosmeticDetailSheet(
                 Text("Close")
             }
         }
-    }
-
-    // --- SHOP HISTORY DIALOG ---
-    if (showHistoryDialog) {
-        val history = item.shopHistory ?: emptyList()
-        AlertDialog(
-            onDismissRequest = { showHistoryDialog = false },
-            containerColor = SleekSurfaceVariant,
-            title = {
-                Text(
-                    "Shop History",
-                    color = SleekCyan,
-                    fontWeight = FontWeight.Black,
-                    fontSize = 18.sp
-                )
-            },
-            text = {
-                Column(modifier = Modifier.fillMaxWidth().heightIn(max = 400.dp)) {
-                    Text(
-                        "${item.name} has appeared $seenCount times.",
-                        color = SleekTextPrimary,
-                        fontSize = 14.sp,
-                        modifier = Modifier.padding(bottom = 12.dp)
-                    )
-                    
-                    val scrollState = rememberScrollState()
-                    Column(modifier = Modifier.verticalScroll(scrollState)) {
-                        history.reversed().forEachIndexed { index, date ->
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 6.dp)
-                                    .background(SleekSurface.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
-                                    .padding(12.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = date.substringBefore("T"),
-                                    color = SleekTextPrimary,
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
-                                Text(
-                                    text = "#${history.size - index}",
-                                    color = SleekTextMuted,
-                                    fontSize = 12.sp
-                                )
-                            }
-                        }
-                    }
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = { showHistoryDialog = false }) {
-                    Text("Done", color = SleekCyan, fontWeight = FontWeight.Bold)
-                }
-            }
-        )
     }
 
     // --- FULL SCREEN IMAGE VIEWER ---
