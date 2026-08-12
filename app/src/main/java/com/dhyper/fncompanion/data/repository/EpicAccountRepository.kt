@@ -177,6 +177,18 @@ class EpicAccountRepository {
                                           apiDetails?.images?.full_background ?: 
                                           iconUrl
 
+                        val backgroundUrl = apiDetails?.images?.other?.background ?: 
+                                           apiDetails?.images?.background ?: 
+                                           apiDetails?.images?.full_background
+
+                        val legoIconUrl = apiDetails?.images?.lego?.large ?: 
+                                         apiDetails?.images?.lego?.small ?: 
+                                         apiDetails?.images?.legoLarge ?: 
+                                         apiDetails?.images?.legoSmall
+
+                        val beanIconUrl = apiDetails?.images?.bean?.large ?: 
+                                         apiDetails?.images?.bean?.small
+
                     val existing = groupedMap[itemData.templateId]
                         if (existing != null) {
                             groupedMap[itemData.templateId] = existing.copy(
@@ -195,6 +207,9 @@ class EpicAccountRepository {
                                 rarity = rarity,
                                 iconUrl = iconUrl,
                                 largeIconUrl = largeIconUrl,
+                                backgroundUrl = backgroundUrl,
+                                legoIconUrl = legoIconUrl,
+                                beanIconUrl = beanIconUrl,
                                 isFavorite = isFav,
                                 isArchived = isArchived,
                                 quantity = itemData.quantity,
@@ -889,8 +904,8 @@ class EpicAccountRepository {
             // Kicks (Shoes_)
             idPart.startsWith("Shoes_", ignoreCase = true) -> LockerCategory.KICKS
             
-            // Cars (CarBody_ or ID_Body_)
-            idPart.startsWith("CarBody_", ignoreCase = true) || idPart.startsWith("ID_Body_", ignoreCase = true) -> LockerCategory.CAR
+            // Cars (CarBody_ or ID_Body_ or Body_)
+            idPart.startsWith("CarBody_", ignoreCase = true) || idPart.startsWith("ID_Body_", ignoreCase = true) || idPart.startsWith("Body_", ignoreCase = true) -> LockerCategory.CAR
             
             // Car Decals (CarSkin_ or ID_Skin_)
             idPart.startsWith("CarSkin_", ignoreCase = true) || idPart.startsWith("ID_Skin_", ignoreCase = true) -> LockerCategory.CAR_DECAL

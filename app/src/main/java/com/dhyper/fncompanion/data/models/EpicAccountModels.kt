@@ -77,6 +77,9 @@ data class ParsedLockerItem(
     val rarity: String,
     val iconUrl: String? = null,
     val largeIconUrl: String? = null,
+    val backgroundUrl: String? = null,
+    val legoIconUrl: String? = null,
+    val beanIconUrl: String? = null,
     val isFavorite: Boolean = false,
     val isArchived: Boolean = false,
     val quantity: Int = 1,
@@ -119,7 +122,41 @@ enum class LockerCategory {
     LEGO_BUILD,
     LEGO_DECOR,
     AURA,
-    OTHER
+    OTHER;
+
+    fun getDisplayName(): String {
+        return when (this) {
+            OUTFIT -> "Outfit"
+            BACK_BLING -> "Back Bling"
+            PICKAXE -> "Pickaxe"
+            GLIDER -> "Glider"
+            CONTRAIL -> "Contrail"
+            EMOTE -> "Emote"
+            EMOTICON -> "Emoticon"
+            SPRAY -> "Spray"
+            WRAP -> "Wrap"
+            MUSIC -> "Music Pack"
+            LOADING_SCREEN -> "Loading Screen"
+            SIDEKICK -> "Sidekick"
+            JAM_TRACK -> "Jam Track"
+            BANNER -> "Banner"
+            KICKS -> "Kicks"
+            CAR -> "Car Body"
+            CAR_DECAL -> "Car Decal"
+            WHEELS -> "Car Wheels"
+            CAR_TRAIL -> "Car Trail"
+            CAR_BOOST -> "Car Boost"
+            GUITAR -> "Guitar"
+            BASS -> "Bass"
+            DRUMS -> "Drums"
+            KEYTAR -> "Keytar"
+            MIC -> "Mic"
+            LEGO_BUILD -> "Lego Build"
+            LEGO_DECOR -> "Lego Decor"
+            AURA -> "Aura"
+            else -> "Cosmetic"
+        }
+    }
 }
 
 data class EquippedPresetSlot(

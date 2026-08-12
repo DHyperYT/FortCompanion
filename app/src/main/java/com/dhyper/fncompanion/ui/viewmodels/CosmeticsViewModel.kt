@@ -101,43 +101,44 @@ class CosmeticsViewModel(
         val filteredBase = all.filter { item ->
             val matchesCategory = when (cat) {
                 "All" -> true
-                "Outfit" -> item.type?.displayValue?.contains("Outfit", ignoreCase = true) == true || 
+                "Outfits" -> item.type?.displayValue?.contains("Outfit", ignoreCase = true) == true || 
                             item.id.startsWith("CID_", ignoreCase = true) || item.id.startsWith("Character_", ignoreCase = true)
-                "Back Bling" -> item.type?.displayValue?.contains("Back Bling", ignoreCase = true) == true || 
+                "Backblings" -> item.type?.displayValue?.contains("Back Bling", ignoreCase = true) == true || 
                                 item.id.startsWith("BID_", ignoreCase = true) || item.id.startsWith("Backpack_", ignoreCase = true) ||
                                 item.id.startsWith("PetID_", ignoreCase = true) || item.id.startsWith("PetCarrier_", ignoreCase = true) ||
                                 item.id.contains("AthenaPet", ignoreCase = true)
-                "Pickaxe" -> item.type?.displayValue?.contains("Pickaxe", ignoreCase = true) == true || 
+                "Pickaxes" -> item.type?.displayValue?.contains("Pickaxe", ignoreCase = true) == true || 
                              item.id.startsWith("Pickaxe_", ignoreCase = true)
-                "Glider" -> item.type?.displayValue?.contains("Glider", ignoreCase = true) == true || 
+                "Gliders" -> item.type?.displayValue?.contains("Glider", ignoreCase = true) == true || 
                             item.id.startsWith("Glider_", ignoreCase = true)
-                "Emoticon" -> item.id.contains("Emoji_", ignoreCase = true) || item.id.contains("Emoticon_", ignoreCase = true)
-                "Spray" -> item.id.contains("SPID_", ignoreCase = true) || item.id.contains("Spray_", ignoreCase = true)
-                "Emote" -> item.type?.displayValue?.contains("Emote", ignoreCase = true) == true || 
+                "Emojis" -> item.id.contains("Emoji_", ignoreCase = true) || item.id.contains("Emoticon_", ignoreCase = true)
+                "Sprays" -> item.id.contains("SPID_", ignoreCase = true) || item.id.contains("Spray_", ignoreCase = true)
+                "Emotes" -> item.type?.displayValue?.contains("Emote", ignoreCase = true) == true || 
                            item.id.startsWith("EID_", ignoreCase = true) || item.id.startsWith("Dance_", ignoreCase = true)
-                "Wrap" -> item.id.startsWith("Wrap_", ignoreCase = true)
-                "Contrail" -> item.id.startsWith("Contrail_", ignoreCase = true) || item.id.startsWith("Trails_ID_", ignoreCase = true)
-                "Music" -> item.id.startsWith("MusicPack_", ignoreCase = true)
-                "Loading Screen" -> item.id.startsWith("LSID_", ignoreCase = true) || item.id.startsWith("LoadingScreen_", ignoreCase = true)
-                "Sidekick" -> item.id.startsWith("Companion_", ignoreCase = true) && 
+                "Wraps" -> item.id.startsWith("Wrap_", ignoreCase = true)
+                "Contrails" -> item.id.startsWith("Contrail_", ignoreCase = true) || item.id.startsWith("Trails_ID_", ignoreCase = true)
+                "Music Packs" -> item.id.startsWith("MusicPack_", ignoreCase = true)
+                "Loading Screens" -> item.id.startsWith("LSID_", ignoreCase = true) || item.id.startsWith("LoadingScreen_", ignoreCase = true)
+                "Sidekicks" -> item.id.startsWith("Companion_", ignoreCase = true) && 
                               !item.id.contains("reactfx", ignoreCase = true) && 
                               !item.id.contains("vtid", ignoreCase = true)
-                "Jam Track" -> item.id.startsWith("sid_", ignoreCase = true)
-                "Banner" -> item.id.startsWith("BRS", ignoreCase = false) || item.id.startsWith("Banner_", ignoreCase = true)
+                "Jam Tracks" -> item.id.startsWith("sid_", ignoreCase = true)
+                "Banners" -> item.id.startsWith("BRS", ignoreCase = true) || item.id.startsWith("Banner_", ignoreCase = true) || item.id.startsWith("OtherBanner", ignoreCase = true)
                 "Kicks" -> item.id.startsWith("Shoes_", ignoreCase = true)
-                "Car" -> item.id.startsWith("CarBody_", ignoreCase = true) || item.id.startsWith("ID_Body_", ignoreCase = true)
-                "Car Decal" -> item.id.startsWith("CarSkin_", ignoreCase = true) || item.id.startsWith("ID_Skin_", ignoreCase = true)
-                "Wheels" -> item.id.startsWith("Wheel_", ignoreCase = true) || item.id.startsWith("ID_Wheel_", ignoreCase = true)
-                "Car Trail" -> item.id.startsWith("ID_DriftTrail_", ignoreCase = true)
-                "Car Boost" -> item.id.startsWith("ID_Booster_", ignoreCase = true)
-                "Guitar" -> item.id.startsWith("Sparks_", ignoreCase = true) && item.id.contains("Guitar", ignoreCase = true)
-                "Bass" -> item.id.startsWith("Sparks_", ignoreCase = true) && item.id.contains("Bass", ignoreCase = true)
+                "Car Bodies" -> item.id.startsWith("CarBody_", ignoreCase = true) || item.id.startsWith("ID_Body_", ignoreCase = true) || 
+                                 item.id.startsWith("Body_", ignoreCase = true)
+                "Car Decals" -> item.id.startsWith("CarSkin_", ignoreCase = true) || item.id.startsWith("ID_Skin_", ignoreCase = true)
+                "Car Wheels" -> item.id.startsWith("Wheel_", ignoreCase = true) || item.id.startsWith("ID_Wheel_", ignoreCase = true)
+                "Car Trails" -> item.id.startsWith("ID_DriftTrail_", ignoreCase = true)
+                "Car Boosts" -> item.id.startsWith("ID_Booster_", ignoreCase = true)
+                "Guitars" -> item.id.startsWith("Sparks_", ignoreCase = true) && item.id.contains("Guitar", ignoreCase = true)
+                "Basses" -> item.id.startsWith("Sparks_", ignoreCase = true) && item.id.contains("Bass", ignoreCase = true)
                 "Drums" -> item.id.startsWith("Sparks_", ignoreCase = true) && item.id.contains("DrumKit", ignoreCase = true)
-                "Keytar" -> item.id.startsWith("Sparks_", ignoreCase = true) && item.id.contains("Keytar", ignoreCase = true)
-                "Mic" -> item.id.startsWith("Sparks_", ignoreCase = true) && item.id.contains("Mic", ignoreCase = true)
-                "Lego Build" -> item.id.startsWith("JBSID_", ignoreCase = true)
-                "Lego Decor" -> item.id.startsWith("JBPID_", ignoreCase = true)
-                "Aura" -> item.id.startsWith("SparksAura_", ignoreCase = true) || 
+                "Keytars" -> item.id.startsWith("Sparks_", ignoreCase = true) && item.id.contains("Keytar", ignoreCase = true)
+                "Mics" -> item.id.startsWith("Sparks_", ignoreCase = true) && item.id.contains("Mic", ignoreCase = true)
+                "Lego Builds" -> item.id.startsWith("JBSID_", ignoreCase = true)
+                "Lego Decors" -> item.id.startsWith("JBPID_", ignoreCase = true)
+                "Auras" -> item.id.startsWith("SparksAura_", ignoreCase = true) || 
                           item.id.startsWith("Aura_", ignoreCase = true) ||
                           item.type?.displayValue?.contains("Aura", ignoreCase = true) == true ||
                           item.type?.value?.contains("Aura", ignoreCase = true) == true

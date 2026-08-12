@@ -64,11 +64,12 @@ fun CosmeticsScreen(
     var selectedSet by remember { mutableStateOf<CosmeticSet?>(null) }
     
     val categories = listOf(
-        "All", "Outfit", "Back Bling", "Pickaxe", "Glider", "Emote", "Wrap", 
-        "Contrail", "Music", "Loading Screen", "Emoticon", "Spray", "Sidekick", 
-        "Jam Track", "Banner", "Kicks", "Car", "Car Decal", "Wheels", "Car Trail", 
-        "Car Boost", "Guitar", "Bass", "Drums", "Keytar", "Mic", "Lego Build", 
-        "Lego Decor", "Aura"
+        "All", "Outfits", "Emotes", "Pickaxes", "Backblings", "Gliders", 
+        "Sidekicks", "Kicks", "Wraps", "Loading Screens", "Music Packs", "Contrails",
+        "Sprays", "Emojis", "Banners",
+        "Auras", "Jam Tracks", "Guitars", "Basses", "Drums", "Keytars", "Mics",
+        "Car Bodies", "Car Decals", "Car Wheels", "Car Trails", "Car Boosts",
+        "Lego Builds", "Lego Decors"
     )
 
     Column(

@@ -239,7 +239,6 @@ class FortniteRepository {
 
             val doc = Jsoup.parse(body)
             val pageText = doc.text()
-
             // 1. Direct check: If the "No V-Bucks" phrase is present in the visible text, there are no missions.
             if (pageText.contains("No V-Bucks Missions today", ignoreCase = true)) {
                 return@withContext Result.success(null)

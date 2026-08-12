@@ -1,28 +1,35 @@
 package com.dhyper.fncompanion.ui.components
 
 import androidx.compose.foundation.*
+import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.FavoriteBorder
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import coil.compose.AsyncImage
 import com.dhyper.fncompanion.data.models.CosmeticItem
 import com.dhyper.fncompanion.ui.theme.*
@@ -37,12 +44,17 @@ fun CosmeticDetailSheet(
     isSearchingVideo: Boolean,
     price: Int? = null,
     includedItems: List<CosmeticItem>? = null,
+    ownedIds: Set<String> = emptySet(), // Added parameter
+    renderImages: List<String>? = null,
     onWishlistToggle: () -> Unit,
     onSetClick: (String) -> Unit,
     onCosmeticClick: ((CosmeticItem) -> Unit)? = null,
     onClose: () -> Unit
 ) {
     val rarityColor = getRarityColor(item.rarity?.value ?: "")
+    val context = LocalContext.current
+    
+    var viewerImageUrl by remember { mutableStateOf<String?>(null) }
     
     Column(
         modifier = Modifier
@@ -57,19 +69,94 @@ fun CosmeticDetailSheet(
                 .clip(RoundedCornerShape(16.dp))
                 .background(Brush.verticalGradient(listOf(rarityColor.copy(alpha = 0.4f), SleekSurfaceVariant)))
         ) {
-            val detailIcon = item.images?.large ?: 
-                             item.images?.legoLarge ?:
-                             item.images?.featured ?: 
-                             item.images?.icon ?: 
-                             item.images?.smallIcon ?:
-                             item.images?.small
-                             
-            AsyncImage(
-                model = detailIcon,
-                contentDescription = item.name,
-                modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Fit
-            )
+            val isOutfit = item.type?.value?.contains("outfit", ignoreCase = true) == true || 
+                            item.id.startsWith("CID_", ignoreCase = true) ||
+                            item.id.startsWith("Character_", ignoreCase = true)
+            
+            val isLoadingScreen = item.type?.value?.contains("loadingscreen", ignoreCase = true) == true || 
+                                 item.id.startsWith("LSID_", ignoreCase = true) || 
+                                 item.id.startsWith("LoadingScreen_", ignoreCase = true)
+
+            val detailIcon = when {
+                isLoadingScreen -> item.images?.other?.background ?: item.images?.background ?: item.images?.full_background ?: item.images?.large
+                isOutfit -> item.images?.featured ?: item.images?.large ?: item.images?.icon ?: item.images?.smallIcon
+                else -> item.images?.large ?: 
+                        item.images?.legoLarge ?:
+                        item.images?.featured ?: 
+                        item.images?.icon ?: 
+                        item.images?.smallIcon ?:
+                        item.images?.small
+            }
+
+            val imagesToScroll = if (!renderImages.isNullOrEmpty()) renderImages else listOf(detailIcon ?: "")
+
+            if (imagesToScroll.size > 1) {
+                val listState = rememberLazyListState()
+                LazyRow(
+                    state = listState,
+                    flingBehavior = rememberSnapFlingBehavior(lazyListState = listState),
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(0.dp),
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    items(imagesToScroll) { imageUrl ->
+                        Box(
+                            modifier = Modifier
+                                .fillParentMaxWidth()
+                                .fillMaxHeight()
+                                .clickable { viewerImageUrl = imageUrl },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            AsyncImage(
+                                model = imageUrl,
+                                contentDescription = item.name,
+                                modifier = Modifier.fillMaxSize(),
+                                contentScale = ContentScale.Fit
+                            )
+                        }
+                    }
+                }
+                
+                // Indicators
+                val currentIndex by remember {
+                    derivedStateOf { listState.firstVisibleItemIndex }
+                }
+
+                Row(
+                    Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(bottom = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    repeat(imagesToScroll.size) { index ->
+                        Box(
+                            Modifier
+                                .size(6.dp)
+                                .background(
+                                    if (currentIndex == index) Color.White else Color.White.copy(alpha = 0.5f), 
+                                    CircleShape
+                                )
+                        )
+                    }
+                }
+            } else {
+                AsyncImage(
+                    model = detailIcon,
+                    contentDescription = item.name,
+                    modifier = Modifier.fillMaxSize().clickable { if (!detailIcon.isNullOrEmpty()) viewerImageUrl = detailIcon },
+                    contentScale = ContentScale.Fit
+                )
+            }
+            
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(8.dp)
+                    .background(Color.Black.copy(alpha = 0.5f), CircleShape)
+                    .padding(4.dp)
+            ) {
+                Icon(Icons.Default.ZoomIn, null, tint = Color.White, modifier = Modifier.size(16.dp))
+            }
         }
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -131,7 +218,11 @@ fun CosmeticDetailSheet(
         }
 
         // --- STYLES / VARIANTS ---
-        if (!item.variants.isNullOrEmpty()) {
+        val legoIcon = item.images?.lego?.large ?: item.images?.lego?.small ?: item.images?.legoLarge ?: item.images?.legoSmall
+        val beanIcon = item.images?.bean?.large ?: item.images?.bean?.small
+        val hasVariants = !item.variants.isNullOrEmpty()
+        
+        if (hasVariants || legoIcon != null || beanIcon != null) {
             Spacer(modifier = Modifier.height(16.dp))
             Text(
                 text = "AVAILABLE STYLES",
@@ -140,7 +231,28 @@ fun CosmeticDetailSheet(
                 fontWeight = FontWeight.Black
             )
             Spacer(modifier = Modifier.height(8.dp))
-            item.variants.forEach { variant ->
+
+            // 1. Show Special Mode Styles (LEGO/Bean)
+            if (legoIcon != null || beanIcon != null) {
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.padding(bottom = 12.dp)
+                ) {
+                    if (legoIcon != null) {
+                        item {
+                            StylePreviewCard(imageUrl = legoIcon, name = "LEGO", onClick = { viewerImageUrl = legoIcon })
+                        }
+                    }
+                    if (beanIcon != null) {
+                        item {
+                            StylePreviewCard(imageUrl = beanIcon, name = "Fall Guys", onClick = { viewerImageUrl = beanIcon })
+                        }
+                    }
+                }
+            }
+
+            // 2. Show Standard Variants
+            item.variants?.forEach { variant ->
                 if (!variant.options.isNullOrEmpty()) {
                     Text(
                         text = variant.type?.uppercase() ?: "VARIANT",
@@ -154,40 +266,7 @@ fun CosmeticDetailSheet(
                         contentPadding = PaddingValues(bottom = 12.dp)
                     ) {
                         items(variant.options) { option ->
-                            Card(
-                                modifier = Modifier
-                                    .size(80.dp)
-                                    .border(1.dp, SleekSurfaceBorder, RoundedCornerShape(10.dp)),
-                                shape = RoundedCornerShape(10.dp),
-                                colors = CardDefaults.cardColors(containerColor = SleekSurfaceVariant)
-                            ) {
-                                Box(contentAlignment = Alignment.Center) {
-                                    if (!option.image.isNullOrEmpty()) {
-                                        AsyncImage(
-                                            model = option.image,
-                                            contentDescription = option.name,
-                                            modifier = Modifier.fillMaxSize(),
-                                            contentScale = ContentScale.Fit
-                                        )
-                                    }
-                                    Box(
-                                        modifier = Modifier
-                                            .align(Alignment.BottomCenter)
-                                            .fillMaxWidth()
-                                            .background(Color.Black.copy(alpha = 0.6f))
-                                            .padding(vertical = 2.dp)
-                                    ) {
-                                        Text(
-                                            text = option.name ?: "Style",
-                                            color = Color.White,
-                                            fontSize = 9.sp,
-                                            textAlign = TextAlign.Center,
-                                            modifier = Modifier.fillMaxWidth(),
-                                            maxLines = 1
-                                        )
-                                    }
-                                }
-                            }
+                            StylePreviewCard(imageUrl = option.image, name = option.name ?: "Style", onClick = { if(!option.image.isNullOrEmpty()) viewerImageUrl = option.image })
                         }
                     }
                 }
@@ -260,6 +339,14 @@ fun CosmeticDetailSheet(
                                 }
                             }
                             Spacer(modifier = Modifier.height(4.dp))
+                            val isSubOwned = ownedIds.contains(subItem.id.lowercase())
+                            if (isSubOwned) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Default.CheckCircle, null, tint = SleekEmerald, modifier = Modifier.size(10.dp))
+                                    Spacer(Modifier.width(2.dp))
+                                    Text("OWNED", color = SleekEmerald, fontSize = 8.sp, fontWeight = FontWeight.Black)
+                                }
+                            }
                             Text(
                                 text = subItem.name,
                                 fontSize = 10.sp,
@@ -322,6 +409,157 @@ fun CosmeticDetailSheet(
             }
         }
     }
+
+    // --- FULL SCREEN IMAGE VIEWER ---
+    viewerImageUrl?.let { url ->
+        Dialog(
+            onDismissRequest = { viewerImageUrl = null },
+            properties = DialogProperties(usePlatformDefaultWidth = false)
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black)
+            ) {
+                var scale by remember { mutableStateOf(1f) }
+                var offset by remember { mutableStateOf(androidx.compose.ui.geometry.Offset.Zero) }
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .pointerInput(Unit) {
+                            detectTransformGestures { _, pan, zoom, _ ->
+                                scale = (scale * zoom).coerceIn(1f, 5f)
+                                offset += pan
+                            }
+                        }
+                        .pointerInput(Unit) {
+                            detectTapGestures(
+                                onDoubleTap = {
+                                    scale = 1f
+                                    offset = androidx.compose.ui.geometry.Offset.Zero
+                                }
+                            )
+                        },
+                    contentAlignment = Alignment.Center
+                ) {
+                    AsyncImage(
+                        model = url,
+                        contentDescription = null,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .graphicsLayer(
+                                scaleX = scale,
+                                scaleY = scale,
+                                translationX = offset.x,
+                                translationY = offset.y
+                            ),
+                        contentScale = ContentScale.Fit
+                    )
+                }
+
+                // Top Controls
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .statusBarsPadding()
+                        .padding(16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(
+                        onClick = { viewerImageUrl = null },
+                        modifier = Modifier.background(Color.Black.copy(alpha = 0.4f), CircleShape)
+                    ) {
+                        Icon(Icons.Default.Close, null, tint = Color.White)
+                    }
+
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        IconButton(
+                            onClick = {
+                                downloadImage(context, url, item.name)
+                            },
+                            modifier = Modifier.background(Color.Black.copy(alpha = 0.4f), CircleShape)
+                        ) {
+                            Icon(Icons.Default.Download, null, tint = Color.White)
+                        }
+                    }
+                }
+                
+                if (scale > 1f) {
+                    Text(
+                        "Reset Zoom",
+                        color = Color.White.copy(alpha = 0.7f),
+                        fontSize = 12.sp,
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .padding(bottom = 32.dp)
+                            .background(Color.Black.copy(alpha = 0.4f), RoundedCornerShape(8.dp))
+                            .padding(horizontal = 12.dp, vertical = 6.dp)
+                            .clickable { scale = 1f; offset = androidx.compose.ui.geometry.Offset.Zero }
+                    )
+                }
+            }
+        }
+    }
+}
+
+private fun downloadImage(context: android.content.Context, url: String, fileName: String) {
+    try {
+        val downloadManager = context.getSystemService(android.content.Context.DOWNLOAD_SERVICE) as android.app.DownloadManager
+        val uri = android.net.Uri.parse(url)
+        val request = android.app.DownloadManager.Request(uri).apply {
+            setNotificationVisibility(android.app.DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+            setTitle(fileName)
+            setDescription("Downloading image from Fortnite Companion")
+            setDestinationInExternalPublicDir(android.os.Environment.DIRECTORY_DOWNLOADS, "$fileName.png")
+            setAllowedOverMetered(true)
+            setAllowedOverRoaming(true)
+        }
+        downloadManager.enqueue(request)
+        android.widget.Toast.makeText(context, "Download started...", android.widget.Toast.LENGTH_SHORT).show()
+    } catch (e: Exception) {
+        android.widget.Toast.makeText(context, "Failed to start download: ${e.localizedMessage}", android.widget.Toast.LENGTH_LONG).show()
+    }
+}
+
+@Composable
+fun StylePreviewCard(imageUrl: String?, name: String, onClick: () -> Unit = {}) {
+    Card(
+        modifier = Modifier
+            .size(80.dp)
+            .border(1.dp, SleekSurfaceBorder, RoundedCornerShape(10.dp))
+            .clickable { onClick() },
+        shape = RoundedCornerShape(10.dp),
+        colors = CardDefaults.cardColors(containerColor = SleekSurfaceVariant)
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            if (!imageUrl.isNullOrEmpty()) {
+                AsyncImage(
+                    model = imageUrl,
+                    contentDescription = name,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Fit
+                )
+            }
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .background(Color.Black.copy(alpha = 0.6f))
+                    .padding(vertical = 2.dp)
+            ) {
+                Text(
+                    text = name,
+                    color = Color.White,
+                    fontSize = 9.sp,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth(),
+                    maxLines = 1
+                )
+            }
+        }
+    }
 }
 
 @Composable
@@ -339,7 +577,7 @@ fun resolveCosmeticIcon(item: CosmeticItem): String? {
     
     return when {
         // Vehicles: prioritize standard icons (like BR locker)
-        id.startsWith("car") || id.startsWith("id_") || type.contains("car") || 
+        id.startsWith("car") || id.startsWith("id_") || id.startsWith("body_") || type.contains("car") || 
         type.contains("wheel") || type.contains("boost") || type.contains("trail") || type.contains("decal") ||
         id.startsWith("id_body_") || id.startsWith("carbody_") ||
         id.startsWith("id_skin_") || id.startsWith("carskin_") ||

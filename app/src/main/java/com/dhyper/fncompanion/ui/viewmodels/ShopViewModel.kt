@@ -28,6 +28,7 @@ sealed class ShopUiState {
         val individualPrices: Map<String, Int> = emptyMap(),
         val skinSetPrices: Map<String, Pair<Int, Set<String>>> = emptyMap(),
         val shopItemIds: Set<String> = emptySet(),
+        val shownBanners: Set<String> = emptySet(),
         val isJamTracksExpanded: Boolean = false
     ) : ShopUiState()
     data class Error(val message: String) : ShopUiState()
@@ -54,7 +55,12 @@ class ShopViewModel(
     private val _wishlistIds = MutableStateFlow<Set<String>>(emptySet())
     val wishlistIds: StateFlow<Set<String>> = _wishlistIds.asStateFlow()
 
+    private val _allCosmetics = MutableStateFlow<List<com.dhyper.fncompanion.data.models.CosmeticItem>>(emptyList())
+
     private val _isJamTracksExpanded = MutableStateFlow(false)
+
+    private val _shownBanners = MutableStateFlow<Set<String>>(emptySet())
+    val shownBanners: StateFlow<Set<String>> = _shownBanners.asStateFlow()
 
     private var currentShopData: ShopData? = null
 
@@ -67,7 +73,15 @@ class ShopViewModel(
         observeAccountChanges()
         
         // Main UI State Pipeline
-        combine(debouncedSearchQuery, _selectedCategory, _wishlistIds, _ownedIds, _isJamTracksExpanded) { query, cat, wishlist, owned, expanded ->
+        combine(debouncedSearchQuery, _selectedCategory, _wishlistIds, _ownedIds, _isJamTracksExpanded, _allCosmetics, _shownBanners) { args: Array<Any?> ->
+            val query = args[0] as String
+            val cat = args[1] as String
+            val wishlist = args[2] as Set<String>
+            val owned = args[3] as Set<String>
+            val expanded = args[4] as Boolean
+            val allCos = args[5] as List<com.dhyper.fncompanion.data.models.CosmeticItem>
+            val shown = args[6] as Set<String>
+
             val data = currentShopData ?: return@combine null
             val allEntries = data.entries ?: emptyList()
             
@@ -76,12 +90,12 @@ class ShopViewModel(
             val allShopIds = mutableSetOf<String>()
 
             allEntries.forEach { entry ->
-                val items = getItemsForEntryInternal(entry)
+                val items = getItemsForEntryInternal(entry, allCos)
                 
                 items.forEach { allShopIds.add(it.id.lowercase()) }
 
                 val p = entry.finalPrice ?: entry.regularPrice ?: 0
-                val t = getShopEntryTitleInternal(entry)
+                val t = getShopEntryTitleInternal(entry, allCos)
                 val sk = items.find { it.type?.value?.equals("outfit", ignoreCase = true) == true }
                 val isB = (entry.bundle != null || t.contains("Bundle", ignoreCase = true)) && (sk == null || !t.trim().equals(sk.name.trim(), ignoreCase = true))
                 if (!isB && items.isNotEmpty()) {
@@ -94,13 +108,14 @@ class ShopViewModel(
 
             ShopUiState.Success(
                 shopData = data,
-                filteredEntries = filterEntries(sorted, cat, query, wishlist),
+                filteredEntries = filterEntries(sorted, cat, query, wishlist, allCos),
                 selectedCategory = cat,
                 ownedIds = owned,
                 wishlistIds = wishlist,
                 individualPrices = indPrices,
                 skinSetPrices = setPrices,
                 shopItemIds = allShopIds,
+                shownBanners = shown,
                 isJamTracksExpanded = expanded
             )
         }.filterNotNull()
@@ -215,6 +230,11 @@ class ShopViewModel(
         viewModelScope.launch {
             _uiState.value = ShopUiState.Loading
             
+            // 0. Fetch all cosmetics for derivation logic
+            launch {
+                repository.fetchAllCosmetics().onSuccess { _allCosmetics.value = it }
+            }
+            
             // 1. Fetch owned items in parallel
             launch {
                 val sessionResult = authRepo.ensureActiveSession()
@@ -241,15 +261,15 @@ class ShopViewModel(
         }
     }
 
-    private fun getShopEntryTitleInternal(entry: ShopEntry): String {
+    private fun getShopEntryTitleInternal(entry: ShopEntry, allCosmetics: List<com.dhyper.fncompanion.data.models.CosmeticItem> = emptyList()): String {
         if (!entry.bundle?.name.isNullOrBlank()) return entry.bundle?.name!!
         
-        val allItems = getItemsForEntryInternal(entry)
+        val allItems = getItemsForEntryInternal(entry, allCosmetics)
         val firstItemName = allItems.firstOrNull { !it.name.isNullOrBlank() }?.name
         return firstItemName ?: entry.devName ?: "Cosmetic"
     }
 
-    private fun getItemsForEntryInternal(entry: ShopEntry): List<com.dhyper.fncompanion.data.models.CosmeticItem> {
+    private fun getItemsForEntryInternal(entry: ShopEntry, allCosmetics: List<com.dhyper.fncompanion.data.models.CosmeticItem> = emptyList()): List<com.dhyper.fncompanion.data.models.CosmeticItem> {
         val itemMap = mutableMapOf<String, com.dhyper.fncompanion.data.models.CosmeticItem>()
         val orderedIds = mutableListOf<String>()
 
@@ -267,11 +287,44 @@ class ShopViewModel(
             }
         }
 
-        processList(entry.brItems)
-        processList(entry.cars)
         processList(entry.vehicles)
+        processList(entry.cars)
+        processList(entry.brItems)
         processList(entry.instruments)
         processList(entry.items)
+
+        // Check for referenced cosmetic ID in NewDisplayAsset
+        entry.newDisplayAsset?.cosmeticId?.let { cid ->
+            if (!itemMap.containsKey(cid)) {
+                val placeholder = com.dhyper.fncompanion.data.models.CosmeticItem(
+                    id = cid, name = entry.devName ?: "Item", description = null, type = null, rarity = null, series = null, images = null, variants = null, introduction = null, set = null, added = null
+                )
+                itemMap[cid] = placeholder
+                orderedIds.add(cid)
+            }
+        }
+
+        // Fix for missing Car Bodies in bundles
+        val hasCarBody = orderedIds.any { id -> 
+            id.startsWith("Body_", true) || id.startsWith("ID_Body_", true) || id.startsWith("CarBody_", true) 
+        }
+        val bundleName = entry.bundle?.name ?: entry.layout?.name ?: ""
+        val isVehicleBundle = entry.cars?.isNotEmpty() == true || entry.vehicles?.isNotEmpty() == true || 
+                             entry.devName?.contains("Car", true) == true || bundleName.contains("Bundle", true) == true
+        
+        if (!hasCarBody && isVehicleBundle && allCosmetics.isNotEmpty()) {
+            val carSearchName = bundleName.replace(" Bundle", "", ignoreCase = true).trim()
+            if (carSearchName.isNotBlank()) {
+                val matchingCar = allCosmetics.find { 
+                    it.name.equals(carSearchName, ignoreCase = true) && 
+                    (it.id.startsWith("Body_", true) || it.id.startsWith("ID_Body_", true) || it.id.startsWith("CarBody_", true))
+                }
+                if (matchingCar != null && !itemMap.containsKey(matchingCar.id)) {
+                    itemMap[matchingCar.id] = matchingCar
+                    orderedIds.add(0, matchingCar.id) // Add to left as it's the main item
+                }
+            }
+        }
 
         entry.tracks?.forEach { t ->
             val trackMap = t.track as? Map<*, *>
@@ -327,8 +380,15 @@ class ShopViewModel(
         }
 
         fun isVehicleOnlyOffer(entry: ShopEntry): Boolean {
-            // Vehicle only means has cars and no BR items, tracks, or instruments
-            return !entry.cars.isNullOrEmpty() && 
+            val allItems = getItemsForEntryInternal(entry)
+            val hasVehicleItems = allItems.isNotEmpty() && allItems.all { 
+                it.id.startsWith("CarBody_", true) || it.id.startsWith("ID_Body_", true) || it.id.startsWith("Body_", true) ||
+                it.id.startsWith("CarSkin_", true) || it.id.startsWith("ID_Skin_", true) ||
+                it.id.startsWith("Wheel_", true) || it.id.startsWith("ID_Wheel_", true) ||
+                it.id.startsWith("ID_DriftTrail_", true) || it.id.startsWith("ID_Booster_", true)
+            }
+            // Vehicle only means has cars or pure vehicle IDs, and no BR items, tracks, or instruments
+            return (hasVehicleItems || !entry.cars.isNullOrEmpty() || !entry.vehicles.isNullOrEmpty()) && 
                    entry.brItems.isNullOrEmpty() && 
                    entry.tracks.isNullOrEmpty() && 
                    entry.instruments.isNullOrEmpty()
@@ -405,6 +465,10 @@ class ShopViewModel(
         _isJamTracksExpanded.value = !_isJamTracksExpanded.value
     }
 
+    fun markBannerAsShown(offerId: String) {
+        _shownBanners.value += offerId
+    }
+
     fun toggleWishlist(item: com.dhyper.fncompanion.data.models.CosmeticItem) {
         val itemId = item.id.lowercase()
         if (_ownedIds.value.contains(itemId)) return
@@ -435,7 +499,7 @@ class ShopViewModel(
         }
     }
 
-    private fun filterEntries(entries: List<ShopEntry>, category: String, query: String, wishlist: Set<String>): List<ShopEntry> {
+    private fun filterEntries(entries: List<ShopEntry>, category: String, query: String, wishlist: Set<String>, allCosmetics: List<com.dhyper.fncompanion.data.models.CosmeticItem> = emptyList()): List<ShopEntry> {
         return entries.filter { entry ->
             val trackIds = entry.tracks?.map { t ->
                 val trackMap = t.track as? Map<*, *>
@@ -451,56 +515,47 @@ class ShopViewModel(
                 }
             } ?: emptyList()
             
-            val allItems = (entry.items ?: emptyList()) + 
-                          (entry.brItems ?: emptyList()) + 
-                          (entry.cars ?: emptyList()) + 
-                          (entry.vehicles ?: emptyList()) + 
-                          (entry.instruments ?: emptyList()) +
-                          trackIds.map { id -> 
-                              com.dhyper.fncompanion.data.models.CosmeticItem(id = id, name = "", description = null, type = null, rarity = null, series = null, images = null, variants = null, introduction = null, set = null, added = null)
-                          }
-            val title = getShopEntryTitleInternal(entry)
-            val skin = allItems.find { it.type?.value?.equals("outfit", ignoreCase = true) == true }
-            val isBundle = (entry.bundle != null || title.contains("Bundle", ignoreCase = true)) && 
-                           (skin == null || !title.trim().equals(skin.name.trim(), ignoreCase = true))
+            val allItems = getItemsForEntryInternal(entry, allCosmetics)
+            val title = getShopEntryTitleInternal(entry, allCosmetics)
+            val isBundle = title.contains("Bundle", ignoreCase = true)
             
             val matchesCategory = when (category) {
                 "All" -> true
                 "Bundles" -> isBundle
-                "Outfit" -> allItems.any { it.type?.displayValue?.contains("Outfit", ignoreCase = true) == true || it.id.startsWith("CID_", ignoreCase = true) || it.id.startsWith("Character_", ignoreCase = true) }
-                "Back Bling" -> allItems.any { it.type?.displayValue?.contains("Back Bling", ignoreCase = true) == true || it.id.startsWith("BID_", ignoreCase = true) || it.id.startsWith("Backpack_", ignoreCase = true) || it.id.startsWith("PetID_", ignoreCase = true) || it.id.startsWith("PetCarrier_", ignoreCase = true) || it.id.contains("AthenaPet", ignoreCase = true) }
-                "Pickaxe" -> allItems.any { it.type?.displayValue?.contains("Pickaxe", ignoreCase = true) == true || it.id.startsWith("Pickaxe_", ignoreCase = true) }
+                "Outfits" -> allItems.any { it.type?.displayValue?.contains("Outfit", ignoreCase = true) == true || it.id.startsWith("CID_", ignoreCase = true) || it.id.startsWith("Character_", ignoreCase = true) }
+                "Backblings" -> allItems.any { it.type?.displayValue?.contains("Back Bling", ignoreCase = true) == true || it.id.startsWith("BID_", ignoreCase = true) || it.id.startsWith("Backpack_", ignoreCase = true) || it.id.startsWith("PetID_", ignoreCase = true) || it.id.startsWith("PetCarrier_", ignoreCase = true) || it.id.contains("AthenaPet", ignoreCase = true) }
+                "Pickaxes" -> allItems.any { it.type?.displayValue?.contains("Pickaxe", ignoreCase = true) == true || it.id.startsWith("Pickaxe_", ignoreCase = true) || it.id.startsWith("Pickaxe_ID_", ignoreCase = true) }
                 "Buried" -> allItems.any { it.type?.displayValue?.contains("Buried", ignoreCase = true) == true }
-                "Glider" -> allItems.any { it.type?.displayValue?.contains("Glider", ignoreCase = true) == true || it.id.startsWith("Glider_", ignoreCase = true) }
-                "Emote" -> allItems.any { it.type?.displayValue?.contains("Emote", ignoreCase = true) == true || it.id.startsWith("EID_", ignoreCase = true) || it.id.startsWith("Dance_", ignoreCase = true) }
-                "Wrap" -> allItems.any { it.id.startsWith("Wrap_", ignoreCase = true) }
-                "Contrail" -> allItems.any { it.id.startsWith("Contrail_", ignoreCase = true) }
-                "Music" -> allItems.any { it.id.startsWith("MusicPack_", ignoreCase = true) }
-                "Loading Screen" -> allItems.any { it.id.startsWith("LSID_", ignoreCase = true) || it.id.startsWith("LoadingScreen_", ignoreCase = true) }
-                "Emoticon" -> allItems.any { it.id.contains("Emoji_", ignoreCase = true) || it.id.contains("Emoticon_", ignoreCase = true) }
-                "Spray" -> allItems.any { it.id.contains("SPID_", ignoreCase = true) || it.id.contains("Spray_", ignoreCase = true) }
-                "Sidekick" -> allItems.any { it.id.startsWith("Companion_", ignoreCase = true) && !it.id.contains("reactfx", ignoreCase = true) && !it.id.contains("vtid", ignoreCase = true) }
-                "Jam Track" -> !entry.tracks.isNullOrEmpty() || allItems.any { it.id.startsWith("sid_", ignoreCase = true) }
+                "Gliders" -> allItems.any { it.type?.displayValue?.contains("Glider", ignoreCase = true) == true || it.id.startsWith("Glider_", ignoreCase = true) || it.id.startsWith("Glider_ID_", ignoreCase = true) }
+                "Emotes" -> allItems.any { it.type?.displayValue?.contains("Emote", ignoreCase = true) == true || it.id.startsWith("EID_", ignoreCase = true) || it.id.startsWith("Dance_", ignoreCase = true) }
+                "Wraps" -> allItems.any { it.id.startsWith("Wrap_", ignoreCase = true) }
+                "Contrails" -> allItems.any { it.id.startsWith("Contrail_", ignoreCase = true) || it.id.startsWith("Trails_ID_", ignoreCase = true) || it.id.startsWith("ID_DriftTrail_", ignoreCase = true) }
+                "Music Packs" -> allItems.any { it.id.startsWith("MusicPack_", ignoreCase = true) }
+                "Loading Screens" -> allItems.any { it.id.startsWith("LSID_", ignoreCase = true) || it.id.startsWith("LoadingScreen_", ignoreCase = true) }
+                "Emojis" -> allItems.any { it.id.contains("Emoji_", ignoreCase = true) || it.id.contains("Emoticon_", ignoreCase = true) }
+                "Sprays" -> allItems.any { it.id.contains("SPID_", ignoreCase = true) || it.id.contains("Spray_", ignoreCase = true) }
+                "Sidekicks" -> allItems.any { it.id.startsWith("Companion_", ignoreCase = true) && !it.id.contains("reactfx", ignoreCase = true) && !it.id.contains("vtid", ignoreCase = true) }
+                "Jam Tracks" -> !entry.tracks.isNullOrEmpty() || allItems.any { it.id.startsWith("sid_", ignoreCase = true) }
                 "Vehicles" -> !entry.cars.isNullOrEmpty() || !entry.vehicles.isNullOrEmpty() || 
-                             allItems.any { it.id.startsWith("CarBody_", ignoreCase = true) || it.id.startsWith("ID_Body_", ignoreCase = true) || 
+                             allItems.any { it.id.startsWith("CarBody_", ignoreCase = true) || it.id.startsWith("ID_Body_", ignoreCase = true) || it.id.startsWith("Body_", ignoreCase = true) || 
                                            it.id.startsWith("CarSkin_", ignoreCase = true) || it.id.startsWith("ID_Skin_", ignoreCase = true) || 
                                            it.id.startsWith("Wheel_", ignoreCase = true) || it.id.startsWith("ID_Wheel_", ignoreCase = true) || 
                                            it.id.startsWith("ID_DriftTrail_", ignoreCase = true) || it.id.startsWith("ID_Booster_", ignoreCase = true) }
-                "Banner" -> allItems.any { it.id.startsWith("BRS", ignoreCase = false) || it.id.startsWith("Banner_", ignoreCase = true) }
+                "Banners" -> allItems.any { it.id.startsWith("BRS", ignoreCase = true) || it.id.startsWith("Banner_", ignoreCase = true) || it.id.startsWith("OtherBanner", ignoreCase = true) }
                 "Kicks" -> allItems.any { it.id.startsWith("Shoes_", ignoreCase = true) }
-                "Car" -> allItems.any { it.id.startsWith("CarBody_", ignoreCase = true) || it.id.startsWith("ID_Body_", ignoreCase = true) }
-                "Car Decal" -> allItems.any { it.id.startsWith("CarSkin_", ignoreCase = true) || it.id.startsWith("ID_Skin_", ignoreCase = true) }
-                "Wheels" -> allItems.any { it.id.startsWith("Wheel_", ignoreCase = true) || it.id.startsWith("ID_Wheel_", ignoreCase = true) }
-                "Car Trail" -> allItems.any { it.id.startsWith("ID_DriftTrail_", ignoreCase = true) }
-                "Car Boost" -> allItems.any { it.id.startsWith("ID_Booster_", ignoreCase = true) }
-                "Guitar" -> allItems.any { it.id.startsWith("Sparks_", ignoreCase = true) && it.id.contains("Guitar", ignoreCase = true) }
-                "Bass" -> allItems.any { it.id.startsWith("Sparks_", ignoreCase = true) && it.id.contains("Bass", ignoreCase = true) }
+                "Car Bodies" -> allItems.any { it.id.startsWith("CarBody_", ignoreCase = true) || it.id.startsWith("ID_Body_", ignoreCase = true) || it.id.startsWith("Body_", ignoreCase = true) }
+                "Car Decals" -> allItems.any { it.id.startsWith("CarSkin_", ignoreCase = true) || it.id.startsWith("ID_Skin_", ignoreCase = true) }
+                "Car Wheels" -> allItems.any { it.id.startsWith("Wheel_", ignoreCase = true) || it.id.startsWith("ID_Wheel_", ignoreCase = true) }
+                "Car Trails" -> allItems.any { it.id.startsWith("ID_DriftTrail_", ignoreCase = true) }
+                "Car Boosts" -> allItems.any { it.id.startsWith("ID_Booster_", ignoreCase = true) }
+                "Guitars" -> allItems.any { it.id.startsWith("Sparks_", ignoreCase = true) && it.id.contains("Guitar", ignoreCase = true) }
+                "Basses" -> allItems.any { it.id.startsWith("Sparks_", ignoreCase = true) && it.id.contains("Bass", ignoreCase = true) }
                 "Drums" -> allItems.any { it.id.startsWith("Sparks_", ignoreCase = true) && it.id.contains("DrumKit", ignoreCase = true) }
-                "Keytar" -> allItems.any { it.id.startsWith("Sparks_", ignoreCase = true) && it.id.contains("Keytar", ignoreCase = true) }
-                "Mic" -> allItems.any { it.id.startsWith("Sparks_", ignoreCase = true) && it.id.contains("Mic", ignoreCase = true) }
-                "Lego Build" -> allItems.any { it.id.startsWith("JBSID_", ignoreCase = true) }
-                "Lego Decor" -> allItems.any { it.id.startsWith("JBPID_", ignoreCase = true) }
-                "Aura" -> allItems.any { it.id.startsWith("SparksAura_", ignoreCase = true) || it.id.startsWith("Aura_", ignoreCase = true) }
+                "Keytars" -> allItems.any { it.id.startsWith("Sparks_", ignoreCase = true) && it.id.contains("Keytar", ignoreCase = true) }
+                "Mics" -> allItems.any { it.id.startsWith("Sparks_", ignoreCase = true) && it.id.contains("Mic", ignoreCase = true) }
+                "Lego Builds" -> allItems.any { it.id.startsWith("JBSID_", ignoreCase = true) }
+                "Lego Decors" -> allItems.any { it.id.startsWith("JBPID_", ignoreCase = true) }
+                "Auras" -> allItems.any { it.id.startsWith("SparksAura_", ignoreCase = true) || it.id.startsWith("Aura_", ignoreCase = true) }
                 else -> true
             }
 

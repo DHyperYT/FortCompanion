@@ -313,31 +313,31 @@ fun PersonalLockerScreen(
                     // Category Chips
                     val categories = listOf(
                         LockerCategory.OUTFIT to "Outfits",
-                        LockerCategory.BACK_BLING to "Back Blings",
-                        LockerCategory.PICKAXE to "Pickaxes",
-                        LockerCategory.GLIDER to "Gliders",
-                        LockerCategory.CONTRAIL to "Contrails",
                         LockerCategory.EMOTE to "Emotes",
-                        LockerCategory.EMOTICON to "Emoticons",
-                        LockerCategory.SPRAY to "Sprays",
-                        LockerCategory.WRAP to "Wraps",
-                        LockerCategory.MUSIC to "Music",
-                        LockerCategory.LOADING_SCREEN to "Screens",
+                        LockerCategory.PICKAXE to "Pickaxes",
+                        LockerCategory.BACK_BLING to "Backblings",
+                        LockerCategory.GLIDER to "Gliders",
                         LockerCategory.SIDEKICK to "Sidekicks",
+                        LockerCategory.KICKS to "Kicks",
+                        LockerCategory.WRAP to "Wraps",
+                        LockerCategory.LOADING_SCREEN to "Loading Screens",
+                        LockerCategory.MUSIC to "Music Packs",
+                        LockerCategory.CONTRAIL to "Contrails",
+                        LockerCategory.SPRAY to "Sprays",
+                        LockerCategory.EMOTICON to "Emojis",
+                        LockerCategory.BANNER to "Banners",
                         LockerCategory.AURA to "Auras",
                         LockerCategory.JAM_TRACK to "Jam Tracks",
-                        LockerCategory.BANNER to "Banners",
-                        LockerCategory.KICKS to "Kicks",
-                        LockerCategory.CAR to "Cars",
-                        LockerCategory.CAR_DECAL to "Decals",
-                        LockerCategory.WHEELS to "Wheels",
-                        LockerCategory.CAR_TRAIL to "Trails",
-                        LockerCategory.CAR_BOOST to "Boosts",
                         LockerCategory.GUITAR to "Guitars",
                         LockerCategory.BASS to "Basses",
                         LockerCategory.DRUMS to "Drums",
                         LockerCategory.KEYTAR to "Keytars",
                         LockerCategory.MIC to "Mics",
+                        LockerCategory.CAR to "Car Bodies",
+                        LockerCategory.CAR_DECAL to "Car Decals",
+                        LockerCategory.WHEELS to "Car Wheels",
+                        LockerCategory.CAR_TRAIL to "Car Trails",
+                        LockerCategory.CAR_BOOST to "Car Boosts",
                         LockerCategory.LEGO_BUILD to "Lego Builds",
                         LockerCategory.LEGO_DECOR to "Lego Decors"
                     )
@@ -572,15 +572,29 @@ fun PersonalLockerScreen(
                                     id = item.cosmeticId,
                                     name = item.name,
                                     description = item.description,
-                                    type = com.dhyper.fncompanion.data.models.CosmeticType(item.category.name, item.category.name),
+                                    type = com.dhyper.fncompanion.data.models.CosmeticType(item.category.name, item.category.getDisplayName()),
                                     rarity = com.dhyper.fncompanion.data.models.CosmeticRarity(item.rarity, item.rarity),
                                     series = null,
                                     images = com.dhyper.fncompanion.data.models.CosmeticImages(
                                         smallIcon = item.iconUrl,
                                         largeIcon = item.largeIconUrl,
                                         featured = item.largeIconUrl,
-                                        background = null,
-                                        full_background = null
+                                        background = item.backgroundUrl,
+                                        full_background = item.backgroundUrl,
+                                        other = com.dhyper.fncompanion.data.models.OtherImages(
+                                            albumArt = null,
+                                            background = item.backgroundUrl,
+                                            icon = item.iconUrl
+                                        ),
+                                        lego = com.dhyper.fncompanion.data.models.LegoImages(
+                                            small = item.legoIconUrl,
+                                            large = item.legoIconUrl,
+                                            wide = null
+                                        ),
+                                        bean = com.dhyper.fncompanion.data.models.BeanImages(
+                                            small = item.beanIconUrl,
+                                            large = item.beanIconUrl
+                                        )
                                     ),
                                     variants = item.variants,
                                     introduction = item.introduction,
@@ -598,6 +612,7 @@ fun PersonalLockerScreen(
                                 isWishlisted = false,
                                 videoId = videoId,
                                 isSearchingVideo = isSearchingVideo,
+                                ownedIds = state.allItems.map { it.cosmeticId.lowercase() }.toSet(),
                                 onWishlistToggle = { },
                                 onSetClick = { setId ->
                                     selectedSet = item.set

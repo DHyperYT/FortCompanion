@@ -198,6 +198,7 @@ data class CosmeticImages(
     val icon_background: String? = null,
     val other: OtherImages? = null,
     val lego: LegoImages? = null,
+    val bean: BeanImages? = null,
     // Top-level fallbacks (Modern API keys - /v2/cosmetics/instruments, /v2/cosmetics/lego/kits, /v2/cosmetics/cars)
     val small: String? = null,
     val large: String? = null,
@@ -218,6 +219,12 @@ data class LegoImages(
     val large: String?,
     val wide: String?,
     val icon: String? = null
+)
+
+@JsonClass(generateAdapter = true)
+data class BeanImages(
+    val small: String?,
+    val large: String?
 )
 
 @JsonClass(generateAdapter = true)

@@ -1,73 +1,27 @@
 package com.dhyper.fncompanion.ui.screens
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.GridItemSpan
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.lazy.grid.itemsIndexed
+import androidx.compose.foundation.lazy.grid.*
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.ExpandLess
-import androidx.compose.material.icons.filled.ExpandMore
-import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.FavoriteBorder
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Schedule
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.ShoppingBag
-import androidx.compose.material.icons.filled.Star
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.Text
-import androidx.compose.material3.rememberModalBottomSheetState
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ColorFilter
-import androidx.compose.ui.graphics.ColorMatrix
+import androidx.compose.ui.graphics.*
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -77,25 +31,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.dhyper.fncompanion.data.models.ShopEntry
+import com.dhyper.fncompanion.data.models.CosmeticItem
 import com.dhyper.fncompanion.ui.components.CosmeticDetailSheet
-import com.dhyper.fncompanion.ui.components.resolveCosmeticIcon
-import com.dhyper.fncompanion.ui.components.JamTrackPlayer
-import com.dhyper.fncompanion.ui.components.YouTubeButton
 import com.dhyper.fncompanion.ui.components.getRarityColor
 import com.dhyper.fncompanion.ui.components.getRarityTextColor
-import com.dhyper.fncompanion.ui.theme.FortniteBlue
-import com.dhyper.fncompanion.ui.theme.FortniteGold
-import com.dhyper.fncompanion.ui.theme.SleekBackground
-import com.dhyper.fncompanion.ui.theme.SleekCyan
-import com.dhyper.fncompanion.ui.theme.SleekEmerald
-import com.dhyper.fncompanion.ui.theme.SleekPrimary
-import com.dhyper.fncompanion.ui.theme.SleekSurface
-import com.dhyper.fncompanion.ui.theme.SleekSurfaceBorder
-import com.dhyper.fncompanion.ui.theme.SleekSurfaceVariant
-import com.dhyper.fncompanion.ui.theme.SleekTextMuted
-import com.dhyper.fncompanion.ui.theme.SleekTextPrimary
-import com.dhyper.fncompanion.ui.theme.SleekTextSecondary
-import com.dhyper.fncompanion.ui.utils.SeasonUtils
+import com.dhyper.fncompanion.ui.components.resolveCosmeticIcon
+import com.dhyper.fncompanion.ui.theme.*
 import com.dhyper.fncompanion.ui.viewmodels.ShopUiState
 import com.dhyper.fncompanion.ui.viewmodels.ShopViewModel
 
@@ -107,6 +48,7 @@ fun ShopScreen(
     modifier: Modifier = Modifier
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val cosmeticsState = cosmeticsViewModel.uiState.collectAsState().value as? com.dhyper.fncompanion.ui.viewmodels.CosmeticsUiState.Success
     
     var searchText by remember { mutableStateOf("") }
     
@@ -122,14 +64,12 @@ fun ShopScreen(
 
     val categories = listOf(
         "All", "Bundles", 
-        // Battle Royale (Primary)
-        "Outfit", "Back Bling", "Pickaxe", "Glider", "Emote", "Wrap", "Contrail", "Music", "Aura",
-        // LEGO & Misc
-        "Lego Build", "Lego Decor", "Loading Screen", "Emoticon", "Spray", "Sidekick", "Banner", "Kicks",
-        // Festival
-        "Jam Track", "Guitar", "Bass", "Drums", "Keytar", "Mic",
-        // Vehicles (Rocket Racing)
-        "Vehicles", "Car", "Car Decal", "Wheels", "Car Trail", "Car Boost"
+        "Outfits", "Emotes", "Pickaxes", "Backblings", "Gliders", 
+        "Sidekicks", "Kicks", "Wraps", "Loading Screens", "Music Packs", "Contrails", 
+        "Sprays", "Emojis", "Banners",
+        "Auras", "Jam Tracks", "Guitars", "Basses", "Drums", "Keytars", "Mics",
+        "Car Bodies", "Car Decals", "Car Wheels", "Car Trails", "Car Boosts",
+        "Lego Builds", "Lego Decors"
     )
 
     Column(
@@ -249,13 +189,9 @@ fun ShopScreen(
                         Spacer(modifier = Modifier.height(16.dp))
                         Button(
                             onClick = { viewModel.loadShop() },
-                            colors = ButtonDefaults.buttonColors(containerColor = SleekPrimary),
-                            shape = RoundedCornerShape(10.dp),
-                            modifier = Modifier.testTag("shop_retry_button")
+                            colors = ButtonDefaults.buttonColors(containerColor = SleekPrimary)
                         ) {
-                            Icon(Icons.Default.Refresh, contentDescription = null, tint = Color.White)
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text("Retry", color = Color.White, fontWeight = FontWeight.Bold)
+                            Text("Retry")
                         }
                     }
                 }
@@ -305,6 +241,9 @@ fun ShopScreen(
                                         wishlistIds = state.wishlistIds,
                                         indPrices = state.individualPrices,
                                         setPrices = state.skinSetPrices,
+                                        allCosmetics = cosmeticsState?.allItems ?: emptyList(),
+                                        isBannerShown = state.shownBanners.contains(entry.offerId ?: ""),
+                                        onBannerShown = { id -> viewModel.markBannerAsShown(id) },
                                         onWishlistToggle = { item -> viewModel.toggleWishlist(item) },
                                         onClick = { selectedEntryForDetail = entry }
                                     )
@@ -320,13 +259,13 @@ fun ShopScreen(
     // Detail Modal BottomSheet
     selectedEntryForDetail?.let { entry ->
         val successState = uiState as? ShopUiState.Success
-        
         val videoId by cosmeticsViewModel.selectedVideoId.collectAsState()
         val isSearchingVideo by cosmeticsViewModel.isSearchingVideo.collectAsState()
-
-        val allItemsForEntry = remember(entry) { getItemsForEntry(entry) }
+        
+        val allItemsForEntry = remember(entry, cosmeticsState) { 
+            getItemsForEntry(entry, cosmeticsState?.allItems ?: emptyList()) 
+        }
         val firstItemRaw = allItemsForEntry.firstOrNull()
-        val cosmeticsState = cosmeticsViewModel.uiState.collectAsState().value as? com.dhyper.fncompanion.ui.viewmodels.CosmeticsUiState.Success
         
         val firstItem = remember(firstItemRaw, cosmeticsState) {
             if (firstItemRaw == null) return@remember null
@@ -351,11 +290,14 @@ fun ShopScreen(
         ) {
             if (firstItem != null) {
                 val entryTitle = getShopEntryTitle(entry)
-                val isRealBundle = entry.bundle != null || allItemsForEntry.size > 1 || entryTitle.contains("Bundle", ignoreCase = true)
+                val isCarOffer = allItemsForEntry.any { 
+                    it.id.startsWith("Body_", true) || it.id.startsWith("ID_Body_", true) || it.id.startsWith("CarBody_", true) 
+                }
+                val isRealBundle = entryTitle.contains("Bundle", ignoreCase = true) || isCarOffer
                 
                 val displayItem = if (isRealBundle) {
                     val rarityName = firstItem.rarity?.value ?: firstItem.series?.value ?: if (!entry.tracks.isNullOrEmpty()) "Festival" else "Common"
-                    val shopImg = getShopEntryImage(entry)
+                    val shopImg = getShopEntryImage(entry, cosmeticsState?.allItems ?: emptyList())
                     com.dhyper.fncompanion.data.models.CosmeticItem(
                         id = entry.offerId ?: entry.devName ?: "bundle",
                         name = entryTitle,
@@ -386,6 +328,8 @@ fun ShopScreen(
                     isSearchingVideo = isSearchingVideo,
                     price = price,
                     includedItems = allItemsForEntry,
+                    ownedIds = successState?.ownedIds ?: emptySet(),
+                    renderImages = entry.newDisplayAsset?.renderImages?.mapNotNull { it.image },
                     onWishlistToggle = { viewModel.toggleWishlist(firstItem) },
                     onSetClick = { _ ->
                         selectedSet = firstItem.set
@@ -406,7 +350,6 @@ fun ShopScreen(
         val successState = uiState as? ShopUiState.Success
         val videoId by cosmeticsViewModel.selectedVideoId.collectAsState()
         val isSearchingVideo by cosmeticsViewModel.isSearchingVideo.collectAsState()
-        val cosmeticsState = cosmeticsViewModel.uiState.collectAsState().value as? com.dhyper.fncompanion.ui.viewmodels.CosmeticsUiState.Success
         
         val item = remember(itemRaw, cosmeticsState) {
             cosmeticsState?.allItems?.find { it.id.equals(itemRaw.id, ignoreCase = true) } ?: itemRaw
@@ -435,6 +378,7 @@ fun ShopScreen(
                 videoId = videoId,
                 isSearchingVideo = isSearchingVideo,
                 price = price,
+                ownedIds = successState?.ownedIds ?: emptySet(),
                 onWishlistToggle = { viewModel.toggleWishlist(item) },
                 onSetClick = { 
                     selectedSet = item.set
@@ -448,14 +392,14 @@ fun ShopScreen(
     // Set Detail Popup (Shared with Cosmetics logic)
     selectedSet?.let { cosmeticSet ->
         val wishlistState by cosmeticsViewModel.wishlistIds.collectAsState()
-        val setItemResult = remember(cosmeticSet) { cosmeticsViewModel.getItemsInSet(cosmeticSet.value ?: "") }
-
+        val setItemResult = cosmeticsViewModel.getItemsInSet(cosmeticSet.value ?: "")
+        
         ModalBottomSheet(
             onDismissRequest = { selectedSet = null },
             sheetState = rememberModalBottomSheetState(),
-            containerColor = SleekBackground
+            containerColor = SleekSurface
         ) {
-            Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+            Column(modifier = Modifier.padding(16.dp).verticalScroll(rememberScrollState())) {
                 Text(
                     text = cosmeticSet.text?.uppercase() ?: "COLLECTION",
                     style = MaterialTheme.typography.titleLarge,
@@ -499,228 +443,14 @@ fun ShopScreen(
     }
 }
 
-@Composable
-fun ShopItemCard(
-    entry: ShopEntry,
-    ownedIds: Set<String>,
-    wishlistIds: Set<String>,
-    indPrices: Map<String, Int>,
-    setPrices: Map<String, Pair<Int, Set<String>>>,
-    onWishlistToggle: (com.dhyper.fncompanion.data.models.CosmeticItem) -> Unit,
-    onClick: () -> Unit
-) {
-    val allItems = remember(entry) { getItemsForEntry(entry) }
-    val firstItem = allItems.firstOrNull()
-    
-    val title = getShopEntryTitle(entry)
-    val skin = allItems.find { it.type?.value?.equals("outfit", ignoreCase = true) == true }
-    val itemCount = if (!entry.tracks.isNullOrEmpty()) entry.tracks.size else allItems.size.coerceAtLeast(1)
-    
-    val isRealBundle = (entry.bundle != null || title.contains("Bundle", ignoreCase = true) || itemCount > 1) && 
-                       (skin == null || !title.trim().equals(skin.name.trim(), ignoreCase = true) || itemCount > 1)
-    
-    val ownedCount = allItems.count { ownedIds.contains(it.id.lowercase()) }
-    val isFullyOwned = allItems.isNotEmpty() && ownedCount == allItems.size
-    
-    var finalDisplayPrice = entry.finalPrice ?: entry.regularPrice ?: 0
-    var isPartiallyOwned = false
-
-    if (!isFullyOwned && isRealBundle && ownedCount > 0) {
-        isPartiallyOwned = true
-        var discountValue = 0
-        val handledItemIds = mutableSetOf<String>()
-
-        // 1. Process Skin Sets first
-        allItems.forEach { item ->
-            val itemId = item.id.lowercase()
-            if (ownedIds.contains(itemId) && setPrices.containsKey(itemId)) {
-                val (price, setIds) = setPrices[itemId]!!
-                discountValue += price
-                handledItemIds.addAll(setIds)
-            }
-        }
-
-        // 2. Process remaining owned items
-        allItems.forEach { item ->
-            val itemId = item.id.lowercase()
-            if (ownedIds.contains(itemId) && !handledItemIds.contains(itemId)) {
-                discountValue += indPrices[itemId] ?: 0
-                handledItemIds.add(itemId)
-            }
-        }
-
-        finalDisplayPrice = (finalDisplayPrice - discountValue).coerceAtLeast(100)
-    }
-
-    val rarityName = firstItem?.rarity?.value ?: firstItem?.series?.value ?: if (!entry.tracks.isNullOrEmpty()) "Festival" else "Common"
-    val rarityColor = getRarityColor(rarityName)
-    val imageUrl = getShopEntryImage(entry)
-
-    val grayScaleMatrix = ColorMatrix().apply { setToSaturation(0f) }
-    val colorFilter = if (isFullyOwned) ColorFilter.colorMatrix(grayScaleMatrix) else null
-
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { onClick() }
-            .border(1.dp, if(isFullyOwned) Color.Gray.copy(alpha = 0.3f) else if (getRarityTextColor(rarityColor) == Color.White) Color.White.copy(alpha = 0.5f) else rarityColor.copy(alpha = 0.5f), RoundedCornerShape(14.dp))
-            .testTag("shop_item_card"),
-        shape = RoundedCornerShape(14.dp),
-        colors = CardDefaults.cardColors(containerColor = if(isFullyOwned) SleekSurfaceVariant.copy(alpha = 0.5f) else SleekSurfaceVariant)
-    ) {
-        Box {
-            Column {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .aspectRatio(1f)
-                        .background(
-                            Brush.verticalGradient(
-                                colors = listOf(if(isFullyOwned) Color.Gray.copy(alpha = 0.2f) else rarityColor.copy(alpha = 0.35f), SleekSurfaceVariant)
-                            )
-                        )
-                ) {
-                    if (!imageUrl.isNullOrEmpty()) {
-                        AsyncImage(
-                            model = coil.request.ImageRequest.Builder(androidx.compose.ui.platform.LocalContext.current)
-                                .data(imageUrl)
-                                .crossfade(true)
-                                .build(),
-                            contentDescription = title,
-                            modifier = Modifier.fillMaxSize(),
-                            contentScale = ContentScale.Fit,
-                            colorFilter = colorFilter
-                        )
-                    } else {
-                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                            Icon(Icons.Default.ShoppingBag, contentDescription = null, tint = SleekTextMuted, modifier = Modifier.size(48.dp))
-                        }
-                    }
-
-                    // Banner or Bundle tag if present
-                    val bannerText = when {
-                        isFullyOwned -> "OWNED"
-                        isPartiallyOwned -> "DISCOUNTED"
-                        else -> entry.banner?.value ?: entry.bundle?.info ?: if (itemCount > 1) "$itemCount ITEMS" else null
-                    }
-
-                    if (!bannerText.isNullOrBlank()) {
-                        Box(
-                            modifier = Modifier
-                                .padding(6.dp)
-                                .background(if(isFullyOwned) Color.Gray else if(isPartiallyOwned) SleekEmerald else SleekPrimary, RoundedCornerShape(6.dp))
-                                .padding(horizontal = 6.dp, vertical = 2.dp)
-                                .align(Alignment.TopStart)
-                        ) {
-                            Text(
-                                text = bannerText.uppercase(),
-                                color = Color.White,
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                    }
-                }
-
-                Column(modifier = Modifier.padding(10.dp)) {
-                    Text(
-                        text = title,
-                        style = MaterialTheme.typography.titleMedium,
-                        color = if(isFullyOwned) SleekTextMuted else SleekTextPrimary,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-
-                    Spacer(modifier = Modifier.height(4.dp))
-
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        // Rarity pill
-                        Text(
-                            text = rarityName.uppercase(),
-                            color = if(isFullyOwned) SleekTextMuted else if (getRarityTextColor(rarityColor) == Color.White) Color.White else rarityColor,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.SemiBold
-                        )
-
-                        // Price Tag
-                        if (!isFullyOwned) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(14.dp)
-                                        .background(FortniteGold, CircleShape),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text("V", color = Color.Black, fontSize = 9.sp, fontWeight = FontWeight.Black)
-                                }
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text(
-                                    text = "$finalDisplayPrice",
-                                    color = if(isPartiallyOwned) SleekEmerald else FortniteGold,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 13.sp
-                                )
-                            }
-                        } else {
-                            Icon(Icons.Default.CheckCircle, contentDescription = null, tint = SleekEmerald, modifier = Modifier.size(16.dp))
-                        }
-                    }
-                }
-            }
-            
-            // Wishlist Toggle
-            if (!isFullyOwned && !isRealBundle && firstItem != null) {
-                IconButton(
-                    onClick = { onWishlistToggle(firstItem) },
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(6.dp)
-                        .size(30.dp)
-                        .background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
-                ) {
-                    val isWishlisted = wishlistIds.any { it.equals(firstItem.id, ignoreCase = true) } || 
-                                       wishlistIds.any { it.equals(firstItem.id.replace("sid_", ""), ignoreCase = true) }
-                    Icon(
-                        imageVector = if (isWishlisted) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                        contentDescription = "Wishlist",
-                        tint = if (isWishlisted) Color.Red else Color.White,
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
-            }
-        }
-    }
-}
-
 private fun cleanShopTitle(rawName: String?): String {
-    if (rawName.isNullOrBlank()) return "Cosmetic Offer"
-    var clean = rawName
-    clean = clean.replace(Regex("(?i)\\[virtual\\]"), "")
-    clean = clean.replace(Regex("(?i)^\\s*\\d+\\s*x\\s*"), "")
-    clean = clean.replace(Regex("(?i)\\s+for\\s+\\d+\\s*v-?bucks"), "")
-    if (clean.contains("_")) {
-        clean = clean.split("_")
-            .filter { !it.equals("outfit", ignoreCase = true) && !it.equals("emote", ignoreCase = true) && !it.equals("pickaxe", ignoreCase = true) && !it.equals("glider", ignoreCase = true) }
-            .joinToString(" ") { word -> word.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() } }
-    }
-    clean = clean.trim()
-    return if (clean.isBlank()) "Cosmetic Offer" else clean
+    if (rawName == null) return ""
+    return rawName.replace(" Bundle", "", ignoreCase = true).trim()
 }
 
-private fun getShopEntryTitle(entry: ShopEntry): String {
-    if (!entry.bundle?.name.isNullOrBlank()) {
-        return cleanShopTitle(entry.bundle?.name)
-    }
-    val firstTrack = entry.tracks?.firstOrNull()
-    if (firstTrack != null && !firstTrack.title.isNullOrBlank()) {
-        val artist = if (!firstTrack.artist.isNullOrBlank()) " - ${firstTrack.artist}" else ""
-        return "${firstTrack.title}$artist"
-    }
+fun getShopEntryTitle(entry: ShopEntry): String {
+    if (!entry.bundle?.name.isNullOrBlank()) return entry.bundle?.name!!
+    
     val allItems = getItemsForEntry(entry)
     val firstItemName = allItems.firstOrNull { !it.name.isNullOrBlank() }?.name
     if (!firstItemName.isNullOrBlank()) {
@@ -732,7 +462,7 @@ private fun getShopEntryTitle(entry: ShopEntry): String {
     return cleanShopTitle(entry.devName)
 }
 
-private fun getShopEntryImage(entry: ShopEntry): String? {
+private fun getShopEntryImage(entry: ShopEntry, allItemsForDerivation: List<com.dhyper.fncompanion.data.models.CosmeticItem> = emptyList()): String? {
     // 1. Prioritize Bundle Image (for bundles)
     if (!entry.bundle?.image.isNullOrBlank()) return entry.bundle?.image
 
@@ -751,7 +481,7 @@ private fun getShopEntryImage(entry: ShopEntry): String? {
     if (!trackAlbumArt.isNullOrBlank()) return trackAlbumArt
 
     // 4. Resolve by specific Cosmetic ID if referenced in NewDisplayAsset
-    val allItems = getItemsForEntry(entry)
+    val allItems = getItemsForEntry(entry, allItemsForDerivation)
     val referencedCosmeticId = entry.newDisplayAsset?.cosmeticId
     if (!referencedCosmeticId.isNullOrBlank()) {
         val referencedItem = allItems.find { it.id.equals(referencedCosmeticId, ignoreCase = true) }
@@ -775,7 +505,7 @@ private fun getShopEntryImage(entry: ShopEntry): String? {
            "https://fortnite-api.com/images/cosmetics/br/${firstItem?.id}/icon.png"
 }
 
-fun getItemsForEntry(entry: ShopEntry): List<com.dhyper.fncompanion.data.models.CosmeticItem> {
+fun getItemsForEntry(entry: ShopEntry, allCosmetics: List<com.dhyper.fncompanion.data.models.CosmeticItem> = emptyList()): List<com.dhyper.fncompanion.data.models.CosmeticItem> {
     val itemMap = mutableMapOf<String, com.dhyper.fncompanion.data.models.CosmeticItem>()
     val orderedIds = mutableListOf<String>()
 
@@ -794,11 +524,45 @@ fun getItemsForEntry(entry: ShopEntry): List<com.dhyper.fncompanion.data.models.
     }
 
     // Process specific lists first to get better objects
-    processList(entry.brItems)
-    processList(entry.cars)
     processList(entry.vehicles)
+    processList(entry.cars)
+    processList(entry.brItems)
     processList(entry.instruments)
     processList(entry.items)
+
+    // Check for referenced cosmetic ID in NewDisplayAsset if not already present
+    entry.newDisplayAsset?.cosmeticId?.let { cid ->
+        if (!itemMap.containsKey(cid)) {
+            val placeholder = com.dhyper.fncompanion.data.models.CosmeticItem(
+                id = cid, name = entry.devName ?: "Item", description = null, type = null, rarity = null, series = null, images = null, variants = null, introduction = null, set = null, added = null
+            )
+            itemMap[cid] = placeholder
+            orderedIds.add(cid)
+        }
+    }
+
+    // Fix for missing Car Bodies in bundles - Match by Name
+    val hasCarBody = orderedIds.any { id -> 
+        id.startsWith("Body_", true) || id.startsWith("ID_Body_", true) || id.startsWith("CarBody_", true) 
+    }
+    
+    val bundleName = entry.bundle?.name ?: entry.layout?.name ?: ""
+    val isVehicleBundle = entry.cars?.isNotEmpty() == true || entry.vehicles?.isNotEmpty() == true || 
+                         entry.devName?.contains("Car", true) == true || bundleName.contains("Bundle", true) == true
+    
+    if (!hasCarBody && isVehicleBundle && allCosmetics.isNotEmpty()) {
+        val carSearchName = bundleName.replace(" Bundle", "", ignoreCase = true).trim()
+        if (carSearchName.isNotBlank()) {
+            val matchingCar = allCosmetics.find { 
+                it.name.equals(carSearchName, ignoreCase = true) && 
+                (it.id.startsWith("Body_", true) || it.id.startsWith("ID_Body_", true) || it.id.startsWith("CarBody_", true))
+            }
+            if (matchingCar != null && !itemMap.containsKey(matchingCar.id)) {
+                itemMap[matchingCar.id] = matchingCar
+                orderedIds.add(0, matchingCar.id) // Add to left as it's the main item
+            }
+        }
+    }
 
     // Map and add tracks
     entry.tracks?.forEach { t ->
@@ -895,5 +659,236 @@ fun ShopCategoryHeader(
                 .height(if (isModeHeader) 3.dp else 2.dp)
                 .background(Brush.horizontalGradient(listOf(if (isModeHeader) SleekEmerald else SleekCyan, Color.Transparent)))
         )
+    }
+}
+
+@Composable
+fun ShopItemCard(
+    entry: ShopEntry,
+    ownedIds: Set<String>,
+    wishlistIds: Set<String>,
+    indPrices: Map<String, Int>,
+    setPrices: Map<String, Pair<Int, Set<String>>>,
+    allCosmetics: List<com.dhyper.fncompanion.data.models.CosmeticItem> = emptyList(),
+    isBannerShown: Boolean = false,
+    onBannerShown: (String) -> Unit = {},
+    onWishlistToggle: (com.dhyper.fncompanion.data.models.CosmeticItem) -> Unit,
+    onClick: () -> Unit
+) {
+    val allItems = remember(entry, allCosmetics) { getItemsForEntry(entry, allCosmetics) }
+    val firstItem = allItems.firstOrNull()
+    
+    val title = getShopEntryTitle(entry)
+    
+    val isRealBundle = title.contains("Bundle", ignoreCase = true)
+    
+    val ownedCount = allItems.count { ownedIds.contains(it.id.lowercase()) }
+    val isFullyOwned = allItems.isNotEmpty() && ownedCount == allItems.size
+    
+    var finalDisplayPrice = entry.finalPrice ?: entry.regularPrice ?: 0
+    var isPartiallyOwned = false
+
+    if (!isFullyOwned && isRealBundle && ownedCount > 0) {
+        isPartiallyOwned = true
+        var discountValue = 0
+        val handledItemIds = mutableSetOf<String>()
+
+        // 1. Process Skin Sets first
+        allItems.forEach { item ->
+            val itemId = item.id.lowercase()
+            if (ownedIds.contains(itemId) && setPrices.containsKey(itemId)) {
+                val (price, setIds) = setPrices[itemId]!!
+                discountValue += price
+                handledItemIds.addAll(setIds)
+            }
+        }
+
+        // 2. Process remaining owned items
+        allItems.forEach { item ->
+            val itemId = item.id.lowercase()
+            if (ownedIds.contains(itemId) && !handledItemIds.contains(itemId)) {
+                discountValue += indPrices[itemId] ?: 0
+                handledItemIds.add(itemId)
+            }
+        }
+
+        finalDisplayPrice = (finalDisplayPrice - discountValue).coerceAtLeast(100)
+    }
+
+    val rarityName = firstItem?.rarity?.value ?: firstItem?.series?.value ?: if (!entry.tracks.isNullOrEmpty()) "Festival" else "Common"
+    val rarityColor = getRarityColor(rarityName)
+    val imageUrl = getShopEntryImage(entry, allCosmetics)
+
+    val grayScaleMatrix = ColorMatrix().apply { setToSaturation(0f) }
+    val colorFilter = if (isFullyOwned) ColorFilter.colorMatrix(grayScaleMatrix) else null
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onClick() }
+            .border(1.dp, if(isFullyOwned) Color.Gray.copy(alpha = 0.3f) else if (getRarityTextColor(rarityColor) == Color.White) Color.White.copy(alpha = 0.5f) else rarityColor.copy(alpha = 0.5f), RoundedCornerShape(14.dp))
+            .testTag("shop_item_card"),
+        shape = RoundedCornerShape(14.dp),
+        colors = CardDefaults.cardColors(containerColor = if(isFullyOwned) SleekSurfaceVariant.copy(alpha = 0.5f) else SleekSurfaceVariant)
+    ) {
+        val renderImages = entry.newDisplayAsset?.renderImages?.mapNotNull { it.image } ?: emptyList()
+        var currentImageIndex by remember { mutableIntStateOf(0) }
+        
+        if (renderImages.size > 1) {
+            LaunchedEffect(entry.offerId) {
+                while (true) {
+                    kotlinx.coroutines.delay(3600)
+                    currentImageIndex = (currentImageIndex + 1) % renderImages.size
+                }
+            }
+        }
+
+        Box {
+            Column {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .aspectRatio(1f)
+                        .background(
+                            Brush.verticalGradient(
+                                colors = listOf(if(isFullyOwned) Color.Gray.copy(alpha = 0.2f) else rarityColor.copy(alpha = 0.35f), SleekSurfaceVariant)
+                            )
+                        )
+                ) {
+                    val displayImageUrl = if (renderImages.isNotEmpty()) renderImages[currentImageIndex] else imageUrl
+                    
+                    Crossfade(
+                        targetState = displayImageUrl, 
+                        animationSpec = tween(1000),
+                        label = "ShopImageSlideshow"
+                    ) { targetUrl ->
+                        if (!targetUrl.isNullOrEmpty()) {
+                            AsyncImage(
+                                model = coil.request.ImageRequest.Builder(androidx.compose.ui.platform.LocalContext.current)
+                                    .data(targetUrl)
+                                    .crossfade(true)
+                                    .build(),
+                                contentDescription = title,
+                                modifier = Modifier.fillMaxSize(),
+                                contentScale = ContentScale.Fit,
+                                colorFilter = colorFilter
+                            )
+                        } else {
+                            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                Icon(Icons.Default.ShoppingBag, contentDescription = null, tint = SleekTextMuted, modifier = Modifier.size(48.dp))
+                            }
+                        }
+                    }
+
+                    // Banner or Bundle tag if present
+                    val isSessionShown = isBannerShown
+                    var visible by remember(entry.offerId, isSessionShown) { mutableStateOf(!isSessionShown) }
+                    
+                    if (visible) {
+                        LaunchedEffect(entry.offerId) {
+                            kotlinx.coroutines.delay(3000)
+                            visible = false
+                            onBannerShown(entry.offerId ?: "")
+                        }
+                    }
+
+                    androidx.compose.animation.AnimatedVisibility(
+                        visible = visible,
+                        exit = slideOutHorizontally(targetOffsetX = { -it }, animationSpec = tween(600)),
+                        modifier = Modifier.align(Alignment.TopStart)
+                    ) {
+                        if (entry.banner != null) {
+                            Surface(
+                                color = Color.Red.copy(alpha = 0.85f),
+                                shape = RoundedCornerShape(topStart = 14.dp, bottomEnd = 14.dp)
+                            ) {
+                                Text(
+                                    text = entry.banner.value ?: "SALE",
+                                    color = Color.White,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Black,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                )
+                            }
+                        } else if (isRealBundle) {
+                            Surface(
+                                color = SleekPrimary.copy(alpha = 0.85f),
+                                shape = RoundedCornerShape(topStart = 14.dp, bottomEnd = 14.dp)
+                            ) {
+                                Text(
+                                    text = "BUNDLE",
+                                    color = Color.White,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Black,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                )
+                            }
+                        }
+                    }
+
+                    // Wishlist Indicator
+                    if (wishlistIds.contains(firstItem?.id)) {
+                        IconButton(
+                            onClick = { firstItem?.let { onWishlistToggle(it) } },
+                            modifier = Modifier.align(Alignment.TopEnd)
+                        ) {
+                            Icon(
+                                Icons.Default.Favorite,
+                                contentDescription = null,
+                                tint = Color.Red,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    } else {
+                        IconButton(
+                            onClick = { firstItem?.let { onWishlistToggle(it) } },
+                            modifier = Modifier.align(Alignment.TopEnd)
+                        ) {
+                            Icon(
+                                Icons.Default.FavoriteBorder,
+                                contentDescription = null,
+                                tint = Color.White.copy(alpha = 0.7f),
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    }
+                }
+
+                // Price and Title Footer
+                Column(modifier = Modifier.padding(10.dp)) {
+                    Text(
+                        text = title,
+                        color = SleekTextPrimary,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    
+                    Spacer(modifier = Modifier.height(4.dp))
+                    
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        if (isFullyOwned) {
+                            Icon(Icons.Default.CheckCircle, null, tint = SleekEmerald, modifier = Modifier.size(14.dp))
+                            Spacer(Modifier.width(4.dp))
+                            Text("OWNED", color = SleekEmerald, fontSize = 12.sp, fontWeight = FontWeight.Black)
+                        } else {
+                            Icon(Icons.Default.MonetizationOn, null, tint = FortniteGold, modifier = Modifier.size(14.dp))
+                            Spacer(Modifier.width(4.dp))
+                            Text(
+                                text = finalDisplayPrice.toString(),
+                                color = Color.White,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Black
+                            )
+                            if (isPartiallyOwned) {
+                                Spacer(Modifier.width(4.dp))
+                                Text("(Discounted)", color = SleekEmerald, fontSize = 10.sp)
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 }
