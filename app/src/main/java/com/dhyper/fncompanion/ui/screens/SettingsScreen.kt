@@ -325,6 +325,16 @@ fun SettingsScreen(
                 )
 
                 Spacer(modifier = Modifier.height(16.dp))
+                
+                // Data Saver Mode
+                PreferenceSwitch(
+                    label = "Data Saver Mode",
+                    subtitle = "Only download images on Wi-Fi",
+                    checked = settings?.dataSaverMode ?: false,
+                    onCheckedChange = { settingsViewModel.updateDataSaverMode(it) }
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
 
                 // Wishlist Notifications
                 PreferenceSwitch(
@@ -494,11 +504,39 @@ fun SettingsScreen(
                 colors = CardDefaults.cardColors(containerColor = SleekSurface)
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            modifier = Modifier
+                                .size(48.dp)
+                                .background(SleekBackground, CircleShape)
+                                .border(2.dp, SleekPrimary, CircleShape)
+                                .clip(CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            if (active.equippedSkinIcon != null) {
+                                AsyncImage(
+                                    model = active.equippedSkinIcon,
+                                    contentDescription = null,
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentScale = ContentScale.Crop
+                                )
+                            } else {
+                                Icon(Icons.Default.Person, null, tint = SleekPrimary)
+                            }
+                        }
+                        Spacer(Modifier.width(16.dp))
+                        Column {
+                            Text(active.displayName, fontWeight = FontWeight.Bold, color = SleekTextPrimary)
+                            Text("ID: ${active.accountId.take(8)}...", fontSize = 11.sp, color = SleekTextMuted)
+                        }
+                    }
+                    
+                    Spacer(Modifier.height(16.dp))
+                    
                     val countdown by settingsViewModel.tokenExpiryCountdown.collectAsState()
                     val lastRefresh = java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault())
                         .format(java.util.Date(active.lastRefreshTimeMs))
 
-                    StatusRow("Active Account", active.displayName)
                     StatusRow("Token Expiry", countdown)
                     StatusRow("Last Refresh", lastRefresh)
                 }
