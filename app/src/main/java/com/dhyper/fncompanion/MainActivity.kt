@@ -59,11 +59,16 @@ import java.util.concurrent.TimeUnit
 import com.dhyper.fncompanion.ui.screens.*
 import com.dhyper.fncompanion.ui.theme.*
 import com.dhyper.fncompanion.ui.viewmodels.*
+import com.dhyper.fncompanion.data.api.DataSaverInterceptor
+import coil.Coil
+import coil.ImageLoader
+import coil.compose.AsyncImage
+import androidx.compose.ui.draw.clip
 import kotlinx.coroutines.launch
 
 sealed class NavRoute(val route: String, val title: String, val icon: androidx.compose.ui.graphics.vector.ImageVector) {
     object BrHub : NavRoute("br_hub", "BR", Icons.Default.MonetizationOn)
-    object Stw : NavRoute("stw", "STW", Icons.Default.Star)
+    object Stw : NavRoute("stw", "STW", Icons.Default.Home)
     object MyAccount : NavRoute("my_account", "My Account", Icons.Default.AccountCircle)
     object Settings : NavRoute("settings", "Settings", Icons.Default.Settings)
 
@@ -86,6 +91,14 @@ class MainActivity : FragmentActivity() {
         super.onCreate(savedInstanceState)
         val db = AppDatabase.getDatabase(this)
         enableEdgeToEdge()
+        
+        // Initialize Coil with Data Saver Interceptor
+        val imageLoader = ImageLoader.Builder(this)
+            .components {
+                add(DataSaverInterceptor(this@MainActivity, db.settingsDao()))
+            }
+            .build()
+        Coil.setImageLoader(imageLoader)
         
         // Cancel legacy periodic work that was hardcoded to 3am/00:00 UTC
         WorkManager.getInstance(this).cancelUniqueWork("ShopCheckWork")
@@ -155,8 +168,9 @@ fun FortniteCompanionApp(settings: SettingsEntity?) {
     })
     val mapViewModel: MapViewModel = viewModel()
     val newsViewModel: NewsViewModel = viewModel()
+    val activityApp = context.applicationContext as android.app.Application
     val stwViewModel: StwViewModel = viewModel(factory = object : ViewModelProvider.Factory {
-        @Suppress("UNCHECKED_CAST") override fun <T : ViewModel> create(modelClass: Class<T>): T = StwViewModel(authRepo = authRepository) as T
+        @Suppress("UNCHECKED_CAST") override fun <T : ViewModel> create(modelClass: Class<T>): T = StwViewModel(application = activityApp, authRepo = authRepository) as T
     })
     val lockerViewModel: PersonalLockerViewModel = viewModel(factory = object : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST") override fun <T : ViewModel> create(modelClass: Class<T>): T = PersonalLockerViewModel(authRepository = authRepository) as T
@@ -197,8 +211,18 @@ fun FortniteCompanionApp(settings: SettingsEntity?) {
                 },
                 actions = {
                     IconButton(onClick = { navController.navigate(NavRoute.MyAccount.route) }) {
-                        when (authSession) {
-                            is AuthState.Active -> Icon(Icons.Default.CheckCircle, contentDescription = null, tint = SleekEmerald)
+                        when (val state = authSession) {
+                            is AuthState.Active -> {
+                                if (state.session.equippedSkinIcon != null) {
+                                    AsyncImage(
+                                        model = state.session.equippedSkinIcon,
+                                        contentDescription = "Profile",
+                                        modifier = Modifier.size(28.dp).clip(CircleShape).border(1.dp, SleekCyan.copy(alpha = 0.5f), CircleShape)
+                                    )
+                                } else {
+                                    Icon(Icons.Default.AccountCircle, contentDescription = null, tint = SleekEmerald)
+                                }
+                            }
                             is AuthState.TokenRefreshing -> CircularProgressIndicator(modifier = Modifier.size(18.dp), color = SleekCyan, strokeWidth = 2.dp)
                             is AuthState.NoCredentials -> Icon(Icons.Default.Lock, contentDescription = null, tint = SleekTextMuted)
                             is AuthState.NetworkError -> Icon(Icons.Default.WifiOff, contentDescription = null, tint = FortniteGold)
@@ -259,11 +283,14 @@ fun FortniteCompanionApp(settings: SettingsEntity?) {
                 composable(NavRoute.News.route) { NewsScreen(newsViewModel) }
                 composable(NavRoute.Tracker.route) { StatsLookupScreen(statsViewModel) }
                 composable(NavRoute.Cosmetics.route) { CosmeticsScreen(cosmeticsViewModel, shopViewModel) }
-                composable(NavRoute.Stw.route) { StwScreen(stwViewModel) }
+                composable(NavRoute.Stw.route) { 
+                    StwHomebaseScreen(stwViewModel)
+                }
                 composable(NavRoute.MyAccount.route) { 
                     AccountAuthScreen(
-                        authViewModel, 
-                        settingsViewModel,
+                        viewModel = authViewModel, 
+                        settingsViewModel = settingsViewModel,
+                        lockerViewModel = lockerViewModel,
                         onNavigateToLocker = { navController.navigate(NavRoute.Locker.route) },
                         onNavigateToCareer = { navController.navigate(NavRoute.Career.route) }
                     ) 
@@ -285,13 +312,14 @@ fun FortniteCompanionApp(settings: SettingsEntity?) {
                         settingsViewModel,
                         onAddAccount = { navController.navigate(NavRoute.AddAccount.route) },
                         onNavigateToDiagnostic = { navController.navigate(NavRoute.AuthDiagnostic.route) },
-                        onNavigateToStwHomebase = { navController.navigate(NavRoute.StwHomebase.route) }
+                        onNavigateToStwHomebase = { navController.navigate(NavRoute.Stw.route) }
                     ) 
                 }
                 composable(NavRoute.AddAccount.route) {
                     AccountAuthScreen(
-                        authViewModel,
-                        settingsViewModel,
+                        viewModel = authViewModel,
+                        settingsViewModel = settingsViewModel,
+                        lockerViewModel = lockerViewModel,
                         onNavigateToLocker = { navController.popBackStack() },
                         onNavigateToCareer = { navController.popBackStack() },
                         forceLogin = true,

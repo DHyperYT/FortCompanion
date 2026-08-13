@@ -483,6 +483,28 @@ data class ChallengeDefinition(
     val type: String?
 )
 
+enum class StwResourceType {
+    CURRENCY,
+    XP,
+    EVOLUTION_MATERIAL,
+    PERK_RESOURCE,
+    FLUX,
+    TICKET,
+    VOUCHER,
+    SUPERCHARGER,
+    CRAFTING_MATERIAL,
+    OTHER
+}
+
+data class StwResource(
+    val templateId: String,
+    val name: String,
+    val quantity: Long,
+    val type: StwResourceType,
+    val rarity: String = "Common",
+    val iconUrl: String? = null
+)
+
 // --- STW DASHBOARD MODELS ---
 data class StwHomebaseData(
     val powerLevel: Double,
@@ -490,25 +512,174 @@ data class StwHomebaseData(
     val vbucks: Long,
     val xrayTickets: Long,
     val gold: Long,
-    val dailyQuestsCount: Int,
-    val researchStatus: StwResearchStatus,
-    val fortStats: FortStats
+    val resources: List<StwResource> = emptyList(),
+    val research: StwResearch = StwResearch(),
+    val inventory: StwInventory = StwInventory(),
+    val collectionBook: StwCollectionBook? = null,
+    val outposts: List<StwOutpost> = emptyList(),
+    val activeLoadoutId: String? = null,
+    val loadouts: List<StwHeroLoadout> = emptyList(),
+    val squads: List<StwSurvivorSquad> = emptyList(),
+    val heroes: List<StwHero> = emptyList(),
+    val schematics: List<StwSchematic> = emptyList(),
+    val survivors: List<StwSurvivor> = emptyList(),
+    val defenders: List<StwDefender> = emptyList(),
+    val dailyQuests: List<FortniteQuest> = emptyList(),
+    val llamas: List<StwLlama> = emptyList(),
+    val ventures: StwVentures? = null,
+    val totalDaysLoggedIn: Int = 0,
+    val matchesPlayed: Int = 0,
+    val zonesCompleted: Int = 0,
+    val commanderXp: Long = 0,
+    val packsGranted: Int = 0,
+    val profileRevisions: Map<String, Int> = emptyMap() // Map of profileId to rvn
 )
 
-data class StwResearchStatus(
-    val fortitude: Int,
-    val offense: Int,
-    val resistance: Int,
-    val technology: Int,
-    val totalPoints: Long,
-    val isCapped: Boolean
+data class StwHero(
+    val id: String, // Instance ID
+    val templateId: String, // HID_...
+    val name: String,
+    val rarity: String,
+    val level: Int = 1,
+    val rating: Int = 0,
+    val classType: String = "Soldier",
+    val iconUrl: String? = null,
+    val abilities: List<String> = emptyList(),
+    val perks: List<String> = emptyList(),
+    val description: String? = null
 )
 
-data class FortStats(
-    val fortitude: Int,
-    val offense: Int,
-    val resistance: Int,
-    val technology: Int
+data class StwSchematic(
+    val id: String,
+    val templateId: String,
+    val name: String,
+    val rarity: String,
+    val level: Int = 1,
+    val rating: Int = 0,
+    val type: String = "Weapon", // Weapon, Trap
+    val iconUrl: String? = null,
+    val perks: List<StwPerk> = emptyList(),
+    val damageType: String? = null,
+    val durability: Float? = null,
+    val isSlotted: Boolean = false
+)
+
+data class StwPerk(
+    val id: String,
+    val name: String,
+    val rarity: String = "Common",
+    val description: String? = null
+)
+
+data class StwSurvivor(
+    val id: String,
+    val templateId: String,
+    val name: String,
+    val rarity: String,
+    val level: Int = 1,
+    val rating: Int = 0,
+    val personality: String? = null,
+    val setBonus: String? = null,
+    val squadId: String? = null,
+    val isLead: Boolean = false,
+    val synergy: String? = null, // For leads
+    val iconUrl: String? = null
+)
+
+data class StwSurvivorSquad(
+    val id: String,
+    val name: String,
+    val leadSlot: StwSurvivor? = null,
+    val memberSlots: List<StwSurvivor?> = emptyList(),
+    val unlockedSlots: Int = 0,
+    val totalPowerContribution: Int = 0
+)
+
+data class StwDefender(
+    val id: String,
+    val templateId: String,
+    val name: String,
+    val rarity: String,
+    val level: Int = 1,
+    val rating: Int = 0,
+    val type: String = "Defender",
+    val iconUrl: String? = null,
+    val perks: List<String> = emptyList()
+)
+
+data class StwCollectionBook(
+    val level: Int = 0,
+    val maxLevelAchieved: Int = 0,
+    val xp: Int = 0,
+    val categories: List<StwCollectionCategory> = emptyList()
+)
+
+data class StwCollectionCategory(
+    val name: String,
+    val pages: List<StwCollectionPage>
+)
+
+data class StwCollectionPage(
+    val id: String,
+    val templateId: String,
+    val name: String,
+    val state: String,
+    val slottedItems: List<StwInventoryItem> = emptyList()
+)
+
+data class StwResearch(
+    val fortitude: Int = 0,
+    val offense: Int = 0,
+    val resistance: Int = 0,
+    val technology: Int = 0,
+    val totalLevels: Int = 0
+)
+
+data class StwOutpost(
+    val id: String,
+    val templateId: String,
+    val name: String,
+    val level: Int,
+    val enduranceWave: Int = 0,
+    val ownerId: String? = null
+)
+
+data class StwInventory(
+    val backpack: List<StwInventoryItem> = emptyList(),
+    val storage: List<StwInventoryItem> = emptyList()
+)
+
+data class StwInventoryItem(
+    val id: String,
+    val templateId: String,
+    val name: String,
+    val quantity: Int,
+    val level: Int = 1,
+    val rarity: String = "Common",
+    val type: String = "Item",
+    val durability: Float? = null,
+    val iconUrl: String? = null,
+    val perks: List<String> = emptyList()
+)
+
+data class StwHeroLoadout(
+    val id: String,
+    val name: String,
+    val commander: StwHero?,
+    val teamPerkId: String?,
+    val teamPerkName: String?,
+    val support: List<StwHero?>, // 5 slots
+    val gadgets: List<String?>, // 2 slots
+    val isActive: Boolean = false,
+    val index: Int = 0
+)
+
+data class StwVentures(
+    val seasonName: String,
+    val level: Int,
+    val xp: Long,
+    val nextLevelXp: Long,
+    val rewardsClaimed: Int
 )
 
 // --- AES MODELS ---

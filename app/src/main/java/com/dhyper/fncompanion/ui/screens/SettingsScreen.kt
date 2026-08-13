@@ -10,6 +10,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -24,6 +25,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import coil.compose.AsyncImage
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -69,6 +71,15 @@ fun SettingsScreen(
     var isExporting by remember { mutableStateOf(true) } // true = export, false = import
     
     var importedFileContent by remember { mutableStateOf<String?>(null) }
+
+    val activeSession by authViewModel.authSession.collectAsState()
+    val activeAccountId = when (val state = activeSession) {
+        is AuthState.Active -> state.session.accountId
+        is AuthState.TokenRefreshing -> state.session.accountId
+        is AuthState.TokenExpired -> state.session.accountId
+        is AuthState.ReauthRequired -> state.session.accountId
+        else -> null
+    }
 
     val timePicker = TimePickerDialog(
         context,
@@ -252,8 +263,9 @@ fun SettingsScreen(
                     .border(1.dp, if(isActive) SleekPrimary else SleekSurfaceBorder, RoundedCornerShape(12.dp)),
                 colors = CardDefaults.cardColors(containerColor = SleekSurface)
             ) {
+                val isActive = account.accountId == activeAccountId
                 Row(
-                    modifier = Modifier.padding(12.dp),
+                    modifier = Modifier.padding(12.dp).clickable { settingsViewModel.switchAccount(context, account) },
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Box(
@@ -324,6 +336,16 @@ fun SettingsScreen(
                     subtitle = "Share wishlist across all accounts",
                     checked = settings?.useUniversalWishlist ?: false,
                     onCheckedChange = { settingsViewModel.updateUniversalWishlist(it) }
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                // Data Saver Mode
+                PreferenceSwitch(
+                    label = "Data Saver Mode",
+                    subtitle = "Only download images on Wi-Fi",
+                    checked = settings?.dataSaverMode ?: false,
+                    onCheckedChange = { settingsViewModel.updateDataSaverMode(it) }
                 )
 
                 Spacer(modifier = Modifier.height(16.dp))
@@ -496,11 +518,39 @@ fun SettingsScreen(
                 colors = CardDefaults.cardColors(containerColor = SleekSurface)
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            modifier = Modifier
+                                .size(48.dp)
+                                .background(SleekBackground, CircleShape)
+                                .border(2.dp, SleekPrimary, CircleShape)
+                                .clip(CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            if (active.equippedSkinIcon != null) {
+                                AsyncImage(
+                                    model = active.equippedSkinIcon,
+                                    contentDescription = null,
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentScale = ContentScale.Crop
+                                )
+                            } else {
+                                Icon(Icons.Default.Person, null, tint = SleekPrimary)
+                            }
+                        }
+                        Spacer(Modifier.width(16.dp))
+                        Column {
+                            Text(active.displayName, fontWeight = FontWeight.Bold, color = SleekTextPrimary)
+                            Text("ID: ${active.accountId.take(8)}...", fontSize = 11.sp, color = SleekTextMuted)
+                        }
+                    }
+                    
+                    Spacer(Modifier.height(16.dp))
+                    
                     val countdown by settingsViewModel.tokenExpiryCountdown.collectAsState()
                     val lastRefresh = java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault())
                         .format(java.util.Date(active.lastRefreshTimeMs))
 
-                    StatusRow("Active Account", active.displayName)
                     StatusRow("Token Expiry", countdown)
                     StatusRow("Last Refresh", lastRefresh)
                 }

@@ -79,7 +79,7 @@ class AuthViewModel(
 
     fun refreshStats() {
         viewModelScope.launch {
-            epicAccountRepository.clearCache()
+            // epicAccountRepository.clearCache() // Removed as clearCache is not implemented
         }
     }
 
@@ -139,6 +139,16 @@ class AuthViewModel(
     fun getRawAuthState(onResult: (String) -> Unit) {
         viewModelScope.launch {
             onResult(authRepository.getRawDecryptedSessionJson())
+        }
+    }
+
+    fun fetchProfileJson(profileId: String, onResult: (String) -> Unit) {
+        viewModelScope.launch {
+            val result = authRepository.queryRawMcpProfile(profileId)
+            result.fold(
+                onSuccess = { onResult(it) },
+                onFailure = { onResult("Error fetching $profileId: ${it.localizedMessage}") }
+            )
         }
     }
 

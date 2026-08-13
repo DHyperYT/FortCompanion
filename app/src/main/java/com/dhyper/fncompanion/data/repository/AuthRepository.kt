@@ -16,6 +16,7 @@ import com.dhyper.fncompanion.data.models.AuthState
 import com.dhyper.fncompanion.data.models.DeviceAuthStatus
 import com.dhyper.fncompanion.data.models.EpicTokenResponse
 import com.dhyper.fncompanion.data.models.EpicVerifyResponse
+import com.dhyper.fncompanion.data.models.McpQueryResponse
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
@@ -283,7 +284,7 @@ class AuthRepository(private val authDao: AuthDao) {
 
         return try {
             val response = api.getAccessTokenWithAuthCode(code = cleanCode)
-            val iconUrl = epicAccountRepository.fetchEquippedSkinIcon(response.accessToken, response.accountId)
+            val iconUrl: String? = null
             
             var session = AuthEntity(
                 accountId = response.accountId,
@@ -330,7 +331,7 @@ class AuthRepository(private val authDao: AuthDao) {
             try {
                 val response = api.getAccessTokenWithExchangeCode(authHeader = authHeader, exchangeCode = cleanCode)
                 if (!response.accessToken.isNullOrBlank()) {
-                    val iconUrl = epicAccountRepository.fetchEquippedSkinIcon(response.accessToken, response.accountId)
+                    val iconUrl: String? = null
                     var session = AuthEntity(
                         accountId = response.accountId,
                         displayName = response.displayName ?: "Epic Player",
@@ -445,6 +446,15 @@ class AuthRepository(private val authDao: AuthDao) {
     suspend fun addRecentSearch(name: String) { if (name.isNotBlank()) authDao.saveRecentSearch(RecentSearchEntity(accountName = name.trim())) }
     suspend fun removeRecentSearch(name: String) { authDao.deleteRecentSearch(name) }
 
+    suspend fun updateAccountIcon(accountId: String, iconUrl: String?) {
+        authDao.updateEquippedSkinIcon(accountId, iconUrl)
+        val current = sessionCache.value.toMutableMap()
+        current[accountId]?.let {
+            current[accountId] = it.copy(equippedSkinIcon = iconUrl)
+            sessionCache.value = current
+        }
+    }
+
     suspend fun getValidSession(): AuthEntity? = ensureActiveSession().getOrNull()
 
     suspend fun generateExchangeCode(): Result<String> {
@@ -469,6 +479,21 @@ class AuthRepository(private val authDao: AuthDao) {
             adapter.toJson(session)
         } catch (e: Exception) {
             "{\"error\": \"Serialization failed: ${e.message}\"}"
+        }
+    }
+
+    suspend fun queryRawMcpProfile(profileId: String): Result<String> {
+        return try {
+            val session = ensureActiveSession().getOrNull() ?: return Result.failure(Exception("No active session"))
+            val response = api.queryMcpProfile(
+                bearerToken = "Bearer ${session.accessToken}",
+                accountId = session.accountId,
+                profileId = profileId
+            )
+            val adapter = moshi.adapter<McpQueryResponse>(McpQueryResponse::class.java).indent("  ")
+            Result.success(adapter.toJson(response))
+        } catch (e: Exception) {
+            Result.failure(e)
         }
     }
 }

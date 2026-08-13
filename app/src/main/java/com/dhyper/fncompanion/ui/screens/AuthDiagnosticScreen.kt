@@ -24,6 +24,9 @@ import com.dhyper.fncompanion.data.repository.AuthDiagnosticsManager
 import com.dhyper.fncompanion.data.repository.AuthEventType
 import com.dhyper.fncompanion.ui.theme.*
 import com.dhyper.fncompanion.ui.viewmodels.AuthViewModel
+import android.widget.Toast
+import androidx.compose.ui.platform.LocalContext
+import java.io.File
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -32,9 +35,11 @@ fun AuthDiagnosticScreen(
     viewModel: AuthViewModel,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
     val authState by viewModel.authSession.collectAsState()
     val events by AuthDiagnosticsManager.events.collectAsState()
     var diagnosticResult by remember { mutableStateOf<String?>(null) }
+    var currentProfileId by remember { mutableStateOf<String?>(null) }
     var isTesting by remember { mutableStateOf(false) }
 
     val session = when (authState) {
@@ -72,7 +77,14 @@ fun AuthDiagnosticScreen(
                 Spacer(Modifier.height(24.dp))
                 
                 DiagnosticHeader("OPERATIONS")
-                DiagnosticActions(viewModel, isTesting) { diagnosticResult = it }
+                DiagnosticActions(
+                    viewModel = viewModel, 
+                    isTesting = isTesting, 
+                    onDiagnostic = { result, profileId -> 
+                        diagnosticResult = result
+                        currentProfileId = profileId
+                    }
+                )
                 
                 if (diagnosticResult != null) {
                     Spacer(Modifier.height(16.dp))
@@ -80,7 +92,41 @@ fun AuthDiagnosticScreen(
                         colors = CardDefaults.cardColors(containerColor = SleekSurfaceVariant),
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Text(diagnosticResult!!, Modifier.padding(12.dp), fontSize = 12.sp, color = SleekCyan)
+                        Column(Modifier.padding(12.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    currentProfileId?.let { "PROFILE: $it" } ?: "RESULT",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = SleekTextMuted
+                                )
+                                if (currentProfileId != null && !diagnosticResult!!.startsWith("Error")) {
+                                    TextButton(
+                                        onClick = {
+                                            try {
+                                                val fileName = "${currentProfileId}_${System.currentTimeMillis()}.json"
+                                                val file = File(context.getExternalFilesDir(null), fileName)
+                                                file.writeText(diagnosticResult!!)
+                                                Toast.makeText(context, "Exported to ${file.absolutePath}", Toast.LENGTH_LONG).show()
+                                            } catch (e: Exception) {
+                                                Toast.makeText(context, "Export failed: ${e.message}", Toast.LENGTH_SHORT).show()
+                                            }
+                                        },
+                                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+                                    ) {
+                                        Icon(Icons.Default.Download, null, Modifier.size(16.dp))
+                                        Spacer(Modifier.width(4.dp))
+                                        Text("EXPORT", fontSize = 11.sp)
+                                    }
+                                }
+                            }
+                            Spacer(Modifier.height(8.dp))
+                            Text(diagnosticResult!!, fontSize = 11.sp, color = SleekCyan)
+                        }
                     }
                 }
                 
@@ -152,35 +198,79 @@ fun DiagnosticInfoCard(session: AuthEntity?, state: AuthState) {
 }
 
 @Composable
-fun DiagnosticActions(viewModel: AuthViewModel, isTesting: Boolean, onDiagnostic: (String) -> Unit) {
+fun DiagnosticActions(
+    viewModel: AuthViewModel, 
+    isTesting: Boolean, 
+    onDiagnostic: (String, String?) -> Unit
+) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         ActionButton(Icons.Default.Visibility, "Verify Current Access Token", isTesting) {
-            onDiagnostic("Verifying...")
-            viewModel.verifyCurrentToken { onDiagnostic(it) }
+            onDiagnostic("Verifying...", null)
+            viewModel.verifyCurrentToken { onDiagnostic(it, null) }
         }
         ActionButton(Icons.Default.Refresh, "Refresh Access Token", isTesting) {
-            onDiagnostic("Refreshing...")
-            viewModel.refreshAccessToken { onDiagnostic(it) }
+            onDiagnostic("Refreshing...", null)
+            viewModel.refreshAccessToken { onDiagnostic(it, null) }
         }
         ActionButton(Icons.Default.VpnKey, "Get New Access Token", isTesting) {
-            onDiagnostic("Recovering with Device Auth...")
-            viewModel.getNewAccessToken { onDiagnostic(it) }
+            onDiagnostic("Recovering with Device Auth...", null)
+            viewModel.getNewAccessToken { onDiagnostic(it, null) }
+        }
+
+        Spacer(Modifier.height(8.dp))
+        DiagnosticHeader("PROFILE DUMP")
+        
+        val profiles = listOf(
+            "athena" to "Athena (BR)",
+            "campaign" to "Campaign (STW)",
+            "metadata" to "Metadata",
+            "collection_book_people0" to "CB People",
+            "collection_book_schematics0" to "CB Schematics",
+            "outpost0" to "Outpost 0",
+            "theater0" to "Theater 0",
+            "theater1" to "Theater 1",
+            "theater2" to "Theater 2",
+            "recycle_bin" to "Recycle Bin"
+        )
+
+        profiles.chunked(2).forEach { row ->
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                row.forEach { (id, label) ->
+                    ActionButton(
+                        icon = Icons.Default.CloudDownload,
+                        label = label,
+                        enabled = isTesting,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        onDiagnostic("Fetching $id...", id)
+                        viewModel.fetchProfileJson(id) { onDiagnostic(it, id) }
+                    }
+                }
+                if (row.size == 1) Spacer(Modifier.weight(1f))
+            }
         }
     }
 }
 
 @Composable
-fun ActionButton(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, enabled: Boolean, onClick: () -> Unit) {
+fun ActionButton(
+    icon: androidx.compose.ui.graphics.vector.ImageVector, 
+    label: String, 
+    enabled: Boolean, 
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
     OutlinedButton(
         onClick = onClick,
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         enabled = !enabled,
         border = BorderStroke(1.dp, SleekSurfaceBorder),
-        shape = RoundedCornerShape(12.dp)
+        shape = RoundedCornerShape(12.dp),
+        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
     ) {
-        Icon(icon, null, Modifier.size(18.dp))
+        Icon(icon, null, Modifier.size(16.dp))
         Spacer(Modifier.width(8.dp))
-        Text(label, fontSize = 13.sp)
+        Text(label, fontSize = 11.sp, maxLines = 1)
     }
 }
 

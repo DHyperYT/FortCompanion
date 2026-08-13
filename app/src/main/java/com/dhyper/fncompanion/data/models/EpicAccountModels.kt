@@ -204,27 +204,6 @@ data class PastSeasonData(
     val hasBattlePass: Boolean
 )
 
-// --- SAVE THE WORLD (STW) MODELS ---
-data class StwHeroLoadout(
-    val id: String,
-    val name: String,
-    val commander: StwHero?,
-    val teamPerk: String,
-    val support: List<StwHero>,
-    val isActive: Boolean = false
-)
-
-data class StwHero(
-    val id: String, // Instance ID
-    val templateId: String, // HID_...
-    val name: String,
-    val rarity: String,
-    val level: Int = 1,
-    val rating: Int = 0,
-    val classType: String = "Soldier",
-    val iconUrl: String? = null
-)
-
 data class StwMissionAlert(
     val id: String,
     val name: String,
@@ -245,6 +224,16 @@ data class StwReward(
     val quantity: Int,
     val iconUrl: String? = null,
     val rarity: String = "Common"
+)
+
+data class StwLlama(
+    val id: String,
+    val templateId: String,
+    val name: String,
+    val description: String?,
+    val price: Int,
+    val currency: String,
+    val iconUrl: String? = null
 )
 
 // --- QUEST MODELS ---

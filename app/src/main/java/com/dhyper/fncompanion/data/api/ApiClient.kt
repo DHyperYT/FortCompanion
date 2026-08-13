@@ -71,4 +71,13 @@ object ApiClient {
             .build()
             .create(CentralApi::class.java)
     }
+
+    val pennyApi: PennyApi by lazy {
+        Retrofit.Builder()
+            .baseUrl("https://pennydb.net/")
+            .client(okHttpClient)
+            .addConverterFactory(MoshiConverterFactory.create(moshi))
+            .build()
+            .create(PennyApi::class.java)
+    }
 }

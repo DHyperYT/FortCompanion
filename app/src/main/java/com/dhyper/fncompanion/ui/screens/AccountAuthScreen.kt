@@ -10,6 +10,7 @@ import android.webkit.WebViewClient
 import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -30,7 +31,15 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
+import com.dhyper.fncompanion.ui.viewmodels.PersonalLockerViewModel
+import com.dhyper.fncompanion.ui.viewmodels.LockerUiState
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
@@ -38,6 +47,7 @@ import androidx.work.Data
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import com.dhyper.fncompanion.data.models.AuthState
+import com.dhyper.fncompanion.data.models.LockerCategory
 import com.dhyper.fncompanion.ui.theme.*
 import com.dhyper.fncompanion.ui.viewmodels.AuthViewModel
 import com.dhyper.fncompanion.ui.viewmodels.LoginState
@@ -49,6 +59,7 @@ import org.json.JSONObject
 fun AccountAuthScreen(
     viewModel: AuthViewModel,
     settingsViewModel: SettingsViewModel,
+    lockerViewModel: PersonalLockerViewModel,
     onNavigateToLocker: () -> Unit,
     onNavigateToCareer: () -> Unit,
     forceLogin: Boolean = false,
@@ -57,7 +68,8 @@ fun AccountAuthScreen(
 ) {
     val authState by viewModel.authSession.collectAsState()
     val loginState by viewModel.loginState.collectAsState()
-    
+    val lockerState by lockerViewModel.uiState.collectAsState()
+
     val session = when (val state = authState) {
         is AuthState.Active -> state.session
         is AuthState.TokenRefreshing -> state.session
@@ -85,8 +97,15 @@ fun AccountAuthScreen(
     var isGeneratingCode by remember { mutableStateOf(false) }
     var showWebView by remember { mutableStateOf(false) }
     var showMobileLoginDialog by remember { mutableStateOf(false) }
+    var showIconPicker by remember { mutableStateOf(false) }
     var currentWebViewUrl by remember { mutableStateOf("") }
     
+    LaunchedEffect(session) {
+        if (session != null) {
+            lockerViewModel.loadLocker(session)
+        }
+    }
+
     val loginUrl = "https://www.epicgames.com/id/login?prompt=login&redirectUrl=https%3A%2F%2Fwww.epicgames.com%2Fid%2Fapi%2Fredirect%3FclientId%3D3f69e56c7649492c8cc29f1af08a8a12%26responseType%3Dcode"
 
     if (showWebView) {
@@ -187,11 +206,23 @@ fun AccountAuthScreen(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Box(
                             modifier = Modifier
-                                .size(56.dp)
-                                .background(SleekPrimary, CircleShape),
+                                .size(60.dp)
+                                .background(SleekSurface, CircleShape)
+                                .border(2.dp, SleekPrimary, CircleShape)
+                                .clip(CircleShape)
+                                .clickable { showIconPicker = true },
                             contentAlignment = Alignment.Center
                         ) {
-                            Icon(Icons.Default.Person, null, tint = Color.White, modifier = Modifier.size(32.dp))
+                            if (session.equippedSkinIcon != null) {
+                                AsyncImage(
+                                    model = session.equippedSkinIcon,
+                                    contentDescription = null,
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentScale = ContentScale.Crop
+                                )
+                            } else {
+                                Icon(Icons.Default.AddAPhoto, null, tint = SleekPrimary, modifier = Modifier.size(24.dp))
+                            }
                         }
                         Spacer(modifier = Modifier.width(16.dp))
                         Column {
@@ -418,6 +449,67 @@ fun AccountAuthScreen(
                             Text(text = errorMsg, color = MaterialTheme.colorScheme.onErrorContainer, modifier = Modifier.padding(12.dp), fontSize = 13.sp)
                         }
                     }
+                }
+            }
+        }
+    }
+
+    if (showIconPicker) {
+        val outfits = (lockerState as? LockerUiState.Success)?.allItems?.filter { it.category == LockerCategory.OUTFIT } ?: emptyList()
+        
+        ModalBottomSheet(
+            onDismissRequest = { showIconPicker = false },
+            containerColor = SleekSurfaceVariant,
+            dragHandle = { BottomSheetDefaults.DragHandle(color = SleekTextMuted) }
+        ) {
+            Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 16.dp).padding(bottom = 32.dp)) {
+                Text("Choose Profile Icon", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Black, color = SleekTextPrimary)
+                Text("Select an owned outfit to use as your profile picture", fontSize = 13.sp, color = SleekTextMuted)
+                
+                Spacer(Modifier.height(20.dp))
+                
+                if (outfits.isEmpty()) {
+                    Box(Modifier.fillMaxWidth().height(200.dp), contentAlignment = Alignment.Center) {
+                        if (lockerState is LockerUiState.Loading) {
+                            CircularProgressIndicator(color = SleekCyan)
+                        } else {
+                            Text("No outfits found in locker", color = SleekTextMuted)
+                        }
+                    }
+                } else {
+                    LazyVerticalGrid(
+                        columns = GridCells.Adaptive(70.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        modifier = Modifier.heightIn(max = 400.dp)
+                    ) {
+                        items(outfits) { outfit ->
+                            AsyncImage(
+                                model = outfit.iconUrl,
+                                contentDescription = outfit.name,
+                                modifier = Modifier
+                                    .size(70.dp)
+                                    .clip(CircleShape)
+                                    .border(1.dp, SleekSurfaceBorder, CircleShape)
+                                    .clickable {
+                                        settingsViewModel.updateAccountIcon(session!!.accountId, outfit.iconUrl)
+                                        showIconPicker = false
+                                    },
+                                contentScale = ContentScale.Crop
+                            )
+                        }
+                    }
+                }
+                
+                Spacer(Modifier.height(16.dp))
+                TextButton(
+                    onClick = {
+                        settingsViewModel.updateAccountIcon(session!!.accountId, null)
+                        showIconPicker = false
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Remove Current Icon", color = Color.Red)
                 }
             }
         }

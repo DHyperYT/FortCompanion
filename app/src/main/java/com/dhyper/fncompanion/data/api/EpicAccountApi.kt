@@ -5,14 +5,7 @@ import com.dhyper.fncompanion.data.models.EpicTokenResponse
 import com.dhyper.fncompanion.data.models.EpicVerifyResponse
 import com.dhyper.fncompanion.data.models.McpQueryResponse
 import okhttp3.RequestBody
-import retrofit2.http.Body
-import retrofit2.http.Field
-import retrofit2.http.FormUrlEncoded
-import retrofit2.http.GET
-import retrofit2.http.Header
-import retrofit2.http.POST
-import retrofit2.http.Path
-import retrofit2.http.Query
+import retrofit2.http.*
 
 interface EpicAccountApi {
 
@@ -68,6 +61,17 @@ interface EpicAccountApi {
         @Body emptyBody: Map<String, String> = emptyMap()
     ): McpQueryResponse
 
+    @POST("https://fortnite-public-service-prod11.ol.epicgames.com/fortnite/api/game/v2/profile/{accountId}/client/{action}")
+    suspend fun executeMcpAction(
+        @Header("Authorization") bearerToken: String,
+        @Header("User-Agent") userAgent: String = "Fortnite/++Fortnite+Release-25.11-CL-25831038 Android/13",
+        @Path("accountId") accountId: String,
+        @Path("action") action: String,
+        @Query("profileId") profileId: String,
+        @Query("rvn") rvn: Int = -1,
+        @Body body: @JvmSuppressWildcards Map<String, Any>
+    ): McpQueryResponse
+
     @POST("https://fortnite-public-service-prod11.ol.epicgames.com/fortnite/api/game/v2/profile/{accountId}/client/SetActiveHeroLoadout")
     suspend fun setActiveHeroLoadout(
         @Header("Authorization") bearerToken: String,
@@ -88,7 +92,7 @@ interface EpicAccountApi {
         @Header("Authorization") bearerToken: String
     ): EpicVerifyResponse
 
-    @retrofit2.http.DELETE("https://account-public-service-prod.ol.epicgames.com/account/api/oauth/sessions/kill")
+    @DELETE("https://account-public-service-prod.ol.epicgames.com/account/api/oauth/sessions/kill")
     suspend fun killSessions(
         @Header("Authorization") bearerToken: String,
         @Query("killType") killType: String = "ALL"

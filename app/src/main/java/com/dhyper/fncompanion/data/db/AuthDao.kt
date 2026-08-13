@@ -36,6 +36,9 @@ interface AuthDao {
     @Query("DELETE FROM auth_session WHERE accountId = :accountId")
     suspend fun deleteAccountById(accountId: String)
 
+    @Query("UPDATE auth_session SET equippedSkinIcon = :iconUrl WHERE accountId = :accountId")
+    suspend fun updateEquippedSkinIcon(accountId: String, iconUrl: String?)
+
     @Query("DELETE FROM auth_session")
     suspend fun clearAllSessions()
 

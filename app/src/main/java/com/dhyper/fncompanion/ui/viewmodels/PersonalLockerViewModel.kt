@@ -9,6 +9,7 @@ import com.dhyper.fncompanion.data.repository.AuthRepository
 import com.dhyper.fncompanion.data.repository.EpicAccountRepository
 import com.dhyper.fncompanion.ui.components.getRarityRank
 import com.dhyper.fncompanion.ui.utils.LockerImageGenerator
+import com.dhyper.fncompanion.ui.utils.SeasonUtils
 import android.content.Context
 import android.graphics.Bitmap
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -19,7 +20,8 @@ import kotlinx.coroutines.launch
 enum class LockerSortOption(val displayName: String) {
     FAVORITES_FIRST("Favorites First"),
     NAME_ASC("Name (A-Z)"),
-    RARITY_DESC("Rarity (High to Low)")
+    RARITY_DESC("Rarity (High to Low)"),
+    ADDED_DESC("Date Added (New)")
 }
 
 sealed class LockerUiState {
@@ -223,11 +225,27 @@ class PersonalLockerViewModel(
             )
             LockerSortOption.NAME_ASC -> filtered.sortedBy { it.name }
             LockerSortOption.RARITY_DESC -> filtered.sortedWith(
-                compareByDescending<com.dhyper.fncompanion.data.models.ParsedLockerItem> { getRarityRank(it.rarity) }
+                compareByDescending<ParsedLockerItem> { getRarityRank(it.rarity) }
                 .thenBy { it.rarity }
                 .thenBy { it.name }
             )
+            LockerSortOption.ADDED_DESC -> filtered.sortedWith(
+                compareByDescending<ParsedLockerItem> { it.added ?: "" }
+                .thenByDescending { extractNumericFromId(it.templateId) }
+                .thenByDescending { 
+                    SeasonUtils.getGlobalSeasonNumber(
+                        it.introduction?.chapter, 
+                        it.introduction?.season
+                    )
+                }
+                .thenBy { it.name }
+            )
         }
+    }
+
+    private fun extractNumericFromId(id: String): Int {
+        val match = Regex("""(?i)[A-Z_]+_(\d+)""").find(id)
+        return match?.groupValues?.get(1)?.toIntOrNull() ?: 0
     }
 
 }

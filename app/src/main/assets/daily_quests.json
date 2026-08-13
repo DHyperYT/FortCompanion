@@ -1,0 +1,230 @@
+{
+  "quest:daily_destroyserverracks": {
+    "name": "Daily Destroy (Server Racks)",
+    "objectives": {
+      "Server Racks destroyed": 4
+    }
+  },
+  "quest:daily_destroytransformers": {
+    "name": "Daily Destroy (Transformers)",
+    "objectives": {
+      "Industrial Power Transformers destroyed": 2
+    }
+  },
+  "quest:daily_destroytvs": {
+    "name": "Daily Destroy (TVs)",
+    "objectives": {
+      "TVs destroyed": 20
+    }
+  },
+  "quest:daily_discovery_industriallocations": {
+    "name": "Daily Scouting Industrial Construction",
+    "objectives": {
+      "Construction Location Discovered": 3
+    }
+  },
+  "quest:daily_discovery_rurallocations": {
+    "name": "Daily Scouting Rural ",
+    "objectives": {
+      "Rural Location Discovered": 3
+    }
+  },
+  "quest:daily_discovery_shelters": {
+    "name": "Daily Scouting Shelters",
+    "objectives": {
+      "Shelter Location Discovered": 4
+    }
+  },
+  "quest:daily_discovery_suburbanlocations": {
+    "name": "Daily Scouting Suburbia",
+    "objectives": {
+      "Suburban Location Discovered": 10
+    }
+  },
+  "quest:daily_discovery_urbanlocations": {
+    "name": "Daily Scouting Cities",
+    "objectives": {
+      "City Location Discovered": 8
+    }
+  },
+  "quest:daily_explorezones": {
+    "name": "Exploration Party",
+    "objectives": {
+      "Zones explored": 3
+    }
+  },
+  "quest:daily_high_priority": {
+    "name": "All Together Now",
+    "objectives": {
+      "Survivors saved": 50
+    }
+  },
+  "quest:daily_huskextermination_anyhero": {
+    "name": "Husk Extermination (Any Hero)",
+    "objectives": {
+      "Husks eliminated": 500
+    }
+  },
+  "quest:daily_huskextermination_constructor": {
+    "name": "Husk Extermination (Constructor)",
+    "objectives": {
+      "Husks eliminated as a Constructor": 300
+    }
+  },
+  "quest:daily_huskextermination_melee": {
+    "name": "Husk Extermination (Melee)",
+    "objectives": {
+      "Husks eliminated with a melee weapon": 300
+    }
+  },
+  "quest:daily_huskextermination_ninja": {
+    "name": "Husk Extermination (Ninja)",
+    "objectives": {
+      "Husks eliminated as a Ninja": 300
+    }
+  },
+  "quest:daily_huskextermination_outlander": {
+    "name": "Husk Extermination (Outlander)",
+    "objectives": {
+      "Husks eliminated as an Outlander": 300
+    }
+  },
+  "quest:daily_huskextermination_ranged_assault": {
+    "name": "Husk Extermination (Assault Rifle)",
+    "objectives": {
+      "Husks eliminated with an assault rifle": 300
+    }
+  },
+  "quest:daily_huskextermination_ranged_pistol": {
+    "name": "Husk Extermination (Pistol)",
+    "objectives": {
+      "Husks eliminated with a pistol": 300
+    }
+  },
+  "quest:daily_huskextermination_ranged_shotgun": {
+    "name": "Husk Extermination (Shotgun)",
+    "objectives": {
+      "Husks eliminated with a shotgun": 300
+    }
+  },
+  "quest:daily_huskextermination_ranged_smg": {
+    "name": "Husk Extermination (SMG)",
+    "objectives": {
+      "Husks eliminated with an SMG": 300
+    }
+  },
+  "quest:daily_huskextermination_ranged_sniper": {
+    "name": "Husk Extermination (Sniper Rifle)",
+    "objectives": {
+      "Husks eliminated with a sniper rifle": 300
+    }
+  },
+  "quest:daily_huskextermination_soldier": {
+    "name": "Husk Extermination (Soldier)",
+    "objectives": {
+      "Husks eliminated as a Soldier": 300
+    }
+  },
+  "quest:daily_huskextermination_trap": {
+    "name": "Husk Extermination (Trap)",
+    "objectives": {
+      "Husks eliminated with traps": 150
+    }
+  },
+  "quest:daily_mission_buildradar": {
+    "name": "Build the Radar Tower",
+    "objectives": {
+      "Radar Towers built": 4
+    }
+  },
+  "quest:daily_mission_specialist_anyhero_1": {
+    "name": "Mission Specialist (Any Hero)",
+    "objectives": {
+      "Missions completed": 3
+    }
+  },
+  "quest:daily_mission_specialist_anyhero_2": {
+    "name": "Mission Veteran (Any Hero)",
+    "objectives": {
+      "Missions completed": 5
+    }
+  },
+  "quest:daily_mission_specialist_constructor": {
+    "name": "Mission Specialist (Constructor)",
+    "objectives": {
+      "Mission completed as a Constructor": 3
+    }
+  },
+  "quest:daily_mission_specialist_ninja": {
+    "name": "Mission Specialist (Ninja)",
+    "objectives": {
+      "Missions completed as a Ninja": 3
+    }
+  },
+  "quest:daily_mission_specialist_outlander": {
+    "name": "Mission Specialist (Outlander)",
+    "objectives": {
+      "Missions completed as an Outlander": 3
+    }
+  },
+  "quest:daily_mission_specialist_soldier": {
+    "name": "Mission Specialist (Soldier)",
+    "objectives": {
+      "Missions completed as a Soldier": 3
+    }
+  },
+  "quest:daily_partyof50": {
+    "name": "Party of 25",
+    "objectives": {
+      "Survivors saved": 25
+    }
+  },
+  "quest:daily_safes": {
+    "name": "Playing It Safe",
+    "objectives": {
+      "Safes looted": 1
+    }
+  },
+  "quest:daily_treasurechests": {
+    "name": "Lost Treasures",
+    "objectives": {
+      "Treasure chests looted": 5
+    }
+  },
+  "quest:daily_destroyarcademachines": {
+    "name": "Daily Destroy (Arcade Machines)",
+    "objectives": {
+      "Arcade Machines destroyed": 3
+    }
+  },
+  "quest:daily_destroybears": {
+    "name": "Daily Destroy (Teddy Bears)",
+    "objectives": {
+      "Teddy Bears destroyed": 8
+    }
+  },
+  "quest:daily_destroyfiretrucks": {
+    "name": "Daily Destroy (Fire Trucks)",
+    "objectives": {
+      "Fire Truck destroyed": 3
+    }
+  },
+  "quest:daily_destroygnomes": {
+    "name": "Daily Destroy (Garden Gnomes)",
+    "objectives": {
+      "Garden Gnomes destroyed": 3
+    }
+  },
+  "quest:daily_destroypropanetanks": {
+    "name": "Daily Destroy (Propane Tanks)",
+    "objectives": {
+      "Propane Tanks destroyed": 10
+    }
+  },
+  "quest:daily_destroyseesaws": {
+    "name": "Daily Destroy (Park Seesaws)",
+    "objectives": {
+      "Park Seesaws destroyed": 6
+    }
+  }
+}

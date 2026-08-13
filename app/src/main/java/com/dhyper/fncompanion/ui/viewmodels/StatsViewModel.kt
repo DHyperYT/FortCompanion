@@ -72,8 +72,7 @@ class StatsViewModel(
             _uiState.value = StatsUiState.Searching
             val result = epicAccountRepo.fetchPersonalCareerDetails(
                 accessToken = session.accessToken,
-                accountId = session.accountId,
-                displayName = session.displayName
+                accountId = session.accountId
             )
             result.fold(
                 onSuccess = { career ->
