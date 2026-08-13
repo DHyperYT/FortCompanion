@@ -13,5 +13,6 @@ data class SettingsEntity(
     val notificationsEnabled: Boolean = true,
     val vbucksAlertsEnabled: Boolean = false,
     val vbucksAlertTime: String = "00:00",
-    val lastVBucksMissionId: String? = null
+    val lastVBucksMissionId: String? = null,
+    val dataSaverMode: Boolean = false
 )

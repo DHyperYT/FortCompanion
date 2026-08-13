@@ -58,6 +58,11 @@ import java.util.concurrent.TimeUnit
 import com.dhyper.fncompanion.ui.screens.*
 import com.dhyper.fncompanion.ui.theme.*
 import com.dhyper.fncompanion.ui.viewmodels.*
+import com.dhyper.fncompanion.data.api.DataSaverInterceptor
+import coil.Coil
+import coil.ImageLoader
+import coil.compose.AsyncImage
+import androidx.compose.ui.draw.clip
 import kotlinx.coroutines.launch
 
 sealed class NavRoute(val route: String, val title: String, val icon: androidx.compose.ui.graphics.vector.ImageVector) {
@@ -86,6 +91,14 @@ class MainActivity : FragmentActivity() {
         
         // Cancel legacy periodic work that was hardcoded to 3am/00:00 UTC
         WorkManager.getInstance(this).cancelUniqueWork("ShopCheckWork")
+        
+        // Initialize Coil with Data Saver Interceptor
+        val imageLoader = ImageLoader.Builder(this)
+            .components {
+                add(DataSaverInterceptor(this@MainActivity, db.settingsDao()))
+            }
+            .build()
+        Coil.setImageLoader(imageLoader)
         
         ShopRefreshReceiver.scheduleNextAlarm(this)
         VBucksAlertReceiver.scheduleNextAlarm(this)
@@ -194,8 +207,18 @@ fun FortniteCompanionApp(settings: SettingsEntity?) {
                 },
                 actions = {
                     IconButton(onClick = { navController.navigate(NavRoute.MyAccount.route) }) {
-                        when (authSession) {
-                            is AuthState.Active -> Icon(Icons.Default.CheckCircle, contentDescription = null, tint = SleekEmerald)
+                        when (val state = authSession) {
+                            is AuthState.Active -> {
+                                if (state.session.equippedSkinIcon != null) {
+                                    AsyncImage(
+                                        model = state.session.equippedSkinIcon,
+                                        contentDescription = "Profile",
+                                        modifier = Modifier.size(28.dp).clip(CircleShape).border(1.dp, SleekCyan.copy(alpha = 0.5f), CircleShape)
+                                    )
+                                } else {
+                                    Icon(Icons.Default.AccountCircle, contentDescription = null, tint = SleekEmerald)
+                                }
+                            }
                             is AuthState.TokenRefreshing -> CircularProgressIndicator(modifier = Modifier.size(18.dp), color = SleekCyan, strokeWidth = 2.dp)
                             is AuthState.NoCredentials -> Icon(Icons.Default.Lock, contentDescription = null, tint = SleekTextMuted)
                             is AuthState.NetworkError -> Icon(Icons.Default.WifiOff, contentDescription = null, tint = FortniteGold)
