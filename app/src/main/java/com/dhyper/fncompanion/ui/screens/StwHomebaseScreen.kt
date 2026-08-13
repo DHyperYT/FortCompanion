@@ -62,7 +62,7 @@ fun StwHomebaseScreen(
 
     LaunchedEffect(Unit) { viewModel.refreshAll() }
 
-    // Detail Overlays
+    // Detail Overlays (Read-only, no actions)
     if (selectedPennyHero != null) ModalBottomSheet(onDismissRequest = { selectedPennyHero = null }, containerColor = SleekSurfaceVariant) { PennyHeroDetailContent(selectedPennyHero!!) }
     if (selectedPennySchematic != null) ModalBottomSheet(onDismissRequest = { selectedPennySchematic = null }, containerColor = SleekSurfaceVariant) { PennySchematicDetailContent(selectedPennySchematic!!) }
     if (selectedPennySurvivor != null) ModalBottomSheet(onDismissRequest = { selectedPennySurvivor = null }, containerColor = SleekSurfaceVariant) { PennySurvivorDetailContent(selectedPennySurvivor!!) }
@@ -365,7 +365,7 @@ fun PennyQuestItemRow(quest: PennyQuestItem, isCompleted: Boolean) {
             quest.description?.let { desc ->
                 Text(desc, fontSize = 11.sp, color = SleekTextMuted, modifier = Modifier.padding(start = 36.dp, top = 4.dp))
                 
-                // Extraction of [X/Y] progress from description
+                // Progress extraction logic
                 val regex = Regex("\\[(\\d+)/(\\d+)]")
                 val match = regex.find(desc)
                 if (match != null) {
@@ -412,9 +412,9 @@ fun <T> PennyItemList(items: Map<String, T>, rowContent: @Composable (String, T)
 
 @Composable
 fun PennyHeroRow(hero: PennyHero, onClick: () -> Unit) { 
-    val name = if (hero.name == null || hero.name == "Hero") hero.templateId ?: "Unknown Hero" else hero.name
+    val displayName = if (hero.name == null || hero.name == "Hero") hero.templateId ?: "Hero" else hero.name
     PennyItemRowTemplate(
-        name = name, 
+        name = displayName, 
         subtext = "PL ${hero.powerLevel ?: 1} • Lvl ${hero.attributes?.level ?: 1} ${hero.heroClass ?: ""}", 
         rarity = hero.rarity ?: "Common",
         imageUrl = hero.imageLink,
@@ -425,9 +425,9 @@ fun PennyHeroRow(hero: PennyHero, onClick: () -> Unit) {
 
 @Composable
 fun PennySchematicRow(schematic: PennySchematic, onClick: () -> Unit) { 
-    val name = if (schematic.name == null || schematic.name == "Schematic") schematic.templateId ?: "Unknown Schematic" else schematic.name
+    val displayName = if (schematic.name == null || schematic.name == "Schematic") schematic.templateId ?: "Schematic" else schematic.name
     PennyItemRowTemplate(
-        name = name, 
+        name = displayName, 
         subtext = "PL ${schematic.powerLevel ?: 1}", 
         rarity = schematic.rarity ?: "Common",
         imageUrl = schematic.imageLink,
@@ -438,9 +438,9 @@ fun PennySchematicRow(schematic: PennySchematic, onClick: () -> Unit) {
 
 @Composable
 fun PennySurvivorRow(survivor: PennySurvivor, onClick: () -> Unit) { 
-    val name = if (survivor.name == null || survivor.name == "Survivor") survivor.templateId ?: "Survivor" else survivor.name
+    val displayName = if (survivor.name == null || survivor.name == "Survivor") survivor.templateId ?: "Survivor" else survivor.name
     PennyItemRowTemplate(
-        name = name, 
+        name = displayName, 
         subtext = "PL ${survivor.powerLevel ?: 1} • ${survivor.personality ?: ""}", 
         rarity = survivor.rarity ?: "Common",
         imageUrl = survivor.imageLink,
@@ -451,9 +451,9 @@ fun PennySurvivorRow(survivor: PennySurvivor, onClick: () -> Unit) {
 
 @Composable
 fun PennyDefenderRow(defender: PennyDefender, onClick: () -> Unit) { 
-    val name = if (defender.name == null || defender.name == "Defender") defender.templateId ?: "Defender" else defender.name
+    val displayName = if (defender.name == null || defender.name == "Defender") defender.templateId ?: "Defender" else defender.name
     PennyItemRowTemplate(
-        name = name, 
+        name = displayName, 
         subtext = "PL ${defender.powerLevel ?: 1} • ${defender.defenderClass ?: ""}", 
         rarity = defender.rarity ?: "Common",
         imageUrl = defender.imageLink,
@@ -506,7 +506,7 @@ fun PennyDailyMissionRow(mission: PennyDailyMission) {
                 Text(mission.description ?: "", fontSize = 11.sp, color = SleekTextMuted)
                 Spacer(Modifier.height(4.dp))
                 LinearProgressIndicator(
-                    progress = { (mission.currentTotal ?: 0).toFloat() / (mission.totalRequired ?: 1).toFloat() },
+                    progress = { if ((mission.totalRequired ?: 1) > 0) (mission.currentTotal ?: 0).toFloat() / (mission.totalRequired ?: 1).toFloat() else 0f },
                     modifier = Modifier.fillMaxWidth().height(4.dp),
                     color = SleekCyan,
                     trackColor = SleekBackground,

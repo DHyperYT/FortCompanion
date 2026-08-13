@@ -87,6 +87,7 @@ data class PennyResource(
 data class PennySurvivor(
     val name: String?,
     val templateId: String? = null,
+    @Json(name = "template_id") val fullTemplateId: String? = null,
     @Json(name = "power_level_value") val powerLevel: Int?,
     val rarity: String?,
     @Json(name = "image_link") val imageLink: String?,
@@ -119,7 +120,7 @@ data class PennySquad(
     @Json(name = "lead_survivor") val leadSurvivor: PennyLeadSurvivor?,
     @Json(name = "worker_count") val workerCount: Int?,
     @Json(name = "active_bonuses") val activeBonuses: List<PennyActiveBonus>?,
-    @Json(name = "bonus_details") val bonusDetails: Map<String, Any>? = null
+    @Json(name = "bonus_details") val bonusDetails: Map<String, PennyActiveBonus>? = null
 )
 
 @JsonClass(generateAdapter = true)
