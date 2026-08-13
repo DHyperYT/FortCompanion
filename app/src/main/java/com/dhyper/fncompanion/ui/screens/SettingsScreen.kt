@@ -10,6 +10,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -24,6 +25,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import coil.compose.AsyncImage
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -50,7 +52,8 @@ fun SettingsScreen(
     authViewModel: AuthViewModel,
     statsViewModel: StatsViewModel,
     settingsViewModel: SettingsViewModel,
-    onAddAccount: () -> Unit
+    onAddAccount: () -> Unit,
+    onNavigateToDiagnostic: () -> Unit
 ) {
     val context = LocalContext.current
     val allAccounts by settingsViewModel.allAccounts.collectAsState()
@@ -67,6 +70,15 @@ fun SettingsScreen(
     var isExporting by remember { mutableStateOf(true) } // true = export, false = import
     
     var importedFileContent by remember { mutableStateOf<String?>(null) }
+
+    val activeSession by authViewModel.authSession.collectAsState()
+    val activeAccountId = when (val state = activeSession) {
+        is AuthState.Active -> state.session.accountId
+        is AuthState.TokenRefreshing -> state.session.accountId
+        is AuthState.TokenExpired -> state.session.accountId
+        is AuthState.ReauthRequired -> state.session.accountId
+        else -> null
+    }
 
     val timePicker = TimePickerDialog(
         context,
@@ -250,8 +262,9 @@ fun SettingsScreen(
                     .border(1.dp, if(isActive) SleekPrimary else SleekSurfaceBorder, RoundedCornerShape(12.dp)),
                 colors = CardDefaults.cardColors(containerColor = SleekSurface)
             ) {
+                val isActive = account.accountId == activeAccountId
                 Row(
-                    modifier = Modifier.padding(12.dp),
+                    modifier = Modifier.padding(12.dp).clickable { settingsViewModel.switchAccount(context, account) },
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Box(
@@ -544,6 +557,17 @@ fun SettingsScreen(
         }
 
         Spacer(modifier = Modifier.height(24.dp))
+
+        Button(
+            onClick = onNavigateToDiagnostic,
+            modifier = Modifier.fillMaxWidth(),
+            colors = ButtonDefaults.buttonColors(containerColor = SleekSurfaceVariant),
+            shape = RoundedCornerShape(12.dp)
+        ) {
+            Icon(Icons.Default.BugReport, null, tint = FortniteGold)
+            Spacer(Modifier.width(10.dp))
+            Text("Auth Diagnostics", color = SleekTextPrimary, fontWeight = FontWeight.Bold)
+        }
 
         Spacer(modifier = Modifier.height(40.dp))
     }
