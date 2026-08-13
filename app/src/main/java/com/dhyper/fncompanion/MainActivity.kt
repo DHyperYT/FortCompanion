@@ -83,7 +83,6 @@ sealed class NavRoute(val route: String, val title: String, val icon: androidx.c
     object Career : NavRoute("career", "Career", Icons.Default.History)
     object AddAccount : NavRoute("add_account", "Add Account", Icons.Default.PersonAdd)
     object AuthDiagnostic : NavRoute("auth_diagnostic", "Auth Diagnostic", Icons.Default.BugReport)
-    object StwHomebase : NavRoute("stw_homebase", "Homebase Beta", Icons.Default.Home)
 }
 
 class MainActivity : FragmentActivity() {
@@ -311,8 +310,7 @@ fun FortniteCompanionApp(settings: SettingsEntity?) {
                         statsViewModel, 
                         settingsViewModel,
                         onAddAccount = { navController.navigate(NavRoute.AddAccount.route) },
-                        onNavigateToDiagnostic = { navController.navigate(NavRoute.AuthDiagnostic.route) },
-                        onNavigateToStwHomebase = { navController.navigate(NavRoute.Stw.route) }
+                        onNavigateToDiagnostic = { navController.navigate(NavRoute.AuthDiagnostic.route) }
                     ) 
                 }
                 composable(NavRoute.AddAccount.route) {
@@ -328,9 +326,6 @@ fun FortniteCompanionApp(settings: SettingsEntity?) {
                 }
                 composable(NavRoute.AuthDiagnostic.route) {
                     AuthDiagnosticScreen(authViewModel)
-                }
-                composable(NavRoute.StwHomebase.route) {
-                    StwHomebaseScreen(stwViewModel)
                 }
             }
         }
