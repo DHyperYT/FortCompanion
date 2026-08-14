@@ -549,6 +549,7 @@ fun PersonalLockerScreen(
                                     name = item.name,
                                     description = item.description,
                                     artist = item.artist,
+                                    showcaseVideo = item.showcaseVideo,
                                     type = if (isMusicPack) com.dhyper.fncompanion.data.models.CosmeticType("Music", "Music Pack") else null,
                                     rarity = null, series = null, images = null, variants = null, introduction = null, set = null, added = null
                                 )
@@ -596,6 +597,8 @@ fun PersonalLockerScreen(
                                     set = item.set,
                                     added = item.added,
                                     artist = item.artist,
+                                    showcaseVideo = item.showcaseVideo,
+                                    previewUrl = item.previewUrl,
                                     bpm = item.bpm,
                                     duration = item.duration
                                 )

@@ -1,0 +1,241 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 10,
+    "identityHash": "87123a565423c04ee936fc77fb276411",
+    "entities": [
+      {
+        "tableName": "auth_session",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`accountId` TEXT NOT NULL, `displayName` TEXT NOT NULL, `accessToken` TEXT NOT NULL, `refreshToken` TEXT, `expiresAtMs` INTEGER NOT NULL, `deviceId` TEXT, `deviceSecret` TEXT, `loginTimeMs` INTEGER NOT NULL, `lastRefreshTimeMs` INTEGER NOT NULL, `isActive` INTEGER NOT NULL, `equippedSkinIcon` TEXT, `deviceAuthStatus` TEXT NOT NULL, PRIMARY KEY(`accountId`))",
+        "fields": [
+          {
+            "fieldPath": "accountId",
+            "columnName": "accountId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "displayName",
+            "columnName": "displayName",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "accessToken",
+            "columnName": "accessToken",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "refreshToken",
+            "columnName": "refreshToken",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "expiresAtMs",
+            "columnName": "expiresAtMs",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "deviceId",
+            "columnName": "deviceId",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "deviceSecret",
+            "columnName": "deviceSecret",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "loginTimeMs",
+            "columnName": "loginTimeMs",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lastRefreshTimeMs",
+            "columnName": "lastRefreshTimeMs",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "isActive",
+            "columnName": "isActive",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "equippedSkinIcon",
+            "columnName": "equippedSkinIcon",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "deviceAuthStatus",
+            "columnName": "deviceAuthStatus",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "accountId"
+          ]
+        }
+      },
+      {
+        "tableName": "recent_player_search",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`accountName` TEXT NOT NULL, `timestamp` INTEGER NOT NULL, PRIMARY KEY(`accountName`))",
+        "fields": [
+          {
+            "fieldPath": "accountName",
+            "columnName": "accountName",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "timestamp",
+            "columnName": "timestamp",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "accountName"
+          ]
+        }
+      },
+      {
+        "tableName": "cosmetic_wishlist",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `accountId` TEXT NOT NULL, `name` TEXT NOT NULL, `type` TEXT NOT NULL, `rarity` TEXT NOT NULL, `iconUrl` TEXT, `addedAtMs` INTEGER NOT NULL, PRIMARY KEY(`id`, `accountId`))",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "accountId",
+            "columnName": "accountId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "name",
+            "columnName": "name",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "type",
+            "columnName": "type",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "rarity",
+            "columnName": "rarity",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "iconUrl",
+            "columnName": "iconUrl",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "addedAtMs",
+            "columnName": "addedAtMs",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id",
+            "accountId"
+          ]
+        }
+      },
+      {
+        "tableName": "app_settings",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER NOT NULL, `fortniteApiKey` TEXT, `firstLaunchHandled` INTEGER NOT NULL, `useUniversalWishlist` INTEGER NOT NULL, `accentColor` TEXT NOT NULL, `notificationsEnabled` INTEGER NOT NULL, `vbucksAlertsEnabled` INTEGER NOT NULL, `vbucksAlertTime` TEXT NOT NULL, `lastVBucksMissionId` TEXT, `dataSaverMode` INTEGER NOT NULL, PRIMARY KEY(`id`))",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "fortniteApiKey",
+            "columnName": "fortniteApiKey",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "firstLaunchHandled",
+            "columnName": "firstLaunchHandled",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "useUniversalWishlist",
+            "columnName": "useUniversalWishlist",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "accentColor",
+            "columnName": "accentColor",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "notificationsEnabled",
+            "columnName": "notificationsEnabled",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "vbucksAlertsEnabled",
+            "columnName": "vbucksAlertsEnabled",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "vbucksAlertTime",
+            "columnName": "vbucksAlertTime",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lastVBucksMissionId",
+            "columnName": "lastVBucksMissionId",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "dataSaverMode",
+            "columnName": "dataSaverMode",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        }
+      }
+    ],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '87123a565423c04ee936fc77fb276411')"
+    ]
+  }
+}

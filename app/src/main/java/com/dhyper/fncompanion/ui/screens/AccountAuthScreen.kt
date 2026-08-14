@@ -48,6 +48,7 @@ import org.json.JSONObject
 fun AccountAuthScreen(
     viewModel: AuthViewModel,
     settingsViewModel: SettingsViewModel,
+    lockerViewModel: com.dhyper.fncompanion.ui.viewmodels.PersonalLockerViewModel,
     onNavigateToLocker: () -> Unit,
     onNavigateToCareer: () -> Unit,
     forceLogin: Boolean = false,
@@ -56,6 +57,7 @@ fun AccountAuthScreen(
 ) {
     val authState by viewModel.authSession.collectAsState()
     val loginState by viewModel.loginState.collectAsState()
+    val lockerState by lockerViewModel.uiState.collectAsState()
     
     val session = when (val state = authState) {
         is AuthState.Active -> state.session

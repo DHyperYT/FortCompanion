@@ -282,8 +282,9 @@ fun FortniteCompanionApp(settings: SettingsEntity?) {
                 composable(NavRoute.Stw.route) { StwScreen(stwViewModel) }
                 composable(NavRoute.MyAccount.route) { 
                     AccountAuthScreen(
-                        authViewModel, 
-                        settingsViewModel,
+                        viewModel = authViewModel, 
+                        settingsViewModel = settingsViewModel,
+                        lockerViewModel = lockerViewModel,
                         onNavigateToLocker = { navController.navigate(NavRoute.Locker.route) },
                         onNavigateToCareer = { navController.navigate(NavRoute.Career.route) }
                     ) 
@@ -308,8 +309,9 @@ fun FortniteCompanionApp(settings: SettingsEntity?) {
                 }
                 composable(NavRoute.AddAccount.route) {
                     AccountAuthScreen(
-                        authViewModel,
-                        settingsViewModel,
+                        viewModel = authViewModel,
+                        settingsViewModel = settingsViewModel,
+                        lockerViewModel = lockerViewModel,
                         onNavigateToLocker = { navController.popBackStack() },
                         onNavigateToCareer = { navController.popBackStack() },
                         forceLogin = true,

@@ -216,6 +216,7 @@ class EpicAccountRepository {
                                 introduction = apiDetails?.introduction,
                                 set = apiDetails?.set,
                                 added = apiDetails?.added,
+                                showcaseVideo = apiDetails?.showcaseVideo,
                                 previewUrl = apiDetails?.previewUrl,
                                 artist = apiDetails?.artist,
                                 variants = apiDetails?.variants,
