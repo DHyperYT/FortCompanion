@@ -77,7 +77,12 @@ class EpicAccountRepository {
                             quantity = item.quantity,
                             introduction = meta?.introduction,
                             set = meta?.set,
-                            added = meta?.added
+                            added = meta?.added,
+                            showcaseVideo = meta?.showcaseVideo,
+                            previewUrl = meta?.previewUrl,
+                            artist = meta?.artist,
+                            bpm = meta?.bpm,
+                            duration = meta?.duration
                         )
                     )
                 }

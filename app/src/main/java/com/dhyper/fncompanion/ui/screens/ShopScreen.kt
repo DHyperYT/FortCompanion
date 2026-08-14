@@ -277,6 +277,9 @@ fun ShopScreen(
 
         LaunchedEffect(entry.offerId ?: entry.devName) {
             if (firstItem != null) {
+                // Fetch full details (including showcase video) for the item
+                cosmeticsViewModel.loadDetailedItem(firstItem)
+                
                 val isTrack = firstItem.id.startsWith("sid_", ignoreCase = true) || 
                              firstItem.type?.displayValue?.contains("Track", ignoreCase = true) == true
                 val isMusicPack = firstItem.id.startsWith("MusicPack_", ignoreCase = true)
@@ -316,7 +319,8 @@ fun ShopScreen(
                             icon = shopImg
                         ),
                         variants = null, introduction = firstItem.introduction, set = firstItem.set, added = firstItem.added,
-                        artist = firstItem.artist, bpm = firstItem.bpm, duration = firstItem.duration
+                        artist = firstItem.artist, bpm = firstItem.bpm, duration = firstItem.duration,
+                        showcaseVideo = firstItem.showcaseVideo, previewUrl = firstItem.previewUrl
                     )
                 } else firstItem
 
@@ -360,6 +364,8 @@ fun ShopScreen(
 
         // Trigger search in background when detail sheet opens
         LaunchedEffect(item.id) {
+            cosmeticsViewModel.loadDetailedItem(item)
+            
             val isTrack = item.id.startsWith("sid_", ignoreCase = true) || 
                          item.type?.displayValue?.contains("Track", ignoreCase = true) == true
             val isMusicPack = item.id.startsWith("MusicPack_", ignoreCase = true)
