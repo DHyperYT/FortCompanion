@@ -426,6 +426,15 @@ class AuthRepository(private val authDao: AuthDao) {
     suspend fun addRecentSearch(name: String) { if (name.isNotBlank()) authDao.saveRecentSearch(RecentSearchEntity(accountName = name.trim())) }
     suspend fun removeRecentSearch(name: String) { authDao.deleteRecentSearch(name) }
 
+    suspend fun updateAccountIcon(accountId: String, iconUrl: String?) {
+        authDao.updateEquippedSkinIcon(accountId, iconUrl)
+        val current = sessionCache.value.toMutableMap()
+        current[accountId]?.let {
+            current[accountId] = it.copy(equippedSkinIcon = iconUrl)
+            sessionCache.value = current
+        }
+    }
+
     suspend fun getValidSession(): AuthEntity? = ensureActiveSession().getOrNull()
 
     suspend fun generateExchangeCode(): Result<String> {

@@ -10,6 +10,7 @@ import android.webkit.WebViewClient
 import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -29,7 +30,15 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
+import com.dhyper.fncompanion.data.models.LockerCategory
+import com.dhyper.fncompanion.ui.viewmodels.LockerUiState
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
@@ -86,6 +95,7 @@ fun AccountAuthScreen(
     var isGeneratingCode by remember { mutableStateOf(false) }
     var showWebView by remember { mutableStateOf(false) }
     var showMobileLoginDialog by remember { mutableStateOf(false) }
+    var showIconPicker by remember { mutableStateOf(false) }
     var currentWebViewUrl by remember { mutableStateOf("") }
     
     val loginUrl = "https://www.epicgames.com/id/login?prompt=login&redirectUrl=https%3A%2F%2Fwww.epicgames.com%2Fid%2Fapi%2Fredirect%3FclientId%3D3f69e56c7649492c8cc29f1af08a8a12%26responseType%3Dcode"
@@ -188,11 +198,40 @@ fun AccountAuthScreen(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Box(
                             modifier = Modifier
-                                .size(56.dp)
-                                .background(SleekPrimary, CircleShape),
-                            contentAlignment = Alignment.Center
+                                .size(60.dp)
+                                .clickable { showIconPicker = true }
                         ) {
-                            Icon(Icons.Default.Person, null, tint = Color.White, modifier = Modifier.size(32.dp))
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(SleekSurface, CircleShape)
+                                    .border(2.dp, SleekPrimary, CircleShape)
+                                    .clip(CircleShape),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                if (session.equippedSkinIcon != null) {
+                                    AsyncImage(
+                                        model = session.equippedSkinIcon,
+                                        contentDescription = null,
+                                        modifier = Modifier.fillMaxSize(),
+                                        contentScale = ContentScale.Crop
+                                    )
+                                } else {
+                                    Icon(Icons.Default.AddAPhoto, null, tint = SleekPrimary, modifier = Modifier.size(24.dp))
+                                }
+                            }
+                            
+                            // Edit Icon at corner
+                            Box(
+                                modifier = Modifier
+                                    .align(Alignment.BottomEnd)
+                                    .size(20.dp)
+                                    .background(SleekPrimary, CircleShape)
+                                    .border(1.dp, SleekSurfaceVariant, CircleShape),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(Icons.Default.Edit, null, tint = Color.White, modifier = Modifier.size(12.dp))
+                            }
                         }
                         Spacer(modifier = Modifier.width(16.dp))
                         Column {
@@ -464,6 +503,67 @@ fun AccountAuthScreen(
             containerColor = SleekSurface,
             shape = RoundedCornerShape(24.dp)
         )
+    }
+
+    if (showIconPicker) {
+        val outfits = (lockerState as? LockerUiState.Success)?.allItems?.filter { it.category == LockerCategory.OUTFIT } ?: emptyList()
+
+        ModalBottomSheet(
+            onDismissRequest = { showIconPicker = false },
+            containerColor = SleekSurfaceVariant,
+            dragHandle = { BottomSheetDefaults.DragHandle(color = SleekTextMuted) }
+        ) {
+            Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 16.dp).padding(bottom = 32.dp)) {
+                Text("Choose Profile Icon", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Black, color = SleekTextPrimary)
+                Text("Select an owned outfit to use as your profile picture", fontSize = 13.sp, color = SleekTextMuted)
+
+                Spacer(Modifier.height(20.dp))
+
+                if (outfits.isEmpty()) {
+                    Box(Modifier.fillMaxWidth().height(200.dp), contentAlignment = Alignment.Center) {
+                        if (lockerState is LockerUiState.Loading) {
+                            CircularProgressIndicator(color = SleekCyan)
+                        } else {
+                            Text("No outfits found in locker", color = SleekTextMuted)
+                        }
+                    }
+                } else {
+                    LazyVerticalGrid(
+                        columns = GridCells.Adaptive(70.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        modifier = Modifier.heightIn(max = 400.dp)
+                    ) {
+                        items(outfits) { outfit ->
+                            AsyncImage(
+                                model = outfit.iconUrl,
+                                contentDescription = outfit.name,
+                                modifier = Modifier
+                                    .size(70.dp)
+                                    .clip(CircleShape)
+                                    .border(1.dp, SleekSurfaceBorder, CircleShape)
+                                    .clickable {
+                                        settingsViewModel.updateAccountIcon(session!!.accountId, outfit.iconUrl)
+                                        showIconPicker = false
+                                    },
+                                contentScale = ContentScale.Crop
+                            )
+                        }
+                    }
+                }
+
+                Spacer(Modifier.height(16.dp))
+                TextButton(
+                    onClick = {
+                        settingsViewModel.updateAccountIcon(session!!.accountId, null)
+                        showIconPicker = false
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Remove Current Icon", color = Color.Red)
+                }
+            }
+        }
     }
 }
 
