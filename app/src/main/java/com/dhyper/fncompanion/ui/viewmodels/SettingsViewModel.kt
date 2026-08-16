@@ -221,13 +221,6 @@ class SettingsViewModel(
         }
     }
 
-    fun updateAccountIcon(accountId: String, iconUrl: String?) {
-        viewModelScope.launch {
-            authRepository.updateAccountIcon(accountId, iconUrl)
-            loadAccounts()
-        }
-    }
-
     private fun loadAccounts() {
         viewModelScope.launch {
             authDao.getAllAccounts().collect {
