@@ -217,13 +217,13 @@ fun FortniteCompanionApp(settings: SettingsEntity?) {
                                     AsyncImage(
                                         model = state.session.equippedSkinIcon,
                                         contentDescription = "Profile",
-                                        modifier = Modifier.size(28.dp).clip(CircleShape).border(1.dp, SleekCyan.copy(alpha = 0.5f), CircleShape)
+                                        modifier = Modifier.size(28.dp).clip(CircleShape).border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.5f), CircleShape)
                                     )
                                 } else {
                                     Icon(Icons.Default.AccountCircle, contentDescription = null, tint = SleekEmerald)
                                 }
                             }
-                            is AuthState.TokenRefreshing -> CircularProgressIndicator(modifier = Modifier.size(18.dp), color = SleekCyan, strokeWidth = 2.dp)
+                            is AuthState.TokenRefreshing -> CircularProgressIndicator(modifier = Modifier.size(18.dp), color = MaterialTheme.colorScheme.primary, strokeWidth = 2.dp)
                             is AuthState.NoCredentials -> Icon(Icons.Default.Lock, contentDescription = null, tint = SleekTextMuted)
                             is AuthState.NetworkError -> Icon(Icons.Default.WifiOff, contentDescription = null, tint = FortniteGold)
                             else -> Icon(Icons.Default.Error, contentDescription = null, tint = MaterialTheme.colorScheme.error)
