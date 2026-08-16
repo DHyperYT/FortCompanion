@@ -21,7 +21,6 @@ class ShopCheckWorker(
 ) : CoroutineWorker(appContext, workerParams) {
 
     override suspend fun doWork(): Result {
-        val isManualTest = inputData.getBoolean("is_test", false)
         val repository = FortniteRepository()
         val db = AppDatabase.getDatabase(applicationContext)
         val wishlistDao = db.wishlistDao()
@@ -106,7 +105,6 @@ class ShopCheckWorker(
                 WorkManager.getInstance(applicationContext).enqueue(stwAutoRequest)
             },
             onFailure = {
-                if (isManualTest) sendNotification("Failed to check shop: ${it.localizedMessage}", 0)
             }
         )
 

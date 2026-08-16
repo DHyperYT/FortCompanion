@@ -23,7 +23,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.*
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -104,8 +103,7 @@ fun ShopScreen(
             value = searchText,
             onValueChange = { searchText = it },
             modifier = Modifier
-                .fillMaxWidth()
-                .testTag("shop_search_input"),
+                .fillMaxWidth(),
             placeholder = { Text("Search Item Shop...", color = SleekTextMuted) },
             leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Search", tint = SleekCyan) },
             trailingIcon = if (searchText.isNotEmpty()) {
@@ -152,8 +150,7 @@ fun ShopScreen(
                         selected = isSelected,
                         borderColor = SleekSurfaceBorder,
                         selectedBorderColor = SleekPrimary
-                    ),
-                    modifier = Modifier.testTag("shop_category_$category")
+                    )
                 )
             }
         }
@@ -735,8 +732,7 @@ fun ShopItemCard(
         modifier = Modifier
             .fillMaxWidth()
             .clickable { onClick() }
-            .border(1.dp, if(isFullyOwned) Color.Gray.copy(alpha = 0.3f) else if (getRarityTextColor(rarityColor) == Color.White) Color.White.copy(alpha = 0.5f) else rarityColor.copy(alpha = 0.5f), RoundedCornerShape(14.dp))
-            .testTag("shop_item_card"),
+            .border(1.dp, if(isFullyOwned) Color.Gray.copy(alpha = 0.3f) else if (getRarityTextColor(rarityColor) == Color.White) Color.White.copy(alpha = 0.5f) else rarityColor.copy(alpha = 0.5f), RoundedCornerShape(14.dp)),
         shape = RoundedCornerShape(14.dp),
         colors = CardDefaults.cardColors(containerColor = if(isFullyOwned) SleekSurfaceVariant.copy(alpha = 0.5f) else SleekSurfaceVariant)
     ) {

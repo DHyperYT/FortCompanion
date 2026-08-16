@@ -173,6 +173,13 @@ class SettingsViewModel(
         }
     }
 
+    fun updateDataSaverMode(enabled: Boolean) {
+        viewModelScope.launch {
+            val current = settingsDao.getSettingsDirect() ?: SettingsEntity()
+            settingsDao.saveSettings(current.copy(dataSaverMode = enabled))
+        }
+    }
+
     fun updateVBucksAlerts(enabled: Boolean) {
         viewModelScope.launch {
             val current = settingsDao.getSettingsDirect() ?: SettingsEntity()
@@ -211,6 +218,13 @@ class SettingsViewModel(
         viewModelScope.launch {
             val current = settingsDao.getSettingsDirect() ?: SettingsEntity()
             settingsDao.saveSettings(current.copy(stwAutomationTime = time))
+        }
+    }
+
+    fun updateAccountIcon(accountId: String, iconUrl: String?) {
+        viewModelScope.launch {
+            authRepository.updateAccountIcon(accountId, iconUrl)
+            loadAccounts()
         }
     }
 

@@ -39,7 +39,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -105,8 +104,7 @@ fun NewsScreen(
                         Button(
                             onClick = { viewModel.loadNews() },
                             colors = ButtonDefaults.buttonColors(containerColor = SleekPrimary),
-                            shape = RoundedCornerShape(10.dp),
-                            modifier = Modifier.testTag("news_retry_button")
+                            shape = RoundedCornerShape(10.dp)
                         ) {
                             Icon(Icons.Default.Refresh, contentDescription = null, tint = Color.White)
                             Spacer(modifier = Modifier.width(6.dp))
@@ -141,8 +139,7 @@ fun NewsScreen(
                                     color = if (index == selectedIndex) SleekCyan else SleekTextMuted,
                                     fontSize = 13.sp
                                 )
-                            },
-                            modifier = Modifier.testTag("news_tab_${pair.first}")
+                            }
                         )
                     }
                 }
@@ -180,8 +177,7 @@ fun NewsCard(motd: NewsMotd) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .border(1.dp, SleekSurfaceBorder, RoundedCornerShape(14.dp))
-            .testTag("news_card"),
+            .border(1.dp, SleekSurfaceBorder, RoundedCornerShape(14.dp)),
         shape = RoundedCornerShape(14.dp),
         colors = CardDefaults.cardColors(containerColor = SleekSurfaceVariant)
     ) {

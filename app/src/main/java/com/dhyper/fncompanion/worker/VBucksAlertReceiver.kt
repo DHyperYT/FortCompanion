@@ -47,7 +47,6 @@ class VBucksAlertReceiver : BroadcastReceiver() {
                 )
 
                 if (!isEnabled) {
-                    Log.d("VBucksAlertReceiver", "V-Bucks alerts disabled. Canceling alarm.")
                     alarmManager.cancel(pendingIntent)
                     return@launch
                 }
