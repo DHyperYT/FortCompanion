@@ -1,6 +1,20 @@
 # Fortnite Companion
 
-Fortnite Companion is a feature-rich companion app for Fortnite that lets you authenticate and manage your Epic Games accounts, switch between multiple accounts, maintain persistent sessions, and securely import/export your account credentials. View your Battle Royale locker, item shop, player stats, maps, STW data powered by FortniteDB, AES keys, and all cosmetics in the game. Create per-account or universal wishlists, receive shop and wishlist notifications, generate exchange codes for quick Epic Games or Fortnite Mobile sign-ins, generate images of your BR locker,  and listen to Jam Tracks and Music Packs directly through YouTube.
+Fortnite Companion is a feature-rich companion app for Fortnite that lets you authenticate and manage your Epic Games accounts, switch between multiple accounts, maintain persistent sessions, and securely import/export your account credentials. View your Battle Royale locker, item shop, player stats, maps, STW info, AES keys, and all cosmetics in the game. Create per-account or universal wishlists, receive shop and wishlist notifications, generate exchange codes for quick Epic Games or Fortnite Mobile sign-ins, generate images of your BR locker,  and listen to Jam Tracks and Music Packs directly through YouTube.
+
+## Save the World
+
+Features support for Save the World!
+
+- View all your schematics, heroes, survivors, defenders
+- View your collection book and commander levels
+- View X-Ray tickets, gold, and xp
+- View your hero loadouts and  survivor squads
+- View and reroll daily quests
+- Get notified when a vbucks mission alert is active
+- Automatically remove junk from your inventory
+- Automatically claim free llamas
+- Recycle items from your save the world backpack through the app
 
 ## Security & Privacy
 
@@ -25,6 +39,8 @@ Your account credentials remain under your control. If you uninstall the app or 
 4. Run the app.
 
 API Key is acquired from https://fortnite-api.com
+
+Some images are used from PennyDB, and V-Bucks alerts use FortniteDB please support them!
 
 Join my discord server here: https://discord.gg/PDFG7TU5TY
 
