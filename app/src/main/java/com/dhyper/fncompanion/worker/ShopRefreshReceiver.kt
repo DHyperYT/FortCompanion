@@ -45,7 +45,6 @@ class ShopRefreshReceiver : BroadcastReceiver() {
                 )
 
                 if (!isEnabled) {
-                    android.util.Log.d("ShopRefreshReceiver", "Shop alerts disabled. Canceling alarm.")
                     alarmManager.cancel(pendingIntent)
                     return@launch
                 }

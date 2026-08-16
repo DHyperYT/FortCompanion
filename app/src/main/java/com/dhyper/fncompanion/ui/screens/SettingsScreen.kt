@@ -372,7 +372,7 @@ fun SettingsScreen(
                     shape = RoundedCornerShape(12.dp),
                     border = BorderStroke(1.dp, SleekSurfaceBorder)
                 ) {
-                    Icon(Icons.Default.Alarm, null, tint = SleekCyan, modifier = Modifier.size(18.dp))
+                    Icon(Icons.Default.Alarm, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(10.dp))
                     Text("Shop Refresh Time: ${settings?.shopRefreshTime}", color = SleekTextPrimary, fontWeight = FontWeight.Bold)
                 }
@@ -405,7 +405,7 @@ fun SettingsScreen(
             "BACKUP & RESTORE",
             fontSize = 12.sp,
             fontWeight = FontWeight.Bold,
-            color = SleekCyan,
+            color = MaterialTheme.colorScheme.primary,
             letterSpacing = 1.sp
         )
         Spacer(modifier = Modifier.height(8.dp))

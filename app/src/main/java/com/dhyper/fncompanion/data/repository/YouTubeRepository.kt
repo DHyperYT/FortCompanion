@@ -28,11 +28,6 @@ class YouTubeRepository {
                 videoId = fallbackRegex.find(html)?.groupValues?.get(1)
             }
             
-            // Log for debugging
-            if (videoId != null) {
-                android.util.Log.d("YouTubeSearch", "Found direct video ID: $videoId for query: $query")
-            }
-            
             videoId
         } catch (e: Exception) {
             null

@@ -140,7 +140,6 @@ class StwViewModel(
                 return@launch
             }
 
-            // Sync reactive fields from session
             _autoRecycleJunk.value = session.stwAutoRecycleJunk
             _autoClaimLlamas.value = session.stwAutoClaimLlamas
             _displayName.value = session.displayName

@@ -52,7 +52,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -113,8 +112,7 @@ fun MapScreen(
                         Button(
                             onClick = { viewModel.loadMap() },
                             colors = ButtonDefaults.buttonColors(containerColor = SleekPrimary),
-                            shape = RoundedCornerShape(10.dp),
-                            modifier = Modifier.testTag("map_retry_button")
+                            shape = RoundedCornerShape(10.dp)
                         ) {
                             Icon(Icons.Default.Refresh, contentDescription = null, tint = Color.White)
                             Spacer(modifier = Modifier.width(6.dp))
@@ -155,7 +153,6 @@ fun MapScreen(
                                 )
                                 .clickable { viewModel.selectMapMode(mode) }
                                 .padding(horizontal = 14.dp, vertical = 8.dp)
-                                .testTag("map_mode_${mode.name.lowercase()}")
                         ) {
                             Text(
                                 text = mode.displayName,
@@ -236,8 +233,7 @@ fun MapScreen(
                                     checkedTrackColor = SleekPrimary,
                                     uncheckedThumbColor = SleekTextMuted,
                                     uncheckedTrackColor = SleekSurfaceVariant
-                                ),
-                                modifier = Modifier.testTag("map_poi_switch")
+                                )
                             )
                         }
                     }

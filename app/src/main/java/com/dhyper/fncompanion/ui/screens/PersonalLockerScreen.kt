@@ -40,7 +40,6 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -154,8 +153,7 @@ fun PersonalLockerScreen(
                         Button(
                             onClick = onNavigateToAuth,
                             colors = ButtonDefaults.buttonColors(containerColor = SleekPrimary),
-                            shape = RoundedCornerShape(10.dp),
-                            modifier = Modifier.testTag("locker_login_button")
+                            shape = RoundedCornerShape(10.dp)
                         ) {
                             Text("Connect Epic Games Account", color = Color.White, fontWeight = FontWeight.Bold)
                         }
@@ -191,8 +189,7 @@ fun PersonalLockerScreen(
                             Button(
                                 onClick = { viewModel.loadLocker(session) },
                                 colors = ButtonDefaults.buttonColors(containerColor = SleekPrimary),
-                                shape = RoundedCornerShape(10.dp),
-                                modifier = Modifier.testTag("locker_retry_button")
+                                shape = RoundedCornerShape(10.dp)
                             ) {
                                 Icon(Icons.Default.Refresh, contentDescription = null, tint = Color.White)
                                 Spacer(modifier = Modifier.width(6.dp))
@@ -276,8 +273,7 @@ fun PersonalLockerScreen(
                             value = state.searchQuery,
                             onValueChange = { viewModel.setSearchQuery(it) },
                             modifier = Modifier
-                                .weight(1f)
-                                .testTag("locker_search_input"),
+                                .weight(1f),
                             placeholder = { Text("Search Locker Items...", color = SleekTextMuted, fontSize = 13.sp) },
                             leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = SleekCyan) },
                             trailingIcon = if (state.searchQuery.isNotEmpty()) {
@@ -363,8 +359,7 @@ fun PersonalLockerScreen(
                                     selected = isSelected,
                                     borderColor = SleekSurfaceBorder,
                                     selectedBorderColor = SleekPrimary
-                                ),
-                                modifier = Modifier.testTag("locker_cat_${label}")
+                                )
                             )
                         }
                     }
@@ -743,8 +738,7 @@ fun LockerItemCard(
         modifier = Modifier
             .fillMaxWidth()
             .clickable { onClick() }
-            .border(1.dp, rarityColor.copy(alpha = 0.6f), RoundedCornerShape(10.dp))
-            .testTag("locker_item_card"),
+            .border(1.dp, rarityColor.copy(alpha = 0.6f), RoundedCornerShape(10.dp)),
         shape = RoundedCornerShape(10.dp),
         colors = CardDefaults.cardColors(containerColor = SleekSurfaceVariant)
     ) {
