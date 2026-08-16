@@ -1,7 +1,6 @@
 package com.dhyper.fncompanion.data.repository
 
 import android.content.Context
-import android.util.Log
 import com.dhyper.fncompanion.data.api.ApiClient
 import com.dhyper.fncompanion.data.models.*
 import com.dhyper.fncompanion.ui.utils.SeasonUtils
@@ -500,7 +499,6 @@ class EpicAccountRepository {
                     try {
                         api.queryMcpProfile(bearerToken = "Bearer $accessToken", accountId = accountId, profileId = pid)
                     } catch (e: Exception) {
-                        Log.e("EpicAccountRepo", "Failed to fetch profile $pid", e)
                         null
                     }
                 }

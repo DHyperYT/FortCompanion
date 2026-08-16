@@ -1,6 +1,5 @@
 package com.dhyper.fncompanion.data.repository
 
-import android.util.Log
 import com.dhyper.fncompanion.data.api.ApiClient
 import com.dhyper.fncompanion.data.db.AuthDao
 import com.dhyper.fncompanion.data.db.AuthEntity
@@ -483,7 +482,6 @@ class AuthRepository(private val authDao: AuthDao) {
                     val updated = session.copy(isFounder = isFounder)
                     authDao.upsertAuthSession(encryptSession(updated))
                     sessionCache.value = sessionCache.value + (accountId to updated)
-                    Log.d("AuthRepo", "Updated founder status for $accountId to $isFounder")
                 }
             }
         }

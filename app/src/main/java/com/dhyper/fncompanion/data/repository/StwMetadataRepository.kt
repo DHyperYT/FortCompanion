@@ -1,7 +1,6 @@
 package com.dhyper.fncompanion.data.repository
 
 import android.content.Context
-import android.util.Log
 import com.squareup.moshi.Json
 import com.squareup.moshi.JsonClass
 import com.squareup.moshi.Moshi
@@ -58,7 +57,6 @@ object StwMetadataRepository {
                 if (language == "pt") language = "pt-BR"
                 if (language == "zh") language = "zh-Hans"
 
-                Log.d("StwMetadata", "Loading stringlist.json from assets... (Language: $language)")
                 val json = context.assets.open("stringlist.json").bufferedReader().use { it.readText() }
                 
                 val type = com.squareup.moshi.Types.newParameterizedType(Map::class.java, String::class.java, Any::class.java)
@@ -119,8 +117,6 @@ object StwMetadataRepository {
                     }
                 )
 
-                Log.d("StwMetadata", "Parsed ${itemItems.size} items from JSON")
-
                 try {
                     val questJson = context.assets.open("daily_quests.json").bufferedReader().use { it.readText() }
                     val questMap = asMap(rawAdapter.fromJson(questJson))
@@ -148,14 +144,11 @@ object StwMetadataRepository {
                             dailyQuests["quest:$coreKey"] = meta
                         }
                     }
-                    Log.d("StwMetadata", "Loaded ${dailyQuests.size} daily quests")
                 } catch (e: Exception) {
-                    Log.e("StwMetadata", "Failed to load daily_quests.json", e)
                 }
 
                 isLoaded = true
             } catch (e: Exception) {
-                Log.e("StwMetadata", "Critical metadata load failure", e)
             }
         }
     }
@@ -228,16 +221,12 @@ object StwMetadataRepository {
         val meta = findMetadata(templateId)
         val name = meta?.name?.get(language)?.toString() ?: meta?.name?.get("en")?.toString()
         
-        Log.d("StwMetadata", "resolveName($templateId) -> meta found: ${meta != null}, name: $name")
-        
         return name
     }
 
     fun resolveEnglishName(templateId: String): String? {
         val meta = findMetadata(templateId)
         val name = meta?.name?.get("en")?.toString()
-        
-        Log.d("StwMetadata", "resolveEnglishName($templateId) -> meta found: ${meta != null}, name: $name")
         
         return name
     }
@@ -298,7 +287,6 @@ object StwMetadataRepository {
             }
         } else base
         
-        Log.d("StwMetadata", "resolveLocalizedItemType($typeKey, plural=$plural) -> $result")
         return result
     }
 
