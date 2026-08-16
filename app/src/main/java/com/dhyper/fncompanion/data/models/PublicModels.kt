@@ -524,7 +524,10 @@ data class StwHomebaseData(
     val schematics: List<StwSchematic> = emptyList(),
     val survivors: List<StwSurvivor> = emptyList(),
     val defenders: List<StwDefender> = emptyList(),
+    val quests: List<FortniteQuest> = emptyList(),
     val dailyQuests: List<FortniteQuest> = emptyList(),
+    val storyQuests: List<FortniteQuest> = emptyList(),
+    val achievements: List<StwAchievement> = emptyList(),
     val llamas: List<StwLlama> = emptyList(),
     val ventures: StwVentures? = null,
     val totalDaysLoggedIn: Int = 0,
@@ -532,6 +535,8 @@ data class StwHomebaseData(
     val zonesCompleted: Int = 0,
     val commanderXp: Long = 0,
     val packsGranted: Int = 0,
+    val isFounder: Boolean = true,
+    val profileLockExpiration: String? = null,
     val profileRevisions: Map<String, Int> = emptyMap() // Map of profileId to rvn
 )
 
@@ -543,6 +548,7 @@ data class StwHero(
     val level: Int = 1,
     val rating: Int = 0,
     val classType: String = "Soldier",
+    val gender: String? = null,
     val iconUrl: String? = null,
     val abilities: List<String> = emptyList(),
     val perks: List<String> = emptyList(),
@@ -559,6 +565,7 @@ data class StwSchematic(
     val type: String = "Weapon", // Weapon, Trap
     val iconUrl: String? = null,
     val perks: List<StwPerk> = emptyList(),
+    val alterations: List<String> = emptyList(),
     val damageType: String? = null,
     val durability: Float? = null,
     val isSlotted: Boolean = false
@@ -581,8 +588,20 @@ data class StwSurvivor(
     val personality: String? = null,
     val setBonus: String? = null,
     val squadId: String? = null,
+    val squadSlotIdx: Int = -1,
+    val gender: String? = null,
+    val portrait: String? = null,
     val isLead: Boolean = false,
     val synergy: String? = null, // For leads
+    val iconUrl: String? = null
+)
+
+data class StwAchievement(
+    val id: String,
+    val templateId: String,
+    val name: String,
+    val progress: Long,
+    val target: Long,
     val iconUrl: String? = null
 )
 
@@ -641,11 +660,19 @@ data class StwOutpost(
     val name: String,
     val level: Int,
     val enduranceWave: Int = 0,
-    val ownerId: String? = null
+    val ownerId: String? = null,
+    val amplifiers: List<StwAmplifier> = emptyList()
+)
+
+data class StwAmplifier(
+    val buildingTag: String,
+    val placedTag: String
 )
 
 data class StwInventory(
     val backpack: List<StwInventoryItem> = emptyList(),
+    val eventBackpack: List<StwInventoryItem> = emptyList(),
+    val ventureBackpack: List<StwInventoryItem> = emptyList(),
     val storage: List<StwInventoryItem> = emptyList()
 )
 
@@ -655,6 +682,7 @@ data class StwInventoryItem(
     val name: String,
     val quantity: Int,
     val level: Int = 1,
+    val rating: Int = 0,
     val rarity: String = "Common",
     val type: String = "Item",
     val durability: Float? = null,
@@ -668,8 +696,11 @@ data class StwHeroLoadout(
     val commander: StwHero?,
     val teamPerkId: String?,
     val teamPerkName: String?,
+    val teamPerkIcon: String? = null,
     val support: List<StwHero?>, // 5 slots
     val gadgets: List<String?>, // 2 slots
+    val gadgetNames: List<String?> = emptyList(),
+    val gadgetIcons: List<String?> = emptyList(),
     val isActive: Boolean = false,
     val index: Int = 0
 )

@@ -103,4 +103,10 @@ interface EpicAccountApi {
         @Header("Authorization") bearerToken: String,
         @Header("User-Agent") userAgent: String = "Fortnite/++Fortnite+Release-25.11-CL-25831038 Android/13"
     ): Map<String, Any?>
+
+    @GET("https://fortnite-public-service-prod11.ol.epicgames.com/fortnite/api/storefront/v2/catalog")
+    suspend fun getStwStorefront(
+        @Header("Authorization") bearerToken: String,
+        @Header("User-Agent") userAgent: String = "Fortnite/++Fortnite+Release-25.11-CL-25831038 Android/13"
+    ): Map<String, Any>
 }

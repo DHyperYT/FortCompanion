@@ -12,7 +12,9 @@ data class SettingsEntity(
     val accentColor: String = "Cyan", // "Cyan", "Primary", "Emerald", "Gold"
     val notificationsEnabled: Boolean = true,
     val vbucksAlertsEnabled: Boolean = false,
-    val vbucksAlertTime: String = "00:00",
+    val shopRefreshTime: String = "00:00",
+    val stwVBucksAlertTime: String = "00:00",
+    val stwAutomationTime: String = "00:00",
     val lastVBucksMissionId: String? = null,
     val dataSaverMode: Boolean = false
 )

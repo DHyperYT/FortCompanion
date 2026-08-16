@@ -5,6 +5,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -12,6 +13,7 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -19,6 +21,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.*
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -40,43 +43,151 @@ import com.dhyper.fncompanion.data.repository.StwMetadataRepository
 import com.dhyper.fncompanion.ui.theme.*
 import com.dhyper.fncompanion.ui.viewmodels.StwViewModel
 import com.dhyper.fncompanion.ui.viewmodels.StwUiState
+import com.dhyper.fncompanion.ui.viewmodels.StwActionResult
+import java.util.*
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun StwHomebaseScreen(
     viewModel: StwViewModel
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    val pennyProfile by viewModel.pennyProfile.collectAsState()
+    val homebaseData by viewModel.homebaseData.collectAsState()
+    val commanderProgress by viewModel.commanderLevelProgress.collectAsState()
+    val xpToNext by viewModel.xpToNextLevel.collectAsState()
+    val displayName by viewModel.displayName.collectAsState()
+    val isFounder by viewModel.isFounder.collectAsState()
     
-    // Navigation Stack
     val navStack = remember { mutableStateListOf("DASHBOARD") }
     val currentSection = navStack.last()
 
-    // Selection States (Penny Models Only)
-    var selectedPennyHero by remember { mutableStateOf<PennyHero?>(null) }
-    var selectedPennySchematic by remember { mutableStateOf<PennySchematic?>(null) }
-    var selectedPennySurvivor by remember { mutableStateOf<PennySurvivor?>(null) }
-    var selectedPennyDefender by remember { mutableStateOf<PennyDefender?>(null) }
-    var selectedLoadout by remember { mutableStateOf<PennyLoadout?>(null) }
+    var selectedHero by remember { mutableStateOf<StwHero?>(null) }
+    var selectedSchematic by remember { mutableStateOf<StwSchematic?>(null) }
+    var selectedSurvivor by remember { mutableStateOf<StwSurvivor?>(null) }
+    var selectedDefender by remember { mutableStateOf<StwDefender?>(null) }
+    var selectedLoadout by remember { mutableStateOf<StwHeroLoadout?>(null) }
+    
+    val selectedItemIds = remember { mutableStateListOf<String>() }
+    var isMultiSelectMode by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) { viewModel.refreshAll() }
 
-    // Detail Overlays (Read-only, no actions)
-    if (selectedPennyHero != null) ModalBottomSheet(onDismissRequest = { selectedPennyHero = null }, containerColor = SleekSurfaceVariant) { PennyHeroDetailContent(selectedPennyHero!!) }
-    if (selectedPennySchematic != null) ModalBottomSheet(onDismissRequest = { selectedPennySchematic = null }, containerColor = SleekSurfaceVariant) { PennySchematicDetailContent(selectedPennySchematic!!) }
-    if (selectedPennySurvivor != null) ModalBottomSheet(onDismissRequest = { selectedPennySurvivor = null }, containerColor = SleekSurfaceVariant) { PennySurvivorDetailContent(selectedPennySurvivor!!) }
-    if (selectedPennyDefender != null) ModalBottomSheet(onDismissRequest = { selectedPennyDefender = null }, containerColor = SleekSurfaceVariant) { PennyDefenderDetailContent(selectedPennyDefender!!) }
-    if (selectedLoadout != null) ModalBottomSheet(onDismissRequest = { selectedLoadout = null }, containerColor = SleekSurfaceVariant) { PennyLoadoutDetailContent(selectedLoadout!!) }
+    selectedHero?.let { hero ->
+        ModalBottomSheet(onDismissRequest = { selectedHero = null }, containerColor = SleekSurfaceVariant) {
+            StwHeroDetailContent(hero)
+        }
+    }
+    selectedSchematic?.let { schematic ->
+        ModalBottomSheet(onDismissRequest = { selectedSchematic = null }, containerColor = SleekSurfaceVariant) {
+            StwSchematicDetailContent(schematic)
+        }
+    }
+    selectedSurvivor?.let { survivor ->
+        ModalBottomSheet(onDismissRequest = { selectedSurvivor = null }, containerColor = SleekSurfaceVariant) {
+            StwSurvivorDetailContent(survivor)
+        }
+    }
+    selectedDefender?.let { defender ->
+        ModalBottomSheet(onDismissRequest = { selectedDefender = null }, containerColor = SleekSurfaceVariant) {
+            StwDefenderDetailContent(defender)
+        }
+    }
+    selectedLoadout?.let { loadout ->
+        ModalBottomSheet(onDismissRequest = { selectedLoadout = null }, containerColor = SleekSurfaceVariant) {
+            StwHeroLoadoutDetailContent(loadout)
+        }
+    }
+
+    var showRecycleConfirm by remember { mutableStateOf<List<Pair<String, String>>?>(null) }
+    var showJunkConfirm by remember { mutableStateOf(false) }
+    var showShopConfirm by remember { mutableStateOf(false) }
+
+    showRecycleConfirm?.let { items ->
+        AlertDialog(
+            onDismissRequest = { showRecycleConfirm = null },
+            title = { Text("Recycle / Retire Items", fontWeight = FontWeight.Black) },
+            text = {
+                Column {
+                    Text("Are you sure you want to recycle/retire ${items.size} item(s)?", fontSize = 14.sp)
+                    Spacer(Modifier.height(8.dp))
+                    items.take(5).forEach { 
+                        Text("• ${it.first}", fontSize = 12.sp, color = SleekTextMuted)
+                    }
+                    if (items.size > 5) Text("...and ${items.size - 5} more", fontSize = 12.sp, color = SleekTextMuted)
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val ids = items.map { it.second }
+                        viewModel.recycleBackpackItems(ids)
+                        
+                        showRecycleConfirm = null
+                        isMultiSelectMode = false
+                        selectedItemIds.clear()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color.Red)
+                ) { Text("Confirm") }
+            },
+            dismissButton = { TextButton(onClick = { showRecycleConfirm = null }) { Text("Cancel") } },
+            containerColor = SleekSurface
+        )
+    }
+
+    if (showJunkConfirm) {
+        AlertDialog(
+            onDismissRequest = { showJunkConfirm = false },
+            title = { Text("Auto-Recycle Junk", fontWeight = FontWeight.Black) },
+            text = {
+                Column {
+                    Text("This will recycle all Common/Uncommon weapons and traps, and destroy Tier 1 crafting materials.", fontSize = 14.sp)
+                    Spacer(Modifier.height(8.dp))
+                    Text("Inventory will be scanned for items qualifying as 'Junk'.", fontSize = 12.sp, color = SleekTextMuted)
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.recycleJunkItems()
+                        showJunkConfirm = false
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color.Red)
+                ) { Text("Run Junk Cleaner") }
+            },
+            dismissButton = { TextButton(onClick = { showJunkConfirm = false }) { Text("Cancel") } },
+            containerColor = SleekSurface
+        )
+    }
+
+    if (showShopConfirm) {
+        AlertDialog(
+            onDismissRequest = { showShopConfirm = false },
+            title = { Text("Auto-Purchase Storefront", fontWeight = FontWeight.Black) },
+            text = {
+                Text("Scan the STW Item Shop for free items (like 0-cost X-Ray Llamas) and claim them automatically?", fontSize = 14.sp)
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.purchaseEligibleStorefrontItems()
+                        showShopConfirm = false
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = FortniteGold)
+                ) { Text("Check Shop") }
+            },
+            dismissButton = { TextButton(onClick = { showShopConfirm = false }) { Text("Cancel") } },
+            containerColor = SleekSurface
+        )
+    }
 
     Scaffold(
         containerColor = SleekBackground,
         topBar = { 
-            val summary = pennyProfile?.profileSummary
-            PennyTopBar(
+            StwTopBar(
                 title = currentSection, 
-                summary = summary,
-                onBack = { if (navStack.size > 1) navStack.removeAt(navStack.lastIndex) }
+                onBack = { if (navStack.size > 1) navStack.removeAt(navStack.lastIndex) },
+                onNavigateSettings = { navStack.add("SETTINGS") },
+                displayName = displayName
             ) 
         }
     ) { paddingValues ->
@@ -85,25 +196,40 @@ fun StwHomebaseScreen(
                 is StwUiState.Loading -> Box(Modifier.fillMaxSize(), Alignment.Center) { CircularProgressIndicator(color = SleekCyan) }
                 is StwUiState.Error -> Box(Modifier.fillMaxSize(), Alignment.Center) { Column(horizontalAlignment = Alignment.CenterHorizontally) { Icon(Icons.Default.Error, null, tint = Color.Red, modifier = Modifier.size(48.dp)); Spacer(Modifier.height(16.dp)); Text("Error: ${state.message}", color = Color.White, textAlign = TextAlign.Center); Spacer(Modifier.height(16.dp)); Button(onClick = { viewModel.refreshAll() }) { Text("Retry") } } }
                 is StwUiState.Success -> {
-                    pennyProfile?.let { data ->
+                    homebaseData?.let { data ->
                         AnimatedContent(targetState = currentSection, transitionSpec = { fadeIn() togetherWith fadeOut() }, label = "StwNav") { section ->
                             when (section) {
-                                "DASHBOARD" -> PennyDashboard(data, onNavigate = { navStack.add(it) })
-                                "ARMORY" -> PennyArmorySection(data, onNavigate = { navStack.add(it) })
-                                "PEOPLE" -> PennyPeopleSection(data, onNavigate = { navStack.add(it) })
-                                "COMMAND" -> PennyCommandSection(data, onNavigate = { navStack.add(it) })
-                                "QUESTS" -> PennyQuestsSection(data)
-                                "HEROES" -> PennyItemList(data.heroes ?: emptyMap()) { _, item -> PennyHeroRow(item) { selectedPennyHero = item } }
-                                "SURVIVORS" -> PennyItemList(data.survivors ?: emptyMap()) { _, item -> PennySurvivorRow(item) { selectedPennySurvivor = item } }
-                                "DEFENDERS" -> PennyItemList(data.defenders ?: emptyMap()) { _, item -> PennyDefenderRow(item) { selectedPennyDefender = item } }
-                                "SCHEMATICS" -> PennyItemList(data.schematics ?: emptyMap()) { _, item -> PennySchematicRow(item) { selectedPennySchematic = item } }
-                                "RESOURCES" -> PennyResourcesGrid(data.resourcesSummary?.resources ?: emptyMap())
-                                "LLAMAS" -> PennyLlamasGrid(data.resourcesSummary?.llamas ?: emptyMap())
-                                "SQUADS" -> PennySquadsList(data.squads ?: emptyMap())
-                                "LOADOUTS" -> PennyLoadoutsList(data.loadouts?.loadouts ?: emptyList(), data.loadouts?.currentLoadoutGuid) { selectedLoadout = it }
-                                "ACHIEVEMENTS" -> PennyAchievementsList(data.achievements ?: emptyMap())
-                                "EXPEDITIONS" -> PennyExpeditionsList(data.expeditions ?: emptyMap())
-                                "CONNECTED ACCOUNTS" -> PennyConnectedAccounts(data.alternateAccounts ?: emptyList())
+                                "DASHBOARD" -> StwDashboard(data, onNavigate = { navStack.add(it) }, commanderProgress, xpToNext, viewModel, onShowJunk = { showJunkConfirm = true }, onShowShop = { showShopConfirm = true }, displayName = displayName)
+                                "ARMORY" -> StwArmorySection(data, onNavigate = { navStack.add(it) })
+                                "PEOPLE" -> StwPeopleSection(data, onNavigate = { navStack.add(it) })
+                                "COMMAND" -> StwCommandSection(data, onNavigate = { navStack.add(it) })
+                                "QUESTS" -> StwDailyQuestsSection(data, viewModel, isFounder)
+                                "HEROES" -> StwItemListUnified(data.heroes.sortedByDescending { it.rating }) { _, hero -> 
+                                    StwHeroRow(hero = hero, onClick = { selectedHero = hero }) 
+                                }
+                                "SURVIVORS" -> StwItemListUnified(data.survivors.sortedByDescending { it.rating }) { _, survivor -> 
+                                    StwSurvivorRow(survivor = survivor, onClick = { selectedSurvivor = survivor }) 
+                                }
+                                "DEFENDERS" -> StwItemListUnified(data.defenders.sortedByDescending { it.rating }) { _, defender -> 
+                                    StwDefenderRow(defender = defender, onClick = { selectedDefender = defender }) 
+                                }
+                                "SCHEMATICS" -> StwItemListUnified(data.schematics.sortedByDescending { it.rating }) { _, schematic -> 
+                                    StwSchematicRow(schematic = schematic, onClick = { selectedSchematic = schematic }) 
+                                }
+                                "BACKPACK" -> StwBackpackList(data.inventory.backpack, isMultiSelectMode, { isMultiSelectMode = it }, selectedItemIds, true) { showRecycleConfirm = it.map { item -> item.name to item.id } }
+                                "EVENT BACKPACK" -> StwBackpackList(data.inventory.eventBackpack, isMultiSelectMode, { isMultiSelectMode = it }, selectedItemIds, true) { showRecycleConfirm = it.map { item -> item.name to item.id } }
+                                "VENTURE BACKPACK" -> StwBackpackList(data.inventory.ventureBackpack, isMultiSelectMode, { isMultiSelectMode = it }, selectedItemIds, false) { }
+                                "STORAGE" -> StwBackpackList(data.inventory.storage, isMultiSelectMode, { isMultiSelectMode = it }, selectedItemIds, false) { }
+                                "RESOURCES" -> StwResourcesGrid(data.resources)
+                                "LLAMAS" -> StwLlamasGrid(data.llamas)
+                                "SQUADS" -> StwSquadsList(data.squads) { survivor -> 
+                                    selectedSurvivor = survivor
+                                }
+                                "LOADOUTS" -> StwItemListUnified(data.loadouts) { _, loadout ->
+                                    StwHeroLoadoutRow(loadout) { selectedLoadout = loadout }
+                                }
+                                "ACHIEVEMENTS" -> StwAchievementsList(data.achievements)
+                                "SETTINGS" -> StwSettingsSection(viewModel, onShowJunk = { showJunkConfirm = true }, onShowShop = { showShopConfirm = true })
                             }
                         }
                     } ?: Box(Modifier.fillMaxSize(), Alignment.Center) { Text("Profile data unavailable", color = Color.White) }
@@ -115,794 +241,405 @@ fun StwHomebaseScreen(
 }
 
 @Composable
-fun PennyTopBar(title: String, summary: PennyProfileSummary?, onBack: () -> Unit) {
-    Column(modifier = Modifier.fillMaxWidth().background(SleekSurfaceVariant).statusBarsPadding()) {
-        Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-            if (title != "DASHBOARD") { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = SleekTextPrimary) } }
-            Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Black, color = SleekTextPrimary, modifier = Modifier.weight(1f))
-            summary?.let {
-                Column(horizontalAlignment = Alignment.End) {
-                    Text("PL ${it.powerLevel ?: 1.0}", color = FortniteGold, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                    Text(it.displayName ?: "", color = SleekTextMuted, fontSize = 11.sp)
+fun StwTopBar(title: String, onBack: () -> Unit, onNavigateSettings: () -> Unit, displayName: String) {
+    Column(modifier = Modifier.fillMaxWidth().background(SleekSurfaceVariant)) {
+        Row(modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+            if (title != "DASHBOARD") { IconButton(onClick = onBack, modifier = Modifier.size(32.dp)) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = SleekTextPrimary, modifier = Modifier.size(18.dp)) } }
+            else { Spacer(Modifier.width(4.dp)) }
+            Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Black, color = SleekTextPrimary, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+            
+            if (title == "DASHBOARD") {
+                IconButton(onClick = onNavigateSettings, modifier = Modifier.size(32.dp)) {
+                    Icon(Icons.Default.Settings, null, tint = SleekTextPrimary, modifier = Modifier.size(18.dp))
                 }
+            }
+            
+            Column(horizontalAlignment = Alignment.End, modifier = Modifier.padding(start = 8.dp)) {
+                Text(displayName.uppercase(), color = SleekTextMuted, fontSize = 9.sp)
             }
         }
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun PennyDashboard(data: PennyProfileResponse, onNavigate: (String) -> Unit) {
+fun StwDashboard(data: StwHomebaseData, onNavigate: (String) -> Unit, commanderProgress: Float, xpToNext: Long, viewModel: StwViewModel, onShowJunk: () -> Unit, onShowShop: () -> Unit, displayName: String) {
     Column(modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp).verticalScroll(rememberScrollState())) {
+        Spacer(Modifier.height(8.dp))
+        
+        StwSummaryHeader(data, commanderProgress, xpToNext, displayName)
         Spacer(Modifier.height(16.dp))
-        PennySummaryHeader(data)
-        Spacer(Modifier.height(16.dp))
-        PennyQuickResources(data.resourcesSummary?.resources)
+        StwQuickResources(data)
         Spacer(Modifier.height(24.dp))
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            DashboardTile(Modifier.weight(1f), "ARMORY", Icons.Default.Hardware, FortniteGold) { onNavigate("ARMORY") }
-            DashboardTile(Modifier.weight(1f), "PEOPLE", Icons.Default.Groups, SleekEmerald) { onNavigate("PEOPLE") }
+            DashboardTile(Modifier.weight(1f), "ARMORY", "file:///android_asset/armory.png", FortniteGold) { onNavigate("ARMORY") }
+            DashboardTile(Modifier.weight(1f), "PEOPLE", "file:///android_asset/people.png", SleekEmerald) { onNavigate("PEOPLE") }
         }
         Spacer(Modifier.height(12.dp))
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            DashboardTile(Modifier.weight(1f), "COMMAND", Icons.Default.Shield, SleekCyan) { onNavigate("COMMAND") }
-            DashboardTile(Modifier.weight(1f), "QUESTS", Icons.Default.Assignment, Color.Magenta) { onNavigate("QUESTS") }
+            DashboardTile(Modifier.weight(1f), "COMMAND", "file:///android_asset/command.png", SleekCyan) { onNavigate("COMMAND") }
+            DashboardTile(Modifier.weight(1f), "QUESTS", "file:///android_asset/quests.png", Color.Magenta) { onNavigate("QUESTS") }
         }
         Spacer(Modifier.height(24.dp))
-        PennyVenturesCard(data.venturesData)
+        data.ventures?.let { StwVenturesCard(it) }
         Spacer(Modifier.height(12.dp))
-        PennyFortStatsCard(data.fortStats)
+        StwFortStatsCard(data.research)
         Spacer(Modifier.height(12.dp))
-        PennyAchievementsSummary(data.achievements) { onNavigate("ACHIEVEMENTS") }
-        Spacer(Modifier.height(12.dp))
-        CommandMenuTile("CONNECTED ACCOUNTS", "External linking info", Icons.Default.Link, SleekCyan) { onNavigate("CONNECTED ACCOUNTS") }
+        StwAchievementsSummary(data.achievements) { onNavigate("ACHIEVEMENTS") }
         Spacer(Modifier.height(32.dp))
     }
 }
 
 @Composable
-fun PennySummaryHeader(data: PennyProfileResponse) {
-    val summary = data.profileSummary
+fun StwSummaryHeader(data: StwHomebaseData, commanderProgress: Float, xpToNext: Long, displayName: String) {
+    val activeLoadout = data.loadouts.find { it.isActive }
+    val commander = activeLoadout?.commander
+    val commanderLevel = data.commanderLevel
+    val cbLevel = data.collectionBook?.level ?: 0
+
     Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = SleekSurface), border = BorderStroke(1.dp, SleekSurfaceBorder)) {
-        Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(64.dp).background(Brush.radialGradient(listOf(FortniteGold.copy(alpha = 0.2f), Color.Transparent)), CircleShape).border(2.dp, FortniteGold, CircleShape), contentAlignment = Alignment.Center) {
-                Text("${summary?.powerLevel?.toInt() ?: 1}", fontSize = 24.sp, fontWeight = FontWeight.Black, color = Color.White)
-            }
-            Spacer(Modifier.width(16.dp))
-            Column {
-                Text("COMMANDER LVL ${summary?.commanderLevel ?: 1}", fontSize = 12.sp, color = SleekCyan, fontWeight = FontWeight.Bold)
-                Text(summary?.displayName?.uppercase() ?: "PLAYER", fontSize = 18.sp, fontWeight = FontWeight.Black, color = Color.White)
-                Text("Collection Book Level: ${summary?.collectionBookLevel ?: 0}", fontSize = 11.sp, color = SleekTextMuted)
-            }
-        }
-    }
-}
-
-@Composable
-fun PennyQuickResources(resources: Map<String, PennyResource>?) {
-    resources?.let { resMap ->
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            val keys = listOf("gold", "people_xp", "schematic_xp", "vbucks", "x_ray_tickets")
-            keys.forEach { key ->
-                val r = resMap[key] ?: resMap.values.find { it.name?.lowercase()?.replace(" ", "_")?.contains(key) == true }
-                r?.let {
+        Column(Modifier.padding(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.size(64.dp).clip(CircleShape).background(Brush.radialGradient(listOf(SleekCyan.copy(alpha = 0.2f), Color.Transparent))).border(2.dp, SleekCyan, CircleShape), contentAlignment = Alignment.Center) {
+                    if (commander != null) {
+                        AsyncImage(model = resolvePennyUrl(commander.iconUrl), contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+                    } else {
+                        Icon(Icons.Default.Person, null, tint = SleekTextMuted, modifier = Modifier.size(32.dp))
+                    }
+                }
+                Spacer(Modifier.width(16.dp))
+                Column {
+                    Text("COMMANDER LVL $commanderLevel", fontSize = 12.sp, color = SleekCyan, fontWeight = FontWeight.Bold)
+                    Text(displayName.uppercase(), fontSize = 18.sp, fontWeight = FontWeight.Black, color = Color.White)
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        AsyncImage(model = if (it.image?.startsWith("/") == true) "https://pennydb.net${it.image}" else it.image, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Icon(Icons.Default.Book, null, tint = FortniteGold, modifier = Modifier.size(10.dp))
                         Spacer(Modifier.width(4.dp))
-                        val qty = it.quantity ?: 0L
-                        val text = when {
-                            qty >= 1_000_000 -> "%.1fM".format(qty / 1_000_000f)
-                            qty >= 1_000 -> "%.1fK".format(qty / 1_000f)
-                            else -> qty.toString()
-                        }
-                        Text(text, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                        Text("Collection Book: $cbLevel", fontSize = 11.sp, color = SleekTextMuted)
                     }
                 }
+            }
+
+            Spacer(Modifier.height(12.dp))
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                StwMiniStat("Matches", data.matchesPlayed.toString())
+                StwMiniStat("Zones", data.zonesCompleted.toString())
+            }
+
+            Spacer(Modifier.height(12.dp))
+            LinearProgressIndicator(
+                progress = { commanderProgress },
+                modifier = Modifier.fillMaxWidth().height(4.dp).clip(CircleShape),
+                color = SleekCyan,
+                trackColor = SleekBackground
+            )
+            Row(Modifier.fillMaxWidth().padding(top = 4.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text("Commander XP Progress", fontSize = 10.sp, color = SleekTextMuted)
+                Text(if (xpToNext > 0) "Next Level: ${"%,d".format(xpToNext)} XP" else "Max Level", fontSize = 10.sp, color = SleekTextMuted)
             }
         }
     }
 }
 
 @Composable
-fun PennyVenturesCard(ventures: PennyVenturesData?) {
-    var showQuests by remember { mutableStateOf(false) }
-    ventures?.let {
-        Card(modifier = Modifier.fillMaxWidth().clickable { if (!it.quests.isNullOrEmpty()) showQuests = !showQuests }, colors = CardDefaults.cardColors(containerColor = SleekSurfaceVariant)) {
-            Column(Modifier.padding(16.dp)) {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text("VENTURES", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = SleekCyan)
-                    Text("NEXT: ${it.nextReward ?: ""}", fontSize = 10.sp, color = Color.Yellow, fontWeight = FontWeight.Bold)
-                }
-                Spacer(Modifier.height(8.dp))
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text("Level ${it.currentVentureLevel ?: 1}", color = Color.White, fontWeight = FontWeight.Bold)
-                    Text("PL ${it.venturePowerLevel ?: 1}", color = FortniteGold, fontWeight = FontWeight.Bold)
-                }
-                Spacer(Modifier.height(8.dp))
-                LinearProgressIndicator(
-                    progress = { (it.currentLevelProgress?.replace("%", "")?.toFloatOrNull() ?: 0f) / 100f },
-                    modifier = Modifier.fillMaxWidth().height(6.dp),
-                    color = SleekCyan,
-                    trackColor = SleekBackground,
-                    strokeCap = androidx.compose.ui.graphics.StrokeCap.Round
-                )
-                Text("${it.xpNeeded ?: 0} XP to level up", fontSize = 10.sp, color = SleekTextMuted, modifier = Modifier.padding(top = 4.dp))
-                
-                if (showQuests && !it.quests.isNullOrEmpty()) {
-                    Spacer(Modifier.height(16.dp))
-                    Text("VENTURE QUESTS", fontSize = 11.sp, fontWeight = FontWeight.Black, color = Color.White)
-                    val questMap = it.quests
-                    val names = questMap.keys.filter { k -> k.endsWith("_name") }.sorted()
-                    names.forEach { nameKey ->
-                        val base = nameKey.substringBefore("_name")
-                        val name = questMap[nameKey]
-                        val desc = questMap["${base}_description"]
-                        Column(Modifier.padding(vertical = 4.dp)) {
-                            Text(name ?: "", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = SleekCyan)
-                            Text(desc ?: "", fontSize = 11.sp, color = Color.White.copy(alpha = 0.8f))
-                        }
-                    }
-                }
-            }
+fun StwMiniStat(label: String, value: String, icon: String? = null) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        if (icon != null) {
+            AsyncImage(model = resolvePennyUrl(icon), contentDescription = null, modifier = Modifier.size(16.dp))
+            Spacer(Modifier.height(2.dp))
         }
+        Text(value, fontSize = 13.sp, fontWeight = FontWeight.Black, color = Color.White)
+        Text(label.uppercase(), fontSize = 8.sp, color = SleekTextMuted, fontWeight = FontWeight.Bold)
     }
 }
 
 @Composable
-fun PennyFortStatsCard(stats: Map<String, PennyFortStat>?) {
-    stats?.let {
-        Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = SleekSurface), border = BorderStroke(1.dp, SleekSurfaceBorder)) {
-            Column(Modifier.padding(16.dp)) {
-                Text("F.O.R.T. STATS", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = SleekTextMuted)
-                Spacer(Modifier.height(12.dp))
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    it.values.forEach { stat ->
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text(stat.quantity.toString(), fontSize = 16.sp, fontWeight = FontWeight.Black, color = Color.White)
-                            Text(stat.name?.uppercase() ?: "", fontSize = 9.sp, color = SleekTextMuted)
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun PennyArmorySection(data: PennyProfileResponse, onNavigate: (String) -> Unit) {
-    Column(Modifier.fillMaxSize().padding(16.dp).verticalScroll(rememberScrollState())) {
-        CommandMenuTile("SCHEMATICS", "${data.schematics?.size ?: 0} crafting plans", Icons.Default.Build, FortniteGold) { onNavigate("SCHEMATICS") }
-        CommandMenuTile("RESOURCES", "${data.resourcesSummary?.resources?.size ?: 0} items", Icons.Default.Inventory2, SleekCyan) { onNavigate("RESOURCES") }
-        CommandMenuTile("LLAMAS", "${data.resourcesSummary?.llamas?.size ?: 0} unopened loot", Icons.Default.CardGiftcard, Color.Magenta) { onNavigate("LLAMAS") }
+fun StwQuickResources(data: StwHomebaseData) {
+    Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+        ResourceItem(data.vbucks, "V-Bucks", "file:///android_asset/vbucks.png")
+        ResourceItem(data.xrayTickets, "X-Ray", "file:///android_asset/xray.png")
+        ResourceItem(data.gold, "Gold", "/images/resources/gold.png")
         
-        data.profileSummary?.unslotCost?.let { cost ->
-            Spacer(Modifier.height(16.dp))
-            Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = SleekSurface), border = BorderStroke(1.dp, SleekSurfaceBorder)) {
-                Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.AutoMirrored.Filled.Logout, null, tint = Color.Yellow)
-                    Spacer(Modifier.width(12.dp))
-                    Column {
-                        Text("UNSLOT COST", fontSize = 10.sp, color = SleekTextMuted, fontWeight = FontWeight.Bold)
-                        Text("$cost Legendary Flux", fontSize = 14.sp, color = Color.White, fontWeight = FontWeight.Bold)
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun PennyPeopleSection(data: PennyProfileResponse, onNavigate: (String) -> Unit) {
-    Column(Modifier.fillMaxSize().padding(16.dp).verticalScroll(rememberScrollState())) {
-        CommandMenuTile("HEROES", "${data.heroes?.size ?: 0} items", Icons.Default.Person, SleekCyan) { onNavigate("HEROES") }
-        CommandMenuTile("SURVIVORS", "${data.survivors?.size ?: 0} items", Icons.Default.RecordVoiceOver, SleekEmerald) { onNavigate("SURVIVORS") }
-        CommandMenuTile("DEFENDERS", "${data.defenders?.size ?: 0} items", Icons.Default.Shield, Color.LightGray) { onNavigate("DEFENDERS") }
-        CommandMenuTile("SQUADS", "Manage survivor teams", Icons.Default.Groups, SleekEmerald) { onNavigate("SQUADS") }
+        val peopleXp = data.resources.find { it.templateId.lowercase().contains("peoplexp") }?.quantity ?: 0L
+        val schematicXp = data.resources.find { it.templateId.lowercase().contains("schematicxp") }?.quantity ?: 0L
         
-        data.survivorBonusOverview?.let { bonus ->
+        ResourceItem(peopleXp, "People XP", "/images/resources/hero_xp.png")
+        ResourceItem(schematicXp, "Schematic XP", "/images/resources/schematic_xp.png")
+    }
+}
+
+@Composable
+fun ResourceItem(qty: Long, label: String, icon: String) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        AsyncImage(model = resolvePennyUrl(icon), contentDescription = null, modifier = Modifier.size(16.dp))
+        Spacer(Modifier.width(4.dp))
+        val text = when {
+            qty >= 1_000_000 -> "%.1fM".format(qty / 1_000_000f)
+            qty >= 1_000 -> "%.1fK".format(qty / 1_000f)
+            else -> qty.toString()
+        }
+        Text(text, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
+    }
+}
+
+@Composable
+fun StwVenturesCard(ventures: StwVentures) {
+    Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = SleekSurfaceVariant)) {
+        Column(Modifier.padding(16.dp)) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text("VENTURES", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = SleekCyan)
+                Text(ventures.seasonName.uppercase(), fontSize = 10.sp, color = Color.Yellow, fontWeight = FontWeight.Bold)
+            }
+            Spacer(Modifier.height(8.dp))
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text("Level ${ventures.level}", color = Color.White, fontWeight = FontWeight.Bold)
+                Text("${ventures.rewardsClaimed} Rewards", color = FortniteGold, fontWeight = FontWeight.Bold)
+            }
+            Spacer(Modifier.height(8.dp))
+            val progress = if (ventures.nextLevelXp > 0) ventures.xp.toFloat() / ventures.nextLevelXp.toFloat() else 1f
+            LinearProgressIndicator(
+                progress = { progress },
+                modifier = Modifier.fillMaxWidth().height(6.dp),
+                color = SleekCyan,
+                trackColor = SleekBackground,
+                strokeCap = androidx.compose.ui.graphics.StrokeCap.Round
+            )
+            Text("${"%,d".format(ventures.nextLevelXp - ventures.xp)} XP to level up", fontSize = 10.sp, color = SleekTextMuted, modifier = Modifier.padding(top = 4.dp))
+        }
+    }
+}
+
+@Composable
+fun StwFortStatsCard(research: StwResearch) {
+    Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = SleekSurface), border = BorderStroke(1.dp, SleekSurfaceBorder)) {
+        Column(Modifier.padding(16.dp)) {
+            Text("F.O.R.T. STATS", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = SleekTextMuted)
             Spacer(Modifier.height(16.dp))
-            Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = SleekSurface), border = BorderStroke(1.dp, SleekSurfaceBorder)) {
-                Column(Modifier.padding(16.dp)) {
-                    Text("ACTIVE BONUSES", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = SleekCyan)
-                    Spacer(Modifier.height(12.dp))
-                    bonus.activeBonuses?.forEach { b ->
-                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text(b.bonusName ?: "", fontSize = 13.sp, color = Color.White)
-                            Text("+${b.totalBonusPct}%", fontSize = 13.sp, color = SleekEmerald, fontWeight = FontWeight.Bold)
-                        }
-                        Spacer(Modifier.height(4.dp))
-                    }
-                }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                StatTile("Fortitude", research.fortitude, "/images/base/fortitude.png")
+                StatTile("Offense", research.offense, "/images/base/offense.png")
+                StatTile("Resistance", research.resistance, "/images/base/resistance.png")
+                StatTile("Tech", research.technology, "/images/base/tech.png")
             }
         }
     }
 }
 
 @Composable
-fun PennyCommandSection(data: PennyProfileResponse, onNavigate: (String) -> Unit) {
-    Column(Modifier.fillMaxSize().padding(16.dp).verticalScroll(rememberScrollState())) {
-        CommandMenuTile("LOADOUTS", "${data.loadouts?.loadouts?.size ?: 0} hero loadouts", Icons.Default.ViewCarousel, SleekCyan) { onNavigate("LOADOUTS") }
-        CommandMenuTile("EXPEDITIONS", "${data.expeditions?.size ?: 0} available", Icons.Default.Explore, Color.Yellow) { onNavigate("EXPEDITIONS") }
+fun StatTile(label: String, value: Int, icon: String) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        AsyncImage(model = resolvePennyUrl(icon), contentDescription = null, modifier = Modifier.size(24.dp))
+        Spacer(Modifier.height(4.dp))
+        Text(value.toString(), fontSize = 16.sp, fontWeight = FontWeight.Black, color = Color.White)
+        Text(label.uppercase(), fontSize = 8.sp, color = SleekTextMuted, fontWeight = FontWeight.Bold)
     }
 }
 
 @Composable
-fun PennyQuestsSection(data: PennyProfileResponse) {
-    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        val categories = listOf(
-            "DAILY MISSIONS" to data.dailyMissionData?.values?.toList(),
-            "ACTIVE QUESTS" to data.activeQuests?.values?.toList(),
-            "VENTURE QUESTS" to data.liveVenturesQuests?.values?.toList(),
-            "WEEKLY QUESTS" to data.liveWeeklyQuests?.values?.toList(),
-            "WARGAMES" to data.liveWargamesQuests?.values?.toList(),
-            "DUNGEONS" to data.liveDungeonsQuests?.values?.toList(),
-            "STORM SHIELD" to data.liveStormshieldQuests?.values?.toList(),
-            "COMPLETED (RECENT)" to data.completedQuests?.values?.take(10)
-        )
+fun StwArmorySection(data: StwHomebaseData, onNavigate: (String) -> Unit) {
+    Column(Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 8.dp).verticalScroll(rememberScrollState())) {
+        CommandMenuTile("SCHEMATICS", "${data.schematics.size} schematics", "file:///android_asset/schematics.png", FortniteGold) { onNavigate("SCHEMATICS") }
+        CommandMenuTile("BACKPACK", "Carried items and materials", "file:///android_asset/backpack.png", SleekCyan) { onNavigate("BACKPACK") }
+        CommandMenuTile("VENTURE BACKPACK", "Venture season items", "file:///android_asset/ventures.png", Color(0xFFFFC107)) { onNavigate("VENTURE BACKPACK") }
+        CommandMenuTile("STORAGE", "Storm Shield storage", "file:///android_asset/storage.png", SleekEmerald) { onNavigate("STORAGE") }
+    }
+}
 
-        categories.forEach { (title, list) ->
-            if (!list.isNullOrEmpty()) {
-                item { Text(title, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = SleekCyan, modifier = Modifier.padding(top = 8.dp)) }
-                items(list) { item ->
-                    when (item) {
-                        is PennyDailyMission -> PennyDailyMissionRow(item)
-                        is PennyQuestItem -> PennyQuestItemRow(item, title.contains("COMPLETED"))
-                    }
-                }
+@Composable
+fun StwPeopleSection(data: StwHomebaseData, onNavigate: (String) -> Unit) {
+    Column(Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 8.dp).verticalScroll(rememberScrollState())) {
+        CommandMenuTile("HEROES", "${data.heroes.size} items", "file:///android_asset/heroes.png", SleekCyan) { onNavigate("HEROES") }
+        CommandMenuTile("SURVIVORS", "${data.survivors.size} items", "file:///android_asset/survivors.png", SleekEmerald) { onNavigate("SURVIVORS") }
+        CommandMenuTile("DEFENDERS", "${data.defenders.size} items", "file:///android_asset/defenders.png", Color.LightGray) { onNavigate("DEFENDERS") }
+    }
+}
+
+@Composable
+fun StwCommandSection(data: StwHomebaseData, onNavigate: (String) -> Unit) {
+    Column(Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 8.dp).verticalScroll(rememberScrollState())) {
+        CommandMenuTile("LOADOUTS", "${data.loadouts.size} hero loadouts", "file:///android_asset/command.png", SleekCyan) { onNavigate("LOADOUTS") }
+        CommandMenuTile("SQUADS", "Manage survivor teams", "file:///android_asset/survivors.png", SleekEmerald) { onNavigate("SQUADS") }
+    }
+}
+
+@Composable
+fun StwDailyQuestsSection(data: StwHomebaseData, viewModel: StwViewModel, isFounder: Boolean) {
+    val dailyQuests = data.dailyQuests
+
+    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        if (dailyQuests.isNotEmpty()) {
+            item { Text("DAILY QUESTS", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = SleekCyan, modifier = Modifier.padding(top = 8.dp)) }
+            items(dailyQuests) { quest ->
+                StwQuestItemRow(quest, viewModel, isFounder)
             }
+        } else {
+            item { Box(Modifier.fillMaxWidth().padding(32.dp), Alignment.Center) { Text("No daily quests active", color = SleekTextMuted) } }
         }
     }
 }
 
 @Composable
-fun PennyQuestItemRow(quest: PennyQuestItem, isCompleted: Boolean) {
+fun StwQuestItemRow(quest: FortniteQuest, viewModel: StwViewModel, isFounder: Boolean = false) {
     Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = SleekSurface)) {
         Column(Modifier.padding(12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(if (isCompleted) Icons.Default.CheckCircle else Icons.Default.RadioButtonUnchecked, null, tint = if (isCompleted) SleekEmerald else SleekTextMuted)
+                Icon(if (quest.isCompleted) Icons.Default.CheckCircle else Icons.Default.RadioButtonUnchecked, null, tint = if (quest.isCompleted) SleekEmerald else SleekTextMuted)
                 Spacer(Modifier.width(12.dp))
-                Text(quest.name ?: "Unnamed Quest", fontWeight = FontWeight.Bold, color = Color.White)
-            }
-            quest.description?.let { desc ->
-                Text(desc, fontSize = 11.sp, color = SleekTextMuted, modifier = Modifier.padding(start = 36.dp, top = 4.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(quest.name, fontWeight = FontWeight.Bold, color = Color.White)
+                    quest.description?.let { Text(it, fontSize = 11.sp, color = SleekTextMuted) }
+                }
+
+                if (quest.rewardMtx > 0) {
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = 8.dp)) {
+                        if (isFounder) {
+                            AsyncImage(model = "file:///android_asset/vbucks.png", contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.width(2.dp))
+                        }
+                        AsyncImage(model = "file:///android_asset/xray.png", contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text("${quest.rewardMtx}", color = Color.White, fontWeight = FontWeight.Black, fontSize = 13.sp)
+                    }
+                }
                 
-                // Progress extraction logic
-                val regex = Regex("\\[(\\d+)/(\\d+)]")
-                val match = regex.find(desc)
-                if (match != null) {
-                    val current = match.groupValues[1].toFloatOrNull() ?: 0f
-                    val total = match.groupValues[2].toFloatOrNull() ?: 1f
-                    Spacer(Modifier.height(8.dp))
-                    LinearProgressIndicator(
-                        progress = { if (total > 0) current / total else 0f },
-                        modifier = Modifier.fillMaxWidth().height(4.dp).padding(start = 36.dp),
-                        color = SleekCyan,
-                        trackColor = SleekBackground,
-                        strokeCap = androidx.compose.ui.graphics.StrokeCap.Round
-                    )
+                if (!quest.isCompleted) {
+                    IconButton(onClick = { viewModel.rerollDailyQuest(quest.id) }) {
+                        Icon(Icons.Default.Refresh, null, tint = SleekCyan, modifier = Modifier.size(18.dp))
+                    }
                 }
             }
-            if (!isCompleted && !quest.completionData.isNullOrEmpty()) {
-                Spacer(Modifier.height(4.dp))
-                quest.completionData.forEach { (k, v) ->
-                    Text("• ${k.replace("completion_", "").replace("_", " ").uppercase()}: $v", fontSize = 10.sp, color = SleekCyan, modifier = Modifier.padding(start = 36.dp))
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun <T> PennyItemList(items: Map<String, T>, rowContent: @Composable (String, T) -> Unit) {
-    if (items.isEmpty()) Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text("No items found", color = SleekTextMuted) }
-    else {
-        val sortedList = items.entries.toList().sortedByDescending { 
-            when (val v = it.value) {
-                is PennyHero -> v.powerLevel ?: 0
-                is PennySchematic -> v.powerLevel ?: 0
-                is PennySurvivor -> v.powerLevel ?: 0
-                is PennyDefender -> v.powerLevel ?: 0
-                else -> 0
-            }
-        }
-        LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) { 
-            items(sortedList) { entry -> rowContent(entry.key, entry.value) } 
-        }
-    }
-}
-
-@Composable
-fun PennyHeroRow(hero: PennyHero, onClick: () -> Unit) { 
-    val displayName = if (hero.name == null || hero.name == "Hero") hero.templateId ?: "Hero" else hero.name
-    PennyItemRowTemplate(
-        name = displayName, 
-        subtext = "PL ${hero.powerLevel ?: 1} • Lvl ${hero.attributes?.level ?: 1} ${hero.heroClass ?: ""}", 
-        rarity = hero.rarity ?: "Common",
-        imageUrl = hero.imageLink,
-        classIcon = hero.heroClassImage,
-        onClick = onClick
-    ) 
-}
-
-@Composable
-fun PennySchematicRow(schematic: PennySchematic, onClick: () -> Unit) { 
-    val displayName = if (schematic.name == null || schematic.name == "Schematic") schematic.templateId ?: "Schematic" else schematic.name
-    PennyItemRowTemplate(
-        name = displayName, 
-        subtext = "PL ${schematic.powerLevel ?: 1}", 
-        rarity = schematic.rarity ?: "Common",
-        imageUrl = schematic.imageLink,
-        classIcon = schematic.classImage,
-        onClick = onClick
-    ) 
-}
-
-@Composable
-fun PennySurvivorRow(survivor: PennySurvivor, onClick: () -> Unit) { 
-    val displayName = if (survivor.name == null || survivor.name == "Survivor") survivor.templateId ?: "Survivor" else survivor.name
-    PennyItemRowTemplate(
-        name = displayName, 
-        subtext = "PL ${survivor.powerLevel ?: 1} • ${survivor.personality ?: ""}", 
-        rarity = survivor.rarity ?: "Common",
-        imageUrl = survivor.imageLink,
-        extraIcon = survivor.personalityImage,
-        onClick = onClick
-    ) 
-}
-
-@Composable
-fun PennyDefenderRow(defender: PennyDefender, onClick: () -> Unit) { 
-    val displayName = if (defender.name == null || defender.name == "Defender") defender.templateId ?: "Defender" else defender.name
-    PennyItemRowTemplate(
-        name = displayName, 
-        subtext = "PL ${defender.powerLevel ?: 1} • ${defender.defenderClass ?: ""}", 
-        rarity = defender.rarity ?: "Common",
-        imageUrl = defender.imageLink,
-        classIcon = defender.classImage,
-        onClick = onClick
-    ) 
-}
-
-@Composable
-fun PennyItemRowTemplate(
-    name: String, 
-    subtext: String, 
-    rarity: String, 
-    imageUrl: String?, 
-    classIcon: String? = null,
-    extraIcon: String? = null,
-    onClick: () -> Unit
-) {
-    Card(modifier = Modifier.fillMaxWidth().clickable { onClick() }, colors = CardDefaults.cardColors(containerColor = SleekSurface), shape = RoundedCornerShape(8.dp), border = BorderStroke(1.dp, SleekSurfaceBorder)) {
-        Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(48.dp).clip(RoundedCornerShape(8.dp)).background(getRarityColor(rarity).copy(alpha = 0.1f)).border(1.dp, getRarityColor(rarity).copy(alpha = 0.5f), RoundedCornerShape(8.dp)), contentAlignment = Alignment.Center) {
-                AsyncImage(model = imageUrl, contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
-            }
-            Spacer(Modifier.width(12.dp))
-            if (classIcon != null) {
-                AsyncImage(model = classIcon, contentDescription = null, modifier = Modifier.size(20.dp).alpha(0.8f))
-                Spacer(Modifier.width(8.dp))
-            }
-            Column(Modifier.weight(1f)) {
-                Text(name, fontWeight = FontWeight.Bold, color = SleekTextPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(subtext, fontSize = 12.sp, color = SleekTextMuted)
-            }
-            if (extraIcon != null) {
-                AsyncImage(model = extraIcon, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(8.dp))
-            }
-            Text(rarity.take(3).uppercase(), fontSize = 10.sp, fontWeight = FontWeight.Black, color = getRarityColor(rarity))
-        }
-    }
-}
-
-@Composable
-fun PennyDailyMissionRow(mission: PennyDailyMission) {
-    Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = SleekSurfaceVariant)) {
-        Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-            AsyncImage(model = if (mission.dailyReward?.startsWith("/") == true) "https://pennydb.net${mission.dailyReward}" else mission.dailyReward, contentDescription = null, modifier = Modifier.size(32.dp))
-            Spacer(Modifier.width(12.dp))
-            Column(Modifier.weight(1f)) {
-                Text(mission.name ?: "", fontWeight = FontWeight.Bold, color = Color.White)
-                Text(mission.description ?: "", fontSize = 11.sp, color = SleekTextMuted)
-                Spacer(Modifier.height(4.dp))
+            
+            if (!quest.isCompleted && quest.target > 0) {
+                Spacer(Modifier.height(12.dp))
                 LinearProgressIndicator(
-                    progress = { if ((mission.totalRequired ?: 1) > 0) (mission.currentTotal ?: 0).toFloat() / (mission.totalRequired ?: 1).toFloat() else 0f },
-                    modifier = Modifier.fillMaxWidth().height(4.dp),
+                    progress = { quest.progress.toFloat() / quest.target.toFloat() },
+                    modifier = Modifier.fillMaxWidth().height(4.dp).padding(start = 36.dp),
                     color = SleekCyan,
                     trackColor = SleekBackground,
                     strokeCap = androidx.compose.ui.graphics.StrokeCap.Round
                 )
-                Text("${mission.currentTotal} / ${mission.totalRequired}", fontSize = 10.sp, color = Color.White, modifier = Modifier.padding(top = 2.dp))
+                Text("${quest.progress} / ${quest.target}", fontSize = 10.sp, color = Color.White, modifier = Modifier.padding(start = 36.dp, top = 2.dp))
             }
         }
     }
 }
 
 @Composable
-fun PennyResourcesGrid(resources: Map<String, PennyResource>) {
-    val list = resources.values.filter { (it.quantity ?: 0) > 0 }.toList().sortedByDescending { it.quantity }
-    LazyVerticalGrid(columns = GridCells.Fixed(3), contentPadding = PaddingValues(16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        items(list) { res ->
-            Card(colors = CardDefaults.cardColors(containerColor = SleekSurface), border = BorderStroke(1.dp, SleekSurfaceBorder)) {
-                Column(Modifier.padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                    AsyncImage(model = if (res.image?.startsWith("/") == true) "https://pennydb.net${res.image}" else res.image, contentDescription = null, modifier = Modifier.size(32.dp))
-                    val qty = res.quantity ?: 0L
-                    val text = when {
-                        qty >= 1_000_000 -> "%.1fM".format(qty / 1_000_000f)
-                        qty >= 1_000 -> "%.1fK".format(qty / 1_000f)
-                        else -> qty.toString()
-                    }
-                    Text(text, fontWeight = FontWeight.Black, fontSize = 14.sp, color = Color.White)
-                    Text(res.name ?: "", fontSize = 8.sp, color = SleekTextMuted, textAlign = TextAlign.Center, maxLines = 1)
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun PennyLlamasGrid(llamas: Map<String, PennyResource>) {
-    val list = llamas.values.filter { (it.quantity ?: 0) > 0 }.toList()
-    if (list.isEmpty()) Box(Modifier.fillMaxSize(), Alignment.Center) { Text("No unopened llamas", color = SleekTextMuted) }
+fun <T> StwItemListUnified(list: List<T>, itemContent: @Composable (Int, T) -> Unit) {
+    if (list.isEmpty()) Box(Modifier.fillMaxSize(), Alignment.Center) { Text("No items found", color = SleekTextMuted) }
     else {
-        LazyVerticalGrid(columns = GridCells.Fixed(3), contentPadding = PaddingValues(16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            items(list) { llama ->
-                Card(colors = CardDefaults.cardColors(containerColor = SleekSurface), border = BorderStroke(1.dp, SleekSurfaceBorder)) {
-                    Column(Modifier.padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                        AsyncImage(model = if (llama.image?.startsWith("/") == true) "https://pennydb.net${llama.image}" else llama.image, contentDescription = null, modifier = Modifier.size(48.dp))
-                        Text(llama.quantity.toString(), fontWeight = FontWeight.Black, fontSize = 14.sp, color = Color.White)
-                        Text(llama.name ?: "", fontSize = 9.sp, color = Color.White, textAlign = TextAlign.Center, maxLines = 1)
-                    }
-                }
-            }
+        LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            itemsIndexed(list) { index, item -> itemContent(index, item) }
         }
     }
 }
 
 @Composable
-fun PennySquadsList(squads: Map<String, PennySquad>) {
-    if (squads.isEmpty()) Box(Modifier.fillMaxSize(), Alignment.Center) { Text("No squads found", color = SleekTextMuted) }
-    else {
-        LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            items(squads.values.toList()) { squad ->
-                Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = SleekSurface), border = BorderStroke(1.dp, SleekSurfaceBorder)) {
-                    Column(Modifier.padding(16.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(squad.squadName ?: "Unnamed Squad", fontWeight = FontWeight.Black, color = Color.White, modifier = Modifier.weight(1f))
-                            Text("${squad.workerCount}/7", fontSize = 11.sp, color = SleekTextMuted)
-                        }
-                        Spacer(Modifier.height(8.dp))
-                        Text("Lead: ${squad.leadSurvivor?.name ?: "None"}", color = getRarityColor(squad.leadSurvivor?.rarity ?: "Common"), fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                        squad.activeBonuses?.forEach { bonus ->
-                            Text("• ${bonus.bonusName}: +${bonus.totalBonusPct}%", fontSize = 11.sp, color = SleekEmerald)
+fun StwBackpackList(
+    items: List<StwInventoryItem>,
+    isMultiSelectMode: Boolean,
+    onMultiSelectModeChange: (Boolean) -> Unit,
+    selectedItems: MutableList<String>,
+    canRecycle: Boolean = true,
+    onRecycleRequest: (List<StwInventoryItem>) -> Unit
+) {
+    var selectedTab by remember { mutableStateOf("RANGED") }
+    val visibleItems = items.filter { !StwMetadataRepository.isInternalItem(it.templateId) }
+    val ranged = visibleItems.filter { it.type == "Ranged" }
+    val melee = visibleItems.filter { it.type == "Melee" }
+    val traps = visibleItems.filter { it.type == "Trap" }
+    val resources = visibleItems.filter { it.type == "Material" || it.type == "Item" || it.type == "Ammo" }
+
+    Column(Modifier.fillMaxSize()) {
+        Row(Modifier.fillMaxWidth().background(SleekSurfaceVariant).padding(vertical = 4.dp), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
+             BackpackTabIcon(Icons.Default.AdsClick, "RANGED", selectedTab == "RANGED") { selectedTab = "RANGED" }
+             BackpackTabIcon(Icons.Default.Hardware, "MELEE", selectedTab == "MELEE") { selectedTab = "MELEE" }
+             BackpackTabIcon(Icons.Default.GridView, "TRAPS", selectedTab == "TRAPS") { selectedTab = "TRAPS" }
+             BackpackTabIcon(Icons.Default.Inventory2, "RESOURCES", selectedTab == "RESOURCES") { selectedTab = "RESOURCES" }
+        }
+
+        if (isMultiSelectMode || selectedItems.isNotEmpty()) {
+            Surface(color = SleekCyan.copy(alpha = 0.1f), modifier = Modifier.fillMaxWidth()) {
+                Row(Modifier.padding(horizontal = 16.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text("${selectedItems.size} items selected", color = SleekCyan, fontWeight = FontWeight.Bold, fontSize = 11.sp, modifier = Modifier.weight(1f))
+                    if (canRecycle) {
+                        TextButton(onClick = { onRecycleRequest(visibleItems.filter { it.id in selectedItems }) }) {
+                            Text("RECYCLE", color = Color.Red, fontWeight = FontWeight.Black, fontSize = 11.sp)
                         }
                     }
+                    IconButton(onClick = { 
+                        onMultiSelectModeChange(false)
+                        selectedItems.clear()
+                    }) { Icon(Icons.Default.Close, null, tint = SleekTextMuted, modifier = Modifier.size(16.dp)) }
                 }
+            }
+        }
+        
+        val filteredList = when(selectedTab) {
+            "RANGED" -> ranged
+            "MELEE" -> melee
+            "TRAPS" -> traps
+            "RESOURCES" -> resources
+            else -> emptyList()
+        }.sortedWith(compareByDescending<StwInventoryItem> { it.rating }.thenByDescending { it.level }.thenByDescending { it.quantity })
+
+        LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            items(filteredList) { item ->
+                StwBackpackRow(
+                    item = item,
+                    isSelected = selectedItems.contains(item.id),
+                    isMultiSelectMode = isMultiSelectMode,
+                    canRecycle = canRecycle,
+                    onToggleSelect = { if (selectedItems.contains(item.id)) selectedItems.remove(item.id) else selectedItems.add(item.id) },
+                    onLongPress = { if (canRecycle) { onMultiSelectModeChange(true); selectedItems.add(item.id) } },
+                    onRecycleClick = { onRecycleRequest(listOf(item)) }
+                )
             }
         }
     }
 }
 
 @Composable
-fun PennyConnectedAccounts(accounts: List<PennyAlternateAccount>) {
-    if (accounts.isEmpty()) Box(Modifier.fillMaxSize(), Alignment.Center) { Text("No connected accounts found", color = SleekTextMuted) }
-    else {
-        LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            items(accounts) { acc ->
-                Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = SleekSurface)) {
-                    Column(Modifier.padding(16.dp)) {
-                        Text(acc.displayName ?: "Epic Player", fontWeight = FontWeight.Black, color = Color.White, fontSize = 16.sp)
-                        Spacer(Modifier.height(8.dp))
-                        acc.externalAuths?.forEach { (type, auth) ->
-                            Row(Modifier.padding(vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Icon(when(type) { "psn" -> Icons.Default.Gamepad; "xbl" -> Icons.Default.Gamepad; "steam" -> Icons.Default.Computer; "nintendo" -> Icons.Default.Gamepad; else -> Icons.Default.Link }, null, tint = SleekCyan, modifier = Modifier.size(16.dp))
-                                Spacer(Modifier.width(8.dp))
-                                Text("${type.uppercase()}: ${auth.externalDisplayName ?: "Connected"}", fontSize = 13.sp, color = SleekTextPrimary)
-                            }
-                        }
-                    }
-                }
-            }
-        }
+fun BackpackTabIcon(icon: ImageVector, label: String, isSelected: Boolean, onClick: () -> Unit) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.clickable { onClick() }.alpha(if (isSelected) 1f else 0.4f)) {
+        Icon(icon, null, tint = if (isSelected) SleekCyan else Color.White, modifier = Modifier.size(24.dp))
+        Spacer(Modifier.height(4.dp))
+        Text(label, fontSize = 9.sp, fontWeight = FontWeight.Black, color = if (isSelected) SleekCyan else Color.White)
     }
 }
 
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
-fun PennyLoadoutsList(loadouts: List<PennyLoadout>, currentGuid: String?, onClick: (PennyLoadout) -> Unit) {
-    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        items(loadouts) { loadout ->
-            val isActive = loadout.guid == currentGuid
-            Card(modifier = Modifier.fillMaxWidth().clickable { onClick(loadout) }, colors = CardDefaults.cardColors(containerColor = SleekSurface), border = BorderStroke(1.dp, if (isActive) SleekCyan else SleekSurfaceBorder)) {
-                Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                    AsyncImage(model = loadout.commander?.imageLink, contentDescription = null, modifier = Modifier.size(48.dp).clip(CircleShape))
-                    Spacer(Modifier.width(16.dp))
-                    Column(Modifier.weight(1f)) {
-                        Text(loadout.commander?.name ?: "No Commander", fontWeight = FontWeight.Black, color = Color.White)
-                        Text(loadout.teamPerk ?: "No Team Perk", fontSize = 12.sp, color = SleekCyan)
-                    }
-                    if (isActive) Box(Modifier.background(SleekCyan, RoundedCornerShape(4.dp)).padding(horizontal = 8.dp, vertical = 2.dp)) { Text("ACTIVE", fontSize = 9.sp, fontWeight = FontWeight.Black, color = Color.Black) }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun PennyHeroDetailContent(hero: PennyHero) {
-    Column(Modifier.fillMaxWidth().padding(24.dp).verticalScroll(rememberScrollState())) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            AsyncImage(model = hero.imageLink, contentDescription = null, modifier = Modifier.size(80.dp).clip(RoundedCornerShape(12.dp)))
-            Spacer(Modifier.width(16.dp))
-            Column {
-                val name = if (hero.name == null || hero.name == "Hero") hero.templateId ?: "Hero" else hero.name
-                Text(name, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Black, color = SleekTextPrimary)
-                Text("${hero.rarity?.uppercase()} ${hero.heroClass?.uppercase()}", color = getRarityColor(hero.rarity ?: ""), fontWeight = FontWeight.Bold, fontSize = 12.sp)
-            }
-        }
-        Spacer(Modifier.height(24.dp))
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            DetailStatCard("Level", hero.attributes?.level.toString(), Modifier.weight(1f))
-            DetailStatCard("Power", hero.powerLevel.toString(), Modifier.weight(1f))
-        }
-        Spacer(Modifier.height(24.dp))
-        Text("PERKS", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = SleekCyan)
-        hero.heroPerks?.commanderPerk?.let { PennyPerkItem(it, "Commander") }
-        hero.heroPerks?.subCommanderPerk?.let { PennyPerkItem(it, "Standard") }
-        Spacer(Modifier.height(16.dp))
-        Text("ABILITIES", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = SleekCyan)
-        hero.heroPerks?.abilities?.forEach { ability ->
-            Row(Modifier.padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                AsyncImage(model = ability.imageLink, contentDescription = null, modifier = Modifier.size(24.dp))
+fun StwBackpackRow(
+    item: StwInventoryItem,
+    isSelected: Boolean,
+    isMultiSelectMode: Boolean,
+    canRecycle: Boolean = true,
+    onToggleSelect: () -> Unit,
+    onLongPress: () -> Unit,
+    onRecycleClick: () -> Unit
+) {
+    Card(modifier = Modifier.fillMaxWidth().combinedClickable(onClick = { if (isMultiSelectMode) onToggleSelect() }, onLongClick = onLongPress), colors = CardDefaults.cardColors(containerColor = if (isSelected) SleekCyan.copy(alpha = 0.1f) else SleekSurface), shape = RoundedCornerShape(8.dp), border = BorderStroke(1.dp, if (isSelected) SleekCyan else SleekSurfaceBorder)) {
+        Row(Modifier.padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
+            if (isMultiSelectMode) {
+                Checkbox(checked = isSelected, onCheckedChange = { onToggleSelect() }, colors = CheckboxDefaults.colors(checkedColor = SleekCyan, uncheckedColor = SleekTextMuted))
                 Spacer(Modifier.width(8.dp))
-                Text(ability.name ?: "", color = Color.White, fontSize = 14.sp)
             }
-        }
-        Spacer(Modifier.height(16.dp))
-        Text("DESCRIPTION", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = SleekCyan)
-        Text(hero.description ?: "No description available", color = Color.White, fontSize = 13.sp)
-        Spacer(Modifier.height(32.dp))
-    }
-}
-
-@Composable
-fun PennyPerkItem(perk: PennyPerk, type: String) {
-    Row(Modifier.padding(vertical = 8.dp).fillMaxWidth()) {
-        AsyncImage(model = perk.imageLink, contentDescription = null, modifier = Modifier.size(40.dp))
-        Spacer(Modifier.width(12.dp))
-        Column {
-            Text("$type: ${perk.name}", fontWeight = FontWeight.Bold, color = Color.White)
-            Text(perk.description ?: "", fontSize = 12.sp, color = SleekTextMuted)
-        }
-    }
-}
-
-@Composable
-fun PennySchematicDetailContent(schematic: PennySchematic) {
-    Column(Modifier.fillMaxWidth().padding(24.dp).verticalScroll(rememberScrollState())) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            AsyncImage(model = schematic.imageLink, contentDescription = null, modifier = Modifier.size(80.dp).clip(RoundedCornerShape(12.dp)))
-            Spacer(Modifier.width(16.dp))
-            Column {
-                val name = if (schematic.name == null || schematic.name == "Schematic") schematic.templateId ?: "Schematic" else schematic.name
-                Text(name, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Black, color = SleekTextPrimary)
-                Text(schematic.rarity?.uppercase() ?: "", color = getRarityColor(schematic.rarity ?: ""), fontWeight = FontWeight.Bold, fontSize = 12.sp)
+            Box(Modifier.size(44.dp).clip(RoundedCornerShape(8.dp)).background(getRarityColor(item.rarity).copy(alpha = 0.1f)).border(1.dp, getRarityColor(item.rarity).copy(alpha = 0.5f), RoundedCornerShape(8.dp)), contentAlignment = Alignment.Center) {
+                AsyncImage(model = resolvePennyUrl(item.iconUrl), contentDescription = null, modifier = Modifier.fillMaxSize().padding(4.dp), contentScale = ContentScale.Fit)
             }
-        }
-        Spacer(Modifier.height(24.dp))
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            DetailStatCard("Power", schematic.powerLevel.toString(), Modifier.weight(1f))
-            DetailStatCard("Level", schematic.attributes?.level.toString(), Modifier.weight(1f))
-        }
-        Spacer(Modifier.height(24.dp))
-        Text("STATS", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = SleekCyan)
-        schematic.stats?.forEach { (k, v) ->
-            if (v is Number || v is String) {
-                Row(Modifier.padding(vertical = 2.dp).fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text(k.replace(Regex("([a-z])([A-Z])"), "$1 $2"), color = SleekTextMuted, fontSize = 12.sp)
-                    Text(v.toString(), color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text(item.name, fontWeight = FontWeight.Bold, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis, fontSize = 14.sp)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("Lvl ${item.level}", fontSize = 10.sp, color = SleekTextMuted)
+                    if (item.rating > 0) { Spacer(Modifier.width(8.dp)); Text("PL ${item.rating}", fontSize = 10.sp, color = FortniteGold, fontWeight = FontWeight.Bold) }
                 }
             }
-        }
-        Spacer(Modifier.height(16.dp))
-        Text("PERKS", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = SleekCyan)
-        schematic.perks?.forEach { perk ->
-            Row(Modifier.padding(vertical = 4.dp).fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text(perk.name ?: "", color = Color.White, fontSize = 14.sp)
-                Text(perk.rarity ?: "", color = getRarityColor(perk.rarity ?: "Common"), fontSize = 12.sp, fontWeight = FontWeight.Bold)
+            if (!isMultiSelectMode && canRecycle) { IconButton(onClick = onRecycleClick) { Icon(Icons.Default.Delete, "Recycle", tint = Color.Red.copy(alpha = 0.6f), modifier = Modifier.size(18.dp)) } }
+            Column(horizontalAlignment = Alignment.End) {
+                Text("x${item.quantity}", fontWeight = FontWeight.Black, color = SleekCyan, fontSize = 13.sp)
+                item.durability?.let { val pct = it.coerceIn(0f, 100f).toInt(); Text("$pct%", fontSize = 9.sp, color = if (pct < 20) Color.Red else SleekEmerald) }
             }
-        }
-        Spacer(Modifier.height(16.dp))
-        Text("CRAFTING COST", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = SleekCyan)
-        schematic.craftingCosts?.forEach { cost ->
-            Row(Modifier.padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                AsyncImage(model = if (cost.image?.startsWith("/") == true) "https://pennydb.net${cost.image}" else cost.image, contentDescription = null, modifier = Modifier.size(24.dp))
-                Spacer(Modifier.width(8.dp))
-                Text("${cost.name}: ${cost.quantity}", color = Color.White, fontSize = 14.sp)
-            }
-        }
-        Spacer(Modifier.height(32.dp))
-    }
-}
-
-@Composable
-fun PennySurvivorDetailContent(survivor: PennySurvivor) {
-    Column(Modifier.fillMaxWidth().padding(24.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            AsyncImage(model = survivor.imageLink, contentDescription = null, modifier = Modifier.size(80.dp).clip(RoundedCornerShape(12.dp)))
-            Spacer(Modifier.width(16.dp))
-            Column {
-                val name = if (survivor.name == null || survivor.name == "Survivor") survivor.templateId ?: "Survivor" else survivor.name
-                Text(name, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Black, color = SleekTextPrimary)
-                Text(survivor.rarity?.uppercase() ?: "", color = getRarityColor(survivor.rarity ?: ""), fontWeight = FontWeight.Bold, fontSize = 12.sp)
-            }
-        }
-        Spacer(Modifier.height(24.dp))
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            DetailStatCard("Level", survivor.attributes?.level.toString(), Modifier.weight(1f))
-            DetailStatCard("Power", survivor.powerLevel.toString(), Modifier.weight(1f))
-        }
-        Spacer(Modifier.height(24.dp))
-        InfoRow("Personality", survivor.personality ?: "None")
-        InfoRow("Set Bonus", survivor.setBonus ?: "None")
-        Spacer(Modifier.height(32.dp))
-    }
-}
-
-@Composable
-fun PennyDefenderDetailContent(defender: PennyDefender) {
-    Column(Modifier.fillMaxWidth().padding(24.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            AsyncImage(model = defender.imageLink, contentDescription = null, modifier = Modifier.size(80.dp).clip(RoundedCornerShape(12.dp)))
-            Spacer(Modifier.width(16.dp))
-            Column {
-                val name = if (defender.name == null || defender.name == "Defender") defender.templateId ?: "Defender" else defender.name
-                Text(name, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Black, color = SleekTextPrimary)
-                Text("${defender.rarity?.uppercase()} ${defender.defenderClass?.uppercase()}", color = getRarityColor(defender.rarity ?: ""), fontWeight = FontWeight.Bold, fontSize = 12.sp)
-            }
-        }
-        Spacer(Modifier.height(24.dp))
-        DetailStatCard("Power Level", defender.powerLevel.toString())
-        Spacer(Modifier.height(24.dp))
-        Text("PERKS", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = SleekCyan)
-        defender.perks?.forEach { Text("• ${it.name}", color = Color.White, fontSize = 14.sp) }
-        Spacer(Modifier.height(32.dp))
-    }
-}
-
-@Composable
-fun PennyLoadoutDetailContent(loadout: PennyLoadout) {
-    Column(Modifier.fillMaxWidth().padding(24.dp).verticalScroll(rememberScrollState())) {
-        Text(loadout.commander?.name?.uppercase() ?: "LOADOUT", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Black, color = Color.White)
-        Spacer(Modifier.height(8.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            AsyncImage(model = if (loadout.teamPerkImage?.startsWith("/") == true) "https://pennydb.net${loadout.teamPerkImage}" else loadout.teamPerkImage, contentDescription = null, modifier = Modifier.size(32.dp))
-            Spacer(Modifier.width(8.dp))
-            Text("Team Perk: ${loadout.teamPerk}", color = SleekCyan, fontWeight = FontWeight.Bold)
-        }
-        Spacer(Modifier.height(24.dp))
-        Text("COMMANDER", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = SleekTextMuted)
-        PennyHeroBasicTile(loadout.commander)
-        Spacer(Modifier.height(16.dp))
-        Text("SUPPORT TEAM", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = SleekTextMuted)
-        loadout.followers?.forEach { PennyHeroBasicTile(it) }
-        Spacer(Modifier.height(16.dp))
-        Text("GADGETS", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = SleekTextMuted)
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            PennyGadgetTile(loadout.gadget1, if (loadout.gadget1Image?.startsWith("/") == true) "https://pennydb.net${loadout.gadget1Image}" else loadout.gadget1Image, Modifier.weight(1f))
-            PennyGadgetTile(loadout.gadget2, if (loadout.gadget2Image?.startsWith("/") == true) "https://pennydb.net${loadout.gadget2Image}" else loadout.gadget2Image, Modifier.weight(1f))
-        }
-        Spacer(Modifier.height(32.dp))
-    }
-}
-
-@Composable
-fun PennyHeroBasicTile(hero: PennyHeroBasic?) {
-    hero?.let {
-        Card(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), colors = CardDefaults.cardColors(containerColor = SleekSurface)) {
-            Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                AsyncImage(model = it.imageLink, contentDescription = null, modifier = Modifier.size(40.dp).clip(CircleShape))
-                Spacer(Modifier.width(12.dp))
-                Column {
-                    Text(it.name ?: "", fontWeight = FontWeight.Bold, color = Color.White)
-                    Text("PL ${it.powerLevel} • ${it.heroClass}", fontSize = 11.sp, color = getRarityColor(it.rarity ?: "Common"))
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun PennyGadgetTile(name: String?, imageUrl: String?, modifier: Modifier = Modifier) {
-    Card(modifier = modifier, colors = CardDefaults.cardColors(containerColor = SleekSurface)) {
-        Column(Modifier.padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            AsyncImage(model = imageUrl, contentDescription = null, modifier = Modifier.size(32.dp))
-            Text(name ?: "Empty", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color.White, textAlign = TextAlign.Center)
-        }
-    }
-}
-
-@Composable
-fun PennyAchievementsList(achievements: Map<String, Map<String, PennyAchievement>>) {
-    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        achievements.values.flatMap { it.values }.forEach { ach ->
-            item {
-                Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = SleekSurface)) {
-                    Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                        AsyncImage(model = ach.imageLink, contentDescription = null, modifier = Modifier.size(48.dp))
-                        Spacer(Modifier.width(16.dp))
-                        Column {
-                            Text(ach.name ?: "", fontWeight = FontWeight.Bold, color = Color.White)
-                            Text("${ach.currentValue} / ${ach.totalRequired}", fontSize = 12.sp, color = SleekTextMuted)
-                            Spacer(Modifier.height(4.dp))
-                            LinearProgressIndicator(
-                                progress = { (ach.currentValue ?: 0).toFloat() / (ach.totalRequired ?: 1).toFloat() },
-                                modifier = Modifier.fillMaxWidth().height(4.dp),
-                                color = SleekCyan,
-                                trackColor = SleekBackground,
-                                strokeCap = androidx.compose.ui.graphics.StrokeCap.Round
-                            )
-                            ach.completed?.date?.let { Text("Completed on $it", fontSize = 9.sp, color = SleekEmerald) }
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun PennyAchievementsSummary(achievements: Map<String, Map<String, PennyAchievement>>?, onClick: () -> Unit) {
-    achievements?.let {
-        Card(modifier = Modifier.fillMaxWidth().clickable { onClick() }, colors = CardDefaults.cardColors(containerColor = SleekSurface), border = BorderStroke(1.dp, SleekSurfaceBorder)) {
-            Column(Modifier.padding(16.dp)) {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text("ACHIEVEMENTS", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = SleekTextMuted)
-                    Icon(Icons.Default.ChevronRight, null, tint = SleekTextMuted)
-                }
-                Spacer(Modifier.height(12.dp))
-                Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    it.values.flatMap { inner -> inner.values }.take(5).forEach { ach ->
-                        AsyncImage(model = ach.imageLink, contentDescription = null, modifier = Modifier.size(40.dp))
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun PennyExpeditionsList(expeditions: Map<String, PennyExpedition>) {
-    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        items(expeditions.values.toList()) { ex ->
-            Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = SleekSurface)) {
-                Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.Explore, null, tint = Color.Yellow)
-                    Spacer(Modifier.width(16.dp))
-                    Column {
-                        Text(ex.name ?: "Expedition", fontWeight = FontWeight.Bold, color = Color.White)
-                        Text(ex.templateId ?: "", fontSize = 10.sp, color = SleekTextMuted)
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun DashboardTile(modifier: Modifier = Modifier, label: String, icon: ImageVector, color: Color, onClick: () -> Unit) {
-    Card(modifier = modifier.height(90.dp).clickable { onClick() }, colors = CardDefaults.cardColors(containerColor = SleekSurface), shape = RoundedCornerShape(16.dp), border = BorderStroke(1.dp, SleekSurfaceBorder)) {
-        Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) { Icon(icon, null, tint = color, modifier = Modifier.size(28.dp)); Spacer(Modifier.height(8.dp)); Text(label, fontSize = 11.sp, fontWeight = FontWeight.Black, color = SleekTextPrimary) }
-    }
-}
-
-@Composable
-fun CommandMenuTile(title: String, subtitle: String, icon: ImageVector, color: Color, onClick: () -> Unit) {
-    Card(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp).clickable { onClick() }, colors = CardDefaults.cardColors(containerColor = SleekSurface), shape = RoundedCornerShape(12.dp), border = BorderStroke(1.dp, SleekSurfaceBorder)) {
-        Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(40.dp).background(color.copy(alpha = 0.1f), CircleShape), contentAlignment = Alignment.Center) { Icon(icon, null, tint = color, modifier = Modifier.size(20.dp)) }
-            Spacer(Modifier.width(16.dp))
-            Column(Modifier.weight(1f)) { Text(title, fontWeight = FontWeight.Bold, color = Color.White, fontSize = 14.sp); Text(subtitle, fontSize = 11.sp, color = SleekTextMuted) }
-            Icon(Icons.Default.ChevronRight, null, tint = SleekTextMuted)
         }
     }
 }
@@ -921,6 +658,274 @@ fun getRarityColor(rarity: String): Color {
 }
 
 @Composable
+fun StwItemRowTemplate(
+    name: String, 
+    subtext: String, 
+    rarity: String, 
+    imageUrl: String?, 
+    classIcon: String? = null,
+    extraIcon: String? = null,
+    onClick: () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onClick() },
+        colors = CardDefaults.cardColors(containerColor = SleekSurface),
+        shape = RoundedCornerShape(8.dp),
+        border = BorderStroke(1.dp, SleekSurfaceBorder)
+    ) {
+        Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.size(48.dp).clip(RoundedCornerShape(8.dp)).background(getRarityColor(rarity).copy(alpha = 0.1f)).border(1.dp, getRarityColor(rarity).copy(alpha = 0.5f), RoundedCornerShape(8.dp)), contentAlignment = Alignment.Center) {
+                AsyncImage(model = resolvePennyUrl(imageUrl), contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+            }
+            Spacer(Modifier.width(12.dp))
+            if (classIcon != null) {
+                AsyncImage(model = resolvePennyUrl(classIcon), contentDescription = null, modifier = Modifier.size(20.dp).alpha(0.8f))
+                Spacer(Modifier.width(8.dp))
+            }
+            Column(Modifier.weight(1f)) {
+                Text(name, fontWeight = FontWeight.Bold, color = SleekTextPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(subtext, fontSize = 12.sp, color = SleekTextMuted)
+            }
+            if (extraIcon != null) {
+                AsyncImage(model = resolvePennyUrl(extraIcon), contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+            }
+
+            Text(rarity.take(3).uppercase(), fontSize = 10.sp, fontWeight = FontWeight.Black, color = getRarityColor(rarity))
+        }
+    }
+}
+
+@Composable
+fun StwHeroRow(hero: StwHero, onClick: () -> Unit) {
+    StwItemRowTemplate(
+        name = hero.name,
+        subtext = "PL ${hero.rating} • Lvl ${hero.level}",
+        rarity = hero.rarity,
+        imageUrl = hero.iconUrl,
+        classIcon = "file:///android_asset/${hero.classType}.png",
+        onClick = onClick
+    )
+}
+
+@Composable
+fun StwSurvivorRow(survivor: StwSurvivor, onClick: () -> Unit) {
+    StwItemRowTemplate(name = survivor.name, subtext = "PL ${survivor.rating} • Lvl ${survivor.level} ${survivor.personality ?: ""}", rarity = survivor.rarity, imageUrl = survivor.iconUrl, onClick = onClick)
+}
+
+@Composable
+fun StwDefenderRow(defender: StwDefender, onClick: () -> Unit) {
+    StwItemRowTemplate(name = defender.name, subtext = "PL ${defender.rating} • Lvl ${defender.level} ${defender.type}", rarity = defender.rarity, imageUrl = defender.iconUrl, onClick = onClick)
+}
+
+@Composable
+fun StwSchematicRow(schematic: StwSchematic, onClick: () -> Unit) {
+    StwItemRowTemplate(name = schematic.name, subtext = "PL ${schematic.rating} • Lvl ${schematic.level} ${schematic.type}", rarity = schematic.rarity, imageUrl = schematic.iconUrl, onClick = onClick)
+}
+
+@Composable
+fun StwHeroDetailContent(hero: StwHero) {
+    Column(Modifier.fillMaxWidth().padding(24.dp).verticalScroll(rememberScrollState())) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            AsyncImage(model = resolvePennyUrl(hero.iconUrl), contentDescription = null, modifier = Modifier.size(80.dp).clip(RoundedCornerShape(12.dp)))
+            Spacer(Modifier.width(16.dp))
+            Column {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    AsyncImage(model = "file:///android_asset/${hero.classType}.png", contentDescription = null, modifier = Modifier.size(20.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text(hero.name, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Black, color = SleekTextPrimary)
+                }
+                Text("${hero.rarity.uppercase()} ${hero.classType.uppercase()}", color = getRarityColor(hero.rarity), fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                hero.gender?.let { Text(it.uppercase(), color = SleekTextMuted, fontSize = 10.sp, fontWeight = FontWeight.Bold) }
+            }
+        }
+        Spacer(Modifier.height(24.dp))
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            DetailStatCard("Level", hero.level.toString(), Modifier.weight(1f))
+            DetailStatCard("Power", hero.rating.toString(), Modifier.weight(1f))
+        }
+        if (hero.abilities.isNotEmpty()) {
+            Spacer(Modifier.height(24.dp))
+            Text("ABILITIES", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = SleekCyan)
+            hero.abilities.forEach { Text("• $it", color = Color.White, fontSize = 13.sp, modifier = Modifier.padding(vertical = 2.dp)) }
+        }
+        if (hero.perks.isNotEmpty()) {
+            Spacer(Modifier.height(16.dp))
+            Text("PERKS", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = SleekCyan)
+            hero.perks.forEach { Text("• $it", color = Color.White, fontSize = 13.sp, modifier = Modifier.padding(vertical = 2.dp)) }
+        }
+        Spacer(Modifier.height(48.dp))
+    }
+}
+
+@Composable
+fun StwSchematicDetailContent(schematic: StwSchematic) {
+    Column(Modifier.fillMaxWidth().padding(24.dp).verticalScroll(rememberScrollState())) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            AsyncImage(model = resolvePennyUrl(schematic.iconUrl), contentDescription = null, modifier = Modifier.size(80.dp).clip(RoundedCornerShape(12.dp)))
+            Spacer(Modifier.width(16.dp))
+            Column {
+                Text(schematic.name, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Black, color = SleekTextPrimary)
+                Text(schematic.rarity.uppercase(), color = getRarityColor(schematic.rarity), fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                schematic.damageType?.let { Text(it.uppercase(), color = FortniteGold, fontSize = 10.sp, fontWeight = FontWeight.Bold) }
+            }
+        }
+        Spacer(Modifier.height(24.dp))
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            DetailStatCard("Power", schematic.rating.toString(), Modifier.weight(1f))
+            DetailStatCard("Level", schematic.level.toString(), Modifier.weight(1f))
+        }
+        schematic.durability?.let { Spacer(Modifier.height(16.dp)); DetailInfoRow("Durability", "${it.toInt()}%") }
+        if (schematic.perks.isNotEmpty()) {
+            Spacer(Modifier.height(24.dp))
+            Text("PERKS", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = SleekCyan)
+            schematic.perks.forEach { Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) { Text(it.name, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f)); Text(it.rarity.uppercase(), color = getRarityColor(it.rarity), fontSize = 10.sp, fontWeight = FontWeight.Black) } }
+        } else if (schematic.alterations.isNotEmpty()) {
+            Spacer(Modifier.height(24.dp))
+            Text("ALTERATIONS", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = SleekCyan)
+            schematic.alterations.forEach { Text("• ${it.replace("Alteration:", "").replace("aid_att_", "").replace("_", " ").uppercase()}", color = Color.White, fontSize = 12.sp, modifier = Modifier.padding(vertical = 2.dp)) }
+        }
+        Spacer(Modifier.height(32.dp))
+    }
+}
+
+@Composable
+fun StwSurvivorDetailContent(survivor: StwSurvivor) {
+    Column(Modifier.fillMaxWidth().padding(24.dp).verticalScroll(rememberScrollState())) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            AsyncImage(model = resolvePennyUrl(survivor.iconUrl), contentDescription = null, modifier = Modifier.size(80.dp).clip(RoundedCornerShape(12.dp)))
+            Spacer(Modifier.width(16.dp))
+            Column {
+                Text(survivor.name, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Black, color = SleekTextPrimary)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(survivor.rarity.uppercase(), color = getRarityColor(survivor.rarity), fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                    if (survivor.isLead) { Spacer(Modifier.width(8.dp)); Box(Modifier.background(FortniteGold, RoundedCornerShape(4.dp)).padding(horizontal = 6.dp, vertical = 2.dp)) { Text("LEAD", fontSize = 9.sp, fontWeight = FontWeight.Black, color = Color.Black) } }
+                }
+                survivor.gender?.let { Text(it.uppercase(), color = SleekTextMuted, fontSize = 10.sp, fontWeight = FontWeight.Bold) }
+            }
+        }
+        Spacer(Modifier.height(24.dp))
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            DetailStatCard("Level", survivor.level.toString(), Modifier.weight(1f))
+            DetailStatCard("Power", survivor.rating.toString(), Modifier.weight(1f))
+        }
+        survivor.personality?.let { Spacer(Modifier.height(24.dp)); Text("PERSONALITY", fontSize = 11.sp, fontWeight = FontWeight.Black, color = SleekCyan); Text(it, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp) }
+        survivor.setBonus?.let { Spacer(Modifier.height(16.dp)); Text("SET BONUS", fontSize = 11.sp, fontWeight = FontWeight.Black, color = SleekCyan); Text(it, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp) }
+        if (survivor.isLead && survivor.synergy != null) { Spacer(Modifier.height(16.dp)); Text("LEADER SYNERGY", fontSize = 11.sp, fontWeight = FontWeight.Black, color = SleekCyan); Text(survivor.synergy, color = SleekEmerald, fontWeight = FontWeight.Bold, fontSize = 14.sp) }
+        Spacer(Modifier.height(32.dp))
+    }
+}
+
+@Composable
+fun StwDefenderDetailContent(defender: StwDefender) {
+    Column(Modifier.fillMaxWidth().padding(24.dp).verticalScroll(rememberScrollState())) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            AsyncImage(model = resolvePennyUrl(defender.iconUrl), contentDescription = null, modifier = Modifier.size(80.dp).clip(RoundedCornerShape(12.dp)))
+            Spacer(Modifier.width(16.dp))
+            Column {
+                Text(defender.name, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Black, color = SleekTextPrimary)
+                Text("${defender.rarity.uppercase()} ${defender.type.uppercase()}", color = getRarityColor(defender.rarity), fontWeight = FontWeight.Bold, fontSize = 12.sp)
+            }
+        }
+        Spacer(Modifier.height(24.dp))
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            DetailStatCard("Level", defender.level.toString(), Modifier.weight(1f))
+            DetailStatCard("Power", defender.rating.toString(), Modifier.weight(1f))
+        }
+        if (defender.perks.isNotEmpty()) { Spacer(Modifier.height(24.dp)); Text("PERKS", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = SleekCyan); defender.perks.forEach { Text("• $it", color = Color.White, fontSize = 13.sp, modifier = Modifier.padding(vertical = 2.dp)) } }
+        Spacer(Modifier.height(32.dp))
+    }
+}
+
+@Composable
+fun StwHeroLoadoutRow(loadout: StwHeroLoadout, onClick: () -> Unit) {
+    Card(modifier = Modifier.fillMaxWidth().clickable { onClick() }, colors = CardDefaults.cardColors(containerColor = SleekSurface), shape = RoundedCornerShape(8.dp), border = BorderStroke(1.dp, if (loadout.isActive) SleekCyan else SleekSurfaceBorder)) {
+        Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.size(48.dp).clip(RoundedCornerShape(8.dp)).background(getRarityColor(loadout.commander?.rarity ?: "Common").copy(alpha = 0.1f)).border(1.dp, getRarityColor(loadout.commander?.rarity ?: "Common").copy(alpha = 0.5f), RoundedCornerShape(8.dp)), contentAlignment = Alignment.Center) {
+                AsyncImage(model = resolvePennyUrl(loadout.commander?.iconUrl), contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+            }
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text(loadout.name.uppercase(), fontWeight = FontWeight.Black, color = SleekTextPrimary)
+                Text(loadout.commander?.name ?: "No Commander", fontSize = 12.sp, color = Color.White)
+                if (loadout.teamPerkName != null) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        AsyncImage(model = resolvePennyUrl(loadout.teamPerkIcon ?: getStwTeamPerkIcon(loadout.teamPerkName)), contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text(loadout.teamPerkName, fontSize = 11.sp, color = SleekCyan)
+                    }
+                }
+            }
+            if (loadout.isActive) { Box(Modifier.background(SleekCyan, RoundedCornerShape(4.dp)).padding(horizontal = 8.dp, vertical = 2.dp)) { Text("ACTIVE", fontSize = 9.sp, fontWeight = FontWeight.Black, color = Color.Black) } }
+        }
+    }
+}
+
+@Composable
+fun StwHeroLoadoutDetailContent(loadout: StwHeroLoadout) {
+    Column(Modifier.fillMaxWidth().padding(24.dp).verticalScroll(rememberScrollState())) {
+        Text(loadout.name.uppercase(), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Black, color = SleekTextPrimary)
+        Spacer(Modifier.height(16.dp))
+        Text("COMMANDER", fontSize = 11.sp, fontWeight = FontWeight.Black, color = SleekTextMuted)
+        StwHeroBasicTile(loadout.commander)
+        Spacer(Modifier.height(24.dp))
+        Text("SUPPORT TEAM", fontSize = 11.sp, fontWeight = FontWeight.Black, color = SleekTextMuted)
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) { loadout.support.forEach { StwHeroBasicTile(it) } }
+        Spacer(Modifier.height(24.dp))
+        Text("TEAM PERK", fontSize = 11.sp, fontWeight = FontWeight.Black, color = SleekTextMuted)
+        Card(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), colors = CardDefaults.cardColors(containerColor = SleekSurface), shape = RoundedCornerShape(8.dp), border = BorderStroke(1.dp, SleekSurfaceBorder)) {
+            Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                AsyncImage(model = resolvePennyUrl(loadout.teamPerkIcon ?: getStwTeamPerkIcon(loadout.teamPerkName)), contentDescription = null, modifier = Modifier.size(32.dp))
+                Spacer(Modifier.width(12.dp))
+                Text(loadout.teamPerkName ?: "No Team Perk", fontWeight = FontWeight.Bold, color = SleekCyan)
+            }
+        }
+        Spacer(Modifier.height(24.dp))
+        Text("GADGETS", fontSize = 11.sp, fontWeight = FontWeight.Black, color = SleekTextMuted)
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 4.dp)) {
+            StwGadgetTile(loadout.gadgetNames.getOrNull(0), loadout.gadgetIcons.getOrNull(0), Modifier.weight(1f))
+            StwGadgetTile(loadout.gadgetNames.getOrNull(1), loadout.gadgetIcons.getOrNull(1), Modifier.weight(1f))
+        }
+        Spacer(Modifier.height(48.dp))
+    }
+}
+
+@Composable
+fun StwHeroBasicTile(hero: StwHero?) {
+    hero?.let {
+        Card(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), colors = CardDefaults.cardColors(containerColor = SleekSurface), shape = RoundedCornerShape(8.dp), border = BorderStroke(1.dp, SleekSurfaceBorder)) {
+            Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.size(40.dp).clip(RoundedCornerShape(8.dp)).background(getRarityColor(it.rarity).copy(alpha = 0.1f)).border(1.dp, getRarityColor(it.rarity).copy(alpha = 0.5f), RoundedCornerShape(8.dp)), contentAlignment = Alignment.Center) {
+                    AsyncImage(model = resolvePennyUrl(it.iconUrl), contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+                }
+                Spacer(Modifier.width(12.dp))
+                Column {
+                    Text(it.name, fontWeight = FontWeight.Bold, color = Color.White)
+                    Text("PL ${it.rating} • ${it.classType}", fontSize = 11.sp, color = getRarityColor(it.rarity))
+                }
+            }
+        }
+    } ?: run {
+        Card(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), colors = CardDefaults.cardColors(containerColor = SleekBackground.copy(alpha = 0.5f)), shape = RoundedCornerShape(8.dp), border = BorderStroke(1.dp, SleekSurfaceBorder.copy(alpha = 0.3f))) {
+            Box(Modifier.padding(12.dp).height(40.dp), contentAlignment = Alignment.CenterStart) { Text("EMPTY SLOT", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = SleekTextMuted) }
+        }
+    }
+}
+
+@Composable
+fun StwGadgetTile(name: String?, iconUrl: String?, modifier: Modifier = Modifier) {
+    Card(modifier = modifier, colors = CardDefaults.cardColors(containerColor = SleekSurface), shape = RoundedCornerShape(8.dp), border = BorderStroke(1.dp, SleekSurfaceBorder.copy(alpha = 0.5f))) {
+        Column(Modifier.padding(12.dp).fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+            AsyncImage(model = resolvePennyUrl(iconUrl ?: getStwGadgetIcon(name)), contentDescription = null, modifier = Modifier.size(32.dp))
+            Spacer(Modifier.height(8.dp))
+            Text(name ?: "Empty", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color.White, textAlign = TextAlign.Center, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+    }
+}
+
+@Composable
 fun DetailStatCard(label: String, value: String, modifier: Modifier = Modifier) {
     Card(modifier = modifier, colors = CardDefaults.cardColors(containerColor = SleekSurface), shape = RoundedCornerShape(12.dp), border = BorderStroke(1.dp, SleekSurfaceBorder)) {
         Column(modifier = Modifier.padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally) { Text(value, fontWeight = FontWeight.Black, fontSize = 20.sp, color = Color.White); Text(label, fontSize = 12.sp, color = SleekTextMuted) }
@@ -928,9 +933,421 @@ fun DetailStatCard(label: String, value: String, modifier: Modifier = Modifier) 
 }
 
 @Composable
-fun InfoRow(label: String, value: String) {
+fun DetailInfoRow(label: String, value: String) {
     Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), horizontalArrangement = Arrangement.SpaceBetween) {
         Text(label, fontSize = 12.sp, color = SleekTextMuted)
         Text(value, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = SleekTextPrimary)
     }
+}
+
+@Composable
+fun StwStormShieldStatusCard(outposts: List<StwOutpost>) {
+    Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = SleekSurface), border = BorderStroke(1.dp, SleekSurfaceBorder)) {
+        Column(Modifier.padding(16.dp)) {
+            Text("STORM SHIELD STATUS", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = SleekCyan)
+            Spacer(Modifier.height(12.dp))
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                val zones = listOf("Stonewood", "Plankerton", "Canny Valley", "Twine Peaks")
+                zones.forEach { zoneName ->
+                    val outpost = outposts.find { it.name.contains(zoneName, true) }
+                    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
+                        Text(text = if (outpost != null) "LVL ${outpost.level}" else "--", fontSize = 14.sp, fontWeight = FontWeight.Black, color = if (outpost != null) Color.White else SleekTextMuted)
+                        Text(text = zoneName.substringBefore(" ").uppercase(), fontSize = 8.sp, color = if (outpost != null) FortniteGold else SleekTextMuted, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun StwZoneStormShieldDetail(outposts: List<StwOutpost>, zoneName: String) {
+    val outpost = outposts.find { it.name.contains(zoneName, ignoreCase = true) }
+    if (outpost == null) { Box(Modifier.fillMaxSize(), Alignment.Center) { Text("Storm Shield data for $zoneName not found", color = SleekTextMuted) } }
+    else {
+        LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            item { Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = SleekSurface), border = BorderStroke(1.dp, SleekSurfaceBorder)) { Column(Modifier.padding(16.dp)) { Text(outpost.name.uppercase(), fontWeight = FontWeight.Black, color = Color.White, fontSize = 22.sp); Text("SSD LEVEL ${outpost.level}", fontSize = 14.sp, color = FortniteGold, fontWeight = FontWeight.Bold); if (outpost.enduranceWave > 0) { Spacer(Modifier.height(8.dp)); Text("Highest Endurance: Wave ${outpost.enduranceWave}", fontSize = 12.sp, color = SleekEmerald) } } } }
+            if (outpost.amplifiers.isNotEmpty()) { item { Text("AMPLIFIERS", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = SleekCyan, modifier = Modifier.padding(top = 8.dp)) }; items(outpost.amplifiers) { amp -> Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = SleekSurfaceVariant)) { Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Default.Security, null, tint = SleekEmerald, modifier = Modifier.size(20.dp)); Spacer(Modifier.width(12.dp)); Column { Text(amp.buildingTag.substringAfterLast(".").replace("_", " ").uppercase(), fontWeight = FontWeight.Bold, color = Color.White); Text("Placed at ${amp.placedTag.substringAfterLast(".")}", fontSize = 11.sp, color = SleekTextMuted) } } } } }
+        }
+    }
+}
+
+@Composable
+fun StwAccountActionsCard(viewModel: StwViewModel, onShowJunk: () -> Unit, onShowShop: () -> Unit) {
+    val actionResult by viewModel.actionResult.collectAsState()
+    Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = SleekSurface), border = BorderStroke(1.dp, SleekSurfaceBorder)) {
+        Column(Modifier.padding(16.dp)) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                Text("MANUAL ACTIONS", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = SleekCyan)
+                if (actionResult is StwActionResult.Loading) { CircularProgressIndicator(Modifier.size(14.dp), strokeWidth = 2.dp, color = SleekCyan) }
+            }
+            Spacer(Modifier.height(12.dp))
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(onClick = onShowJunk, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = Color.Red.copy(alpha = 0.2f)), shape = RoundedCornerShape(8.dp), enabled = actionResult !is StwActionResult.Loading) { Text("RECYCLE JUNK", fontSize = 10.sp, color = Color.Red, fontWeight = FontWeight.Bold) }
+                Button(onClick = onShowShop, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = FortniteGold.copy(alpha = 0.2f)), shape = RoundedCornerShape(8.dp), enabled = actionResult !is StwActionResult.Loading) { Text("CLAIM LLAMAS", fontSize = 10.sp, color = FortniteGold, fontWeight = FontWeight.Bold) }
+            }
+            AnimatedVisibility(visible = actionResult !is StwActionResult.Idle) { Column { Spacer(Modifier.height(12.dp)); Surface(color = when (actionResult) { is StwActionResult.Success -> SleekEmerald.copy(alpha = 0.1f); is StwActionResult.Error -> Color.Red.copy(alpha = 0.1f); else -> SleekCyan.copy(alpha = 0.1f) }, shape = RoundedCornerShape(4.dp), modifier = Modifier.fillMaxWidth()) { Text(text = when (val res = actionResult) { is StwActionResult.Success -> "✓ ${res.message}"; is StwActionResult.Error -> "✗ ${res.message}"; is StwActionResult.Loading -> "Working..."; else -> "" }, modifier = Modifier.padding(8.dp), fontSize = 11.sp, color = when (actionResult) { is StwActionResult.Success -> SleekEmerald; is StwActionResult.Error -> Color.Red; else -> SleekCyan }, fontWeight = FontWeight.Bold) }; if (actionResult is StwActionResult.Success || actionResult is StwActionResult.Error) { TextButton(onClick = { viewModel.clearActionResult() }, modifier = Modifier.align(Alignment.End)) { Text("Dismiss", fontSize = 10.sp, color = SleekTextMuted) } } } }
+        }
+    }
+}
+
+@Composable
+fun StwSettingsSection(viewModel: StwViewModel, onShowJunk: () -> Unit, onShowShop: () -> Unit) {
+    val autoRecycle by viewModel.autoRecycleJunk.collectAsState()
+    val autoClaim by viewModel.autoClaimLlamas.collectAsState()
+    val vbucksEnabled by viewModel.vbucksAlertsEnabled.collectAsState()
+    val vbucksTime by viewModel.vbucksAlertTime.collectAsState()
+    val autoTime by viewModel.stwAutomationTime.collectAsState()
+
+    val context = androidx.compose.ui.platform.LocalContext.current
+
+    val vbucksTimePicker = android.app.TimePickerDialog(
+        context,
+        { _, hour, min ->
+            val time = String.format(java.util.Locale.US, "%02d:%02d", hour, min)
+            viewModel.updateVBucksAlertTime(time)
+            com.dhyper.fncompanion.worker.VBucksAlertReceiver.scheduleNextAlarm(context)
+        },
+        vbucksTime.split(":").getOrNull(0)?.toIntOrNull() ?: 0,
+        vbucksTime.split(":").getOrNull(1)?.toIntOrNull() ?: 0,
+        true
+    )
+
+    val autoTimePicker = android.app.TimePickerDialog(
+        context,
+        { _, hour, min ->
+            val time = String.format(Locale.US, "%02d:%02d", hour, min)
+            viewModel.updateAutomationTime(time)
+            com.dhyper.fncompanion.worker.StwAutomationReceiver.scheduleNextAlarm(context)
+        },
+        autoTime.split(":").getOrNull(0)?.toIntOrNull() ?: 0,
+        autoTime.split(":").getOrNull(1)?.toIntOrNull() ?: 0,
+        true
+    )
+
+    Column(Modifier.fillMaxSize().padding(16.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        Text("STW SETTINGS", fontWeight = FontWeight.Black, fontSize = 20.sp, color = Color.White)
+        
+        Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = SleekSurface), border = BorderStroke(1.dp, SleekSurfaceBorder)) {
+            Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.Info, null, tint = FortniteGold, modifier = Modifier.size(20.dp))
+                Spacer(Modifier.width(12.dp))
+                Text("Account linking is required for these actions to run correctly.", fontSize = 12.sp, color = SleekTextMuted)
+            }
+        }
+
+        Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = SleekSurface), border = BorderStroke(1.dp, SleekSurfaceBorder)) {
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                Text("AUTOMATION", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = SleekCyan)
+                
+                StwPreferenceSwitch(
+                    label = "Auto Recycle Junk",
+                    subtitle = "Recycle Common/Uncommon and T1 mats.",
+                    checked = autoRecycle,
+                    onCheckedChange = { viewModel.setAutoRecycleJunk(it) }
+                )
+                
+                Divider(color = SleekSurfaceBorder)
+                
+                StwPreferenceSwitch(
+                    label = "Auto Claim Free Llamas",
+                    subtitle = "Claim 0-cost llamas from shop.",
+                    checked = autoClaim,
+                    onCheckedChange = { viewModel.setAutoClaimLlamas(it) }
+                )
+
+                Button(
+                    onClick = { autoTimePicker.show() },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(containerColor = SleekBackground.copy(alpha = 0.5f)),
+                    shape = RoundedCornerShape(8.dp),
+                    border = BorderStroke(1.dp, SleekSurfaceBorder)
+                ) {
+                    Icon(Icons.Default.Alarm, null, tint = SleekCyan, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Automation Time: $autoTime", color = Color.White, fontSize = 12.sp)
+                }
+            }
+        }
+
+        Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = SleekSurface), border = BorderStroke(1.dp, SleekSurfaceBorder)) {
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                Text("NOTIFICATIONS", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = SleekCyan)
+                
+                StwPreferenceSwitch(
+                    label = "V-Bucks Alerts",
+                    subtitle = "Get notified when V-Bucks missions are active.",
+                    checked = vbucksEnabled,
+                    onCheckedChange = { 
+                        viewModel.updateVBucksAlerts(it)
+                        com.dhyper.fncompanion.worker.VBucksAlertReceiver.scheduleNextAlarm(context)
+                    }
+                )
+
+                if (vbucksEnabled) {
+                    Button(
+                        onClick = { vbucksTimePicker.show() },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(containerColor = SleekBackground.copy(alpha = 0.5f)),
+                        shape = RoundedCornerShape(8.dp),
+                        border = BorderStroke(1.dp, SleekSurfaceBorder)
+                    ) {
+                        Icon(Icons.Default.Alarm, null, tint = SleekCyan, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("Check Time: $vbucksTime", color = Color.White, fontSize = 12.sp)
+                    }
+                }
+            }
+        }
+
+        StwAccountActionsCard(viewModel, onShowJunk, onShowShop)
+        
+        Spacer(Modifier.weight(1f))
+        Text("Automation runs daily at your set automation time. V-Bucks checks run at their own set time.", fontSize = 11.sp, color = SleekTextMuted, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+    }
+}
+
+@Composable
+fun StwPreferenceSwitch(
+    label: String,
+    subtitle: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(label, fontWeight = FontWeight.Bold, color = SleekTextPrimary, fontSize = 14.sp)
+            Text(subtitle, fontSize = 11.sp, color = SleekTextMuted)
+        }
+        Switch(
+            checked = checked,
+            onCheckedChange = onCheckedChange,
+            colors = SwitchDefaults.colors(checkedThumbColor = SleekCyan, checkedTrackColor = SleekCyan.copy(alpha = 0.5f))
+        )
+    }
+}
+
+@Composable
+fun DashboardTile(modifier: Modifier = Modifier, label: String, icon: String, color: Color, onClick: () -> Unit) {
+    Card(modifier = modifier.height(90.dp).clickable { onClick() }, colors = CardDefaults.cardColors(containerColor = SleekSurface), shape = RoundedCornerShape(16.dp), border = BorderStroke(1.dp, SleekSurfaceBorder)) {
+        Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
+            AsyncImage(model = resolvePennyUrl(icon), contentDescription = null, modifier = Modifier.size(32.dp))
+            Spacer(Modifier.height(8.dp))
+            Text(label, fontSize = 11.sp, fontWeight = FontWeight.Black, color = SleekTextPrimary)
+        }
+    }
+}
+
+@Composable
+fun CommandMenuTile(title: String, subtitle: String, icon: Any, color: Color, onClick: () -> Unit) {
+    Card(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp).clickable { onClick() }, colors = CardDefaults.cardColors(containerColor = SleekSurface), shape = RoundedCornerShape(12.dp), border = BorderStroke(1.dp, SleekSurfaceBorder)) {
+        Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.size(40.dp).background(color.copy(alpha = 0.1f), CircleShape), contentAlignment = Alignment.Center) {
+                if (icon is ImageVector) {
+                    Icon(icon, null, tint = color, modifier = Modifier.size(20.dp))
+                } else {
+                    AsyncImage(model = icon, contentDescription = null, modifier = Modifier.size(24.dp))
+                }
+            }
+            Spacer(Modifier.width(16.dp))
+            Column(Modifier.weight(1f)) { Text(title, fontWeight = FontWeight.Bold, color = Color.White, fontSize = 14.sp); Text(subtitle, fontSize = 11.sp, color = SleekTextMuted) }
+            Icon(Icons.Default.ChevronRight, null, tint = SleekTextMuted)
+        }
+    }
+}
+
+@Composable
+fun StwResourcesGrid(resources: List<StwResource>) {
+    val list = resources.filter { it.quantity > 0 }
+        .sortedWith(compareBy({ it.type }, { it.rarity }, { it.name }))
+    
+    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        items(list) { res ->
+            Card(colors = CardDefaults.cardColors(containerColor = SleekSurface), border = BorderStroke(1.dp, SleekSurfaceBorder)) {
+                Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    AsyncImage(model = resolvePennyUrl(res.iconUrl), contentDescription = null, modifier = Modifier.size(32.dp))
+                    Spacer(Modifier.width(12.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(res.name, fontWeight = FontWeight.Bold, color = Color.White, fontSize = 14.sp)
+                        Text(res.type.name, fontSize = 10.sp, color = SleekTextMuted)
+                    }
+                    Text("x${res.quantity}", fontWeight = FontWeight.Black, color = SleekCyan, fontSize = 14.sp)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun StwLlamasGrid(llamas: List<StwLlama>) {
+    val grouped = llamas.groupBy { it.templateId }.values.toList()
+    if (grouped.isEmpty()) Box(Modifier.fillMaxSize(), Alignment.Center) { Text("No llamas unopened", color = SleekTextMuted) }
+    else {
+        LazyVerticalGrid(columns = GridCells.Fixed(3), contentPadding = PaddingValues(16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            items(grouped) { group ->
+                val llama = group.first()
+                val count = group.size
+                Card(colors = CardDefaults.cardColors(containerColor = SleekSurface), border = BorderStroke(1.dp, SleekSurfaceBorder)) {
+                    Column(Modifier.padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                        AsyncImage(model = resolvePennyUrl(llama.iconUrl ?: "/images/resources/llama.png"), contentDescription = null, modifier = Modifier.size(48.dp))
+                        Text(count.toString(), fontWeight = FontWeight.Black, fontSize = 14.sp, color = Color.White)
+                        Text(llama.name, fontSize = 9.sp, color = SleekTextMuted, textAlign = TextAlign.Center, maxLines = 1)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun StwSquadsList(squads: List<StwSurvivorSquad>, onSurvivorClick: (StwSurvivor) -> Unit) {
+    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
+        items(squads) { squad ->
+            StwSquadCard(squad, onSurvivorClick)
+        }
+    }
+}
+
+@Composable
+fun StwSquadCard(squad: StwSurvivorSquad, onSurvivorClick: (StwSurvivor) -> Unit) {
+    Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = SleekSurface), border = BorderStroke(1.dp, SleekSurfaceBorder)) {
+        Column(Modifier.padding(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                val squadSlug = when(squad.id.substringAfterLast("_").lowercase()) {
+                    "fireteamalpha" -> "fireteam_alpha"
+                    "closeassaultsquad" -> "close_assault_squad"
+                    "emtsquad" -> "emt_squad"
+                    "trainingteam" -> "training_team"
+                    "scoutingparty" -> "scouting_party"
+                    "gadgeteers" -> "gadgeteers"
+                    "thethinktank" -> "the_think_tank"
+                    "corpsofengineering" -> "corps_of_engineering"
+                    else -> squad.id.substringAfterLast("_").lowercase()
+                }
+                AsyncImage(
+                    model = "file:///android_asset/squads/$squadSlug.png",
+                    contentDescription = null,
+                    modifier = Modifier.size(28.dp)
+                )
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(squad.name.uppercase(), fontWeight = FontWeight.Black, color = Color.White, fontSize = 16.sp)
+                    val memberCount = (if (squad.leadSlot != null) 1 else 0) + squad.memberSlots.filterNotNull().size
+                    Text("$memberCount/8 MEMBERS", fontSize = 10.sp, color = if (memberCount >= 8) SleekEmerald else FortniteGold, fontWeight = FontWeight.Bold)
+                }
+            }
+            Spacer(Modifier.height(16.dp))
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(Modifier.fillMaxWidth()) { StwSurvivorTile(squad.leadSlot, isLead = true, modifier = Modifier.weight(1f)) { squad.leadSlot?.let { onSurvivorClick(it) } }; Spacer(Modifier.weight(3f)) }
+                Spacer(Modifier.height(8.dp))
+                val members = squad.memberSlots
+                for (row in 0..1) {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        for (col in 0..3) {
+                            val idx = row * 4 + col
+                            if (idx < 7) {
+                                val survivor = members.getOrNull(idx)
+                                StwSurvivorTile(survivor, isLead = false, leadPersonality = squad.leadSlot?.personality, modifier = Modifier.weight(1f)) { survivor?.let { onSurvivorClick(it) } }
+                            } else { Spacer(Modifier.weight(1f)) }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun StwSurvivorTile(survivor: StwSurvivor?, isLead: Boolean, leadPersonality: String? = null, modifier: Modifier = Modifier, onClick: () -> Unit = {}) {
+    val rarityColor = getRarityColor(survivor?.rarity ?: "Common")
+    Box(modifier = modifier.aspectRatio(0.8f).clip(RoundedCornerShape(8.dp)).background(rarityColor.copy(alpha = 0.15f)).border(1.dp, if (isLead) rarityColor else rarityColor.copy(alpha = 0.4f), RoundedCornerShape(8.dp)).clickable(enabled = survivor != null) { onClick() }, contentAlignment = Alignment.Center) {
+        if (survivor != null) {
+            AsyncImage(model = resolvePennyUrl(survivor.iconUrl), contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+            Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().background(Color.Black.copy(alpha = 0.6f)).padding(vertical = 2.dp), contentAlignment = Alignment.Center) { Text("PL ${survivor.rating}", fontSize = 9.sp, fontWeight = FontWeight.Black, color = Color.White) }
+            val matches = !isLead && survivor.personality == leadPersonality
+            if (matches || isLead) {
+                Box(
+                    Modifier
+                        .align(Alignment.TopStart)
+                        .padding(4.dp)
+                        .size(16.dp)
+                        .background(if (matches) SleekEmerald else Color.Black.copy(alpha = 0.7f), CircleShape)
+                        .border(1.dp, if (matches) SleekEmerald else Color.White, CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        survivor.personality?.take(1) ?: "",
+                        fontSize = 9.sp,
+                        color = Color.White,
+                        fontWeight = FontWeight.Black,
+                        modifier = Modifier.offset(y = (-0.5).dp) // Fine-tune centering
+                    )
+                }
+            }
+        } else { Icon(Icons.Default.Add, null, tint = SleekSurfaceBorder, modifier = Modifier.size(20.dp)) }
+    }
+}
+
+@Composable
+fun StwAchievementsSummary(achievements: List<StwAchievement>, onClick: () -> Unit) {
+    if (achievements.isEmpty()) return
+    Card(modifier = Modifier.fillMaxWidth().clickable { onClick() }, colors = CardDefaults.cardColors(containerColor = SleekSurface), border = BorderStroke(1.dp, SleekSurfaceBorder)) {
+        Column(Modifier.padding(16.dp)) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text("ACHIEVEMENTS", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = SleekTextMuted)
+                Icon(Icons.Default.ChevronRight, null, tint = SleekTextMuted)
+            }
+            Spacer(Modifier.height(12.dp))
+            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                achievements.take(8).forEach { ach -> AsyncImage(model = resolvePennyUrl(ach.iconUrl), contentDescription = null, modifier = Modifier.size(40.dp)) }
+            }
+        }
+    }
+}
+
+@Composable
+fun StwAchievementsList(achievements: List<StwAchievement>) {
+    if (achievements.isEmpty()) { Box(Modifier.fillMaxSize(), Alignment.Center) { Text("No achievements found", color = SleekTextMuted) } }
+    else {
+        LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            items(achievements) { ach ->
+                Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = SleekSurface)) {
+                    Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                        AsyncImage(model = resolvePennyUrl(ach.iconUrl), contentDescription = null, modifier = Modifier.size(48.dp))
+                        Spacer(Modifier.width(16.dp))
+                        Column {
+                            Text(ach.name, fontWeight = FontWeight.Bold, color = Color.White)
+                            Text("${"%,d".format(ach.progress)} / ${"%,d".format(ach.target)}", fontSize = 12.sp, color = SleekTextMuted)
+                            Spacer(Modifier.height(4.dp))
+                            LinearProgressIndicator(progress = { if (ach.target > 0) ach.progress.toFloat() / ach.target.toFloat() else 0f }, modifier = Modifier.fillMaxWidth().height(4.dp), color = SleekCyan, trackColor = SleekBackground, strokeCap = androidx.compose.ui.graphics.StrokeCap.Round)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+fun resolvePennyUrl(url: String?): String? {
+    if (url == null || url.isBlank()) return null
+    var cleanUrl = url.trim()
+    if (cleanUrl.startsWith("http") || cleanUrl.startsWith("file://")) return cleanUrl
+    cleanUrl = cleanUrl.removePrefix("/")
+    return "https://pennydb.plingindigo.org/$cleanUrl"
+}
+
+fun getStwTeamPerkIcon(name: String?): String? {
+    if (name == null) return null
+    val slug = name.trim().lowercase().replace(" ", "_").replace(".", "").replace("\"", "")
+    return "https://pennydb.plingindigo.org/images/team_perks/$slug.png"
+}
+
+fun getStwGadgetIcon(name: String?): String? {
+    if (name == null) return null
+    val slug = name.trim().lowercase().replace(" ", "_").replace(".", "").replace("\"", "")
+    return "https://pennydb.plingindigo.org/images/gadgets/$slug.png"
 }

@@ -14909,6 +14909,132 @@
       "rarity": "epic",
       "type": "weapon"
     },
+    "Schematic:sid_floor_player_jump_pad_free_direction": {
+      "name": {
+        "en": "Jump Pad (Directional)"
+      },
+      "rarity": "rare",
+      "type": "trap"
+    },
+    "Schematic:ingredient_duct_tape": {
+      "name": {
+        "en": "Duct Tape"
+      },
+      "rarity": "uncommon",
+      "type": "ingredient"
+    },
+    "Ingredient:ingredient_nuts_bolts": {
+      "name": {
+        "en": "Nuts & Bolts"
+      },
+      "rarity": "uncommon",
+      "type": "ingredient"
+    },
+    "Schematic:sid_floor_player_jump_pad": {
+      "name": {
+        "en": "Jump Pad (Up)"
+      },
+      "rarity": "rare",
+      "type": "trap"
+    },
+    "Schematic:ammo_bulletslight": {
+      "name": {
+        "en": "Ammo: Light Bullets"
+      },
+      "rarity": "uncommon",
+      "type": "ammo"
+    },
+    "Schematic:ammo_shells": {
+      "name": {
+        "en": "Shells 'n' Slugs"
+      },
+      "rarity": "uncommon",
+      "type": "ammo"
+    },
+    "Schematic:ammo_bulletsmedium": {
+      "name": {
+        "en": "Ammo: Medium Bullets"
+      },
+      "rarity": "uncommon",
+      "type": "ammo"
+    },
+    "Ammo:ammodataenergycell": {
+      "name": {
+        "en": "Ammo: Energy Cell"
+      },
+      "rarity": "uncommon",
+      "type": "ammo"
+    },
+    "Ammo:ammodatabulletslight": {
+      "name": {
+        "en": "Ammo: Light Bullets"
+      },
+      "rarity": "uncommon",
+      "type": "ammo"
+    },
+    "Ammo:ammodatashells": {
+      "name": {
+        "en": "Shells 'n' Slugs"
+      },
+      "rarity": "uncommon",
+      "type": "ammo"
+    },
+    "Ammo:ammodatabulletsmedium": {
+      "name": {
+        "en": "Ammo: Medium Bullets"
+      },
+      "rarity": "uncommon",
+      "type": "ammo"
+    },
+    "Ammo:ammodatacell": {
+      "name": {
+        "en": "Ammo: Energy Cell"
+      },
+      "rarity": "uncommon",
+      "type": "ammo"
+    },
+    "Ammo:ammodatabulletsheavy": {
+      "name": {
+        "en": "Ammo: Heavy Bullets"
+      },
+      "rarity": "uncommon",
+      "type": "ammo"
+    },
+    "Ammo:ammodataexplosive": {
+      "name": {
+        "en": "Ammo: Explosive"
+      },
+      "rarity": "uncommon",
+      "type": "ammo"
+    },
+    "Ammo:ammodataproximitymines": {
+      "name": {
+        "en": "Ammo: Proximity Mines"
+      },
+      "rarity": "uncommon",
+      "type": "ammo"
+    },
+    "WorldItem:metalitemdata": {
+      "name": {
+        "en": "Metal"
+      },
+      "rarity": "common",
+      "type": "worlditem"
+    },
+    "WorldItem:stoneitemdata": {
+      "name": {
+        "en": "Brick"
+      },
+      "rarity": "common",
+      "type": "worlditem"
+    },
+    "WorldItem:wooditemdata": {
+      "name": {
+        "en": "Wood"
+      },
+      "rarity": "common",
+      "type": "worlditem"
+    },
     "Schematic:sid_blunt_hammer_retroscifi_vr_ore_t01": {
       "name": {
         "ar": "مشوه المومياء",
@@ -54686,7 +54812,228 @@
       },
       "rarity": "",
       "type": "cosmeticGlider"
-    }
+    },
+    "TeamPerk:tpid_bioenergysource": {
+      "name": {
+        "en": "Bio-Energy Source"
+      },
+      "type": "teamperk"
+    },
+    "TeamPerk:tpid_blakebeardsstash": {
+      "name": {
+        "en": "Blakebeard's Stash"
+      },
+      "type": "teamperk"
+    },
+    "TeamPerk:tpid_blastfromthepast": {
+      "name": {
+        "en": "Blast From The Past"
+      },
+      "type": "teamperk"
+    },
+    "TeamPerk:tpid_boombase": {
+      "name": {
+        "en": "Boom B.A.S.E."
+      },
+      "type": "teamperk"
+    },
+    "TeamPerk:tpid_coolcustomer": {
+      "name": {
+        "en": "Cool Customer"
+      },
+      "type": "teamperk"
+    },
+    "TeamPerk:tpid_dangerdanger": {
+      "name": {
+        "en": "Z.A.P."
+      },
+      "type": "teamperk"
+    },
+    "TeamPerk:tpid_dimmak": {
+      "name": {
+        "en": "Dim Mak"
+      },
+      "type": "teamperk"
+    },
+    "TeamPerk:tpid_holidaycheer": {
+      "name": {
+        "en": "Happy Holidays"
+      },
+      "type": "teamperk"
+    },
+    "TeamPerk:tpid_huntersinstinct": {
+      "name": {
+        "en": "Hunter's Instinct"
+      },
+      "type": "teamperk"
+    },
+    "TeamPerk:tpid_keepout": {
+      "name": {
+        "en": "Keep Out!!!"
+      },
+      "type": "teamperk"
+    },
+    "TeamPerk:tpid_kineticoverdrive": {
+      "name": {
+        "en": "Kinetic Overdrive"
+      },
+      "type": "teamperk"
+    },
+    "TeamPerk:tpid_longarmofthelaw": {
+      "name": {
+        "en": "Long Arm of the Law"
+      },
+      "type": "teamperk"
+    },
+    "TeamPerk:tpid_nevertellmetheodds": {
+      "name": {
+        "en": "Never Tell Me the Odds"
+      },
+      "type": "teamperk"
+    },
+    "TeamPerk:tpid_onetwopunch": {
+      "name": {
+        "en": "One-Two Punch"
+      },
+      "type": "teamperk"
+    },
+    "TeamPerk:tpid_phaseblaster": {
+      "name": {
+        "en": "Phase Blaster"
+      },
+      "type": "teamperk"
+    },
+    "TeamPerk:tpid_recycling": {
+      "name": {
+        "en": "Recycling"
+      },
+      "type": "teamperk"
+    },
+    "TeamPerk:tpid_shiftinggears": {
+      "name": {
+        "en": "Shifting Gears"
+      },
+      "type": "teamperk"
+    },
+    "TeamPerk:tpid_soaringmantis": {
+      "name": {
+        "en": "Soaring Mantis"
+      },
+      "type": "teamperk"
+    },
+    "TeamPerk:tpid_superchargedtraps": {
+      "name": {
+        "en": "Supercharged Traps"
+      },
+      "type": "teamperk"
+    },
+    "TeamPerk:tpid_totallygnarly": {
+      "name": {
+        "en": "Totally Rockin' Out"
+      },
+      "type": "teamperk"
+    },
+    "TeamPerk:tpid_trickandtreat": {
+      "name": {
+        "en": "Trick And Treat"
+      },
+      "type": "teamperk"
+    },
+    "TeamPerk:tpid_violentinspiration": {
+      "name": {
+        "en": "Violent Inspirations"
+      },
+      "type": "teamperk"
+    },
+    "Gadget:g_generic_adrenalinerush": {
+      "name": {
+        "en": "Adrenaline Rush"
+      },
+      "type": "gadget"
+    },
+    "Gadget:g_generic_botturret": {
+      "name": {
+        "en": "Stationary Hover Turret"
+      },
+      "type": "gadget"
+    },
+    "Gadget:g_generic_slowfield": {
+      "name": {
+        "en": "Slow Field"
+      },
+      "type": "gadget"
+    },
+    "Gadget:g_airstrike": {
+      "name": {
+        "en": "Airstrike"
+      },
+      "type": "gadget"
+    },
+    "Gadget:g_generic_banner": {
+      "name": {
+        "en": "Banner"
+      },
+      "type": "gadget"
+    },
+    "Gadget:g_generic_proximitymines": {
+      "name": {
+        "en": "Proximity Mines"
+      },
+      "type": "gadget"
+    },
+    "Gadget:g_supplydrop": {
+      "name": {
+        "en": "Supply Drop"
+      },
+      "type": "gadget"
+    },
+    "Gadget:g_teleporter": {
+      "name": {
+        "en": "Teleporter"
+      },
+      "type": "gadget"
+    },
+    "TeamPerk:tpid_endlessshadow": {
+      "name": {
+        "en": "Endless Shadow"
+      },
+      "type": "teamperk"
+    },
+    "TeamPerk:tpid_hotswap": {
+      "name": {
+        "en": "Hot Swap"
+      },
+      "type": "teamperk"
+    },
+    "TeamPerk:tpid_preemptivestrike": {
+      "name": {
+        "en": "Preemptive Strike"
+      },
+      "type": "teamperk"
+    },
+    "TeamPerk:tpid_roundtrip": {
+      "name": {
+        "en": "Round Trip"
+      },
+      "type": "teamperk"
+    },
+    "TeamPerk:tpid_shakeitoff": {
+      "name": {
+        "en": "Shake It Off"
+      },
+      "type": "teamperk"
+    },
+    "TeamPerk:tpid_slowyourroll": {
+      "name": {
+        "en": "Slow Your Roll"
+      },
+      "type": "teamperk"
+    },
+    "TeamPerk:tpid_underdog": {
+      "name": {
+        "en": "Underdog"
+      },
+      "type": "teamperk"
   },
   "Config": {
     "Settings": [
@@ -55374,7 +55721,12 @@
             "tier"
           ],
           "settingType": "int",
-          "validValues": [2, 3, 4, 5],
+          "validValues": [
+            2,
+            3,
+            4,
+            5
+          ],
           "defaultValue": 5
         },
         {
@@ -55794,19 +56146,49 @@
     ]
   },
   "winterfestRewards": {
-    "ERG.Node.A.1": ["AthenaCharacter:character_chubbyjingle"],
-    "ERG.Node.A.2": ["AthenaCharacter:character_frostiron"],
-    "ERG.Node.A.3": ["AthenaBackpack:backpack_polargander"],
-    "ERG.Node.A.4": ["AthenaDance:emoticon_s39winterfest", "AthenaDance:spray_winterfest3"],
-    "ERG.Node.A.5": ["AthenaBackpack:backpack_winkfin"],
-    "ERG.Node.A.6": ["SparksSong:sid_placeholder_728"],
-    "ERG.Node.A.7": ["AthenaPickaxe:pickaxe_hunsting"],
-    "ERG.Node.A.8": ["AthenaPickaxe:pickaxe_jingleblade"],
-    "ERG.Node.A.9": ["AthenaItemWrap:wrap_shavedice"],
-    "ERG.Node.A.10": ["AthenaSkyDiveContrail:contrail_hollowstun"],
-    "ERG.Node.A.11": ["SparksGuitar:sparks_rainbowhouse_guitar"],
-    "ERG.Node.A.12": ["SparksBass:sparks_frostiron_bass"],
-    "ERG.Node.B.1": ["AthenaDance:spray_winterfest", "AthenaDance:spray_winterfest2"],
-    "ERG.Node.A.13": ["AthenaGlider:glider_rumplewisp"]
+    "ERG.Node.A.1": [
+      "AthenaCharacter:character_chubbyjingle"
+    ],
+    "ERG.Node.A.2": [
+      "AthenaCharacter:character_frostiron"
+    ],
+    "ERG.Node.A.3": [
+      "AthenaBackpack:backpack_polargander"
+    ],
+    "ERG.Node.A.4": [
+      "AthenaDance:emoticon_s39winterfest",
+      "AthenaDance:spray_winterfest3"
+    ],
+    "ERG.Node.A.5": [
+      "AthenaBackpack:backpack_winkfin"
+    ],
+    "ERG.Node.A.6": [
+      "SparksSong:sid_placeholder_728"
+    ],
+    "ERG.Node.A.7": [
+      "AthenaPickaxe:pickaxe_hunsting"
+    ],
+    "ERG.Node.A.8": [
+      "AthenaPickaxe:pickaxe_jingleblade"
+    ],
+    "ERG.Node.A.9": [
+      "AthenaItemWrap:wrap_shavedice"
+    ],
+    "ERG.Node.A.10": [
+      "AthenaSkyDiveContrail:contrail_hollowstun"
+    ],
+    "ERG.Node.A.11": [
+      "SparksGuitar:sparks_rainbowhouse_guitar"
+    ],
+    "ERG.Node.A.12": [
+      "SparksBass:sparks_frostiron_bass"
+    ],
+    "ERG.Node.B.1": [
+      "AthenaDance:spray_winterfest",
+      "AthenaDance:spray_winterfest2"
+    ],
+    "ERG.Node.A.13": [
+      "AthenaGlider:glider_rumplewisp"
+    ]
   }
-}
+}}

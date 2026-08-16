@@ -38,6 +38,7 @@ import androidx.work.WorkManager
 import androidx.work.workDataOf
 import coil.compose.AsyncImage
 import com.dhyper.fncompanion.BuildConfig
+import java.util.Locale
 import com.dhyper.fncompanion.data.models.AuthState
 import com.dhyper.fncompanion.ui.theme.*
 import com.dhyper.fncompanion.ui.viewmodels.AuthViewModel
@@ -53,7 +54,7 @@ fun SettingsScreen(
     statsViewModel: StatsViewModel,
     settingsViewModel: SettingsViewModel,
     onAddAccount: () -> Unit,
-    onNavigateToDiagnostic: () -> Unit
+    onNavigateToAdvanced: () -> Unit
 ) {
     val context = LocalContext.current
     val allAccounts by settingsViewModel.allAccounts.collectAsState()
@@ -83,17 +84,16 @@ fun SettingsScreen(
     val timePicker = TimePickerDialog(
         context,
         { _, hour, min ->
-            val time = String.format("%02d:%02d", hour, min)
+            val time = String.format(Locale.US, "%02d:%02d", hour, min)
             settingsViewModel.updateVBucksAlertTime(time)
             scope.launch {
                 // Give the DB a moment to save the new time
                 kotlinx.coroutines.delay(500)
-                com.dhyper.fncompanion.worker.VBucksAlertReceiver.scheduleNextAlarm(context)
                 com.dhyper.fncompanion.worker.ShopRefreshReceiver.scheduleNextAlarm(context)
             }
         },
-        settings?.vbucksAlertTime?.split(":")?.getOrNull(0)?.toIntOrNull() ?: 0,
-        settings?.vbucksAlertTime?.split(":")?.getOrNull(1)?.toIntOrNull() ?: 0,
+        settings?.shopRefreshTime?.split(":")?.getOrNull(0)?.toIntOrNull() ?: 0,
+        settings?.shopRefreshTime?.split(":")?.getOrNull(1)?.toIntOrNull() ?: 0,
         true
     )
 
@@ -322,7 +322,7 @@ fun SettingsScreen(
                 // Accent Color
                 PreferenceDropdown(
                     label = "Accent Color",
-                    options = listOf("Cyan", "Primary", "Emerald", "Gold"),
+                    options = listOf("Cyan", "Primary", "Emerald", "Gold", "Purple", "Orange", "Pink", "Red", "Blue"),
                     selected = settings?.accentColor ?: "Cyan",
                     onSelected = { settingsViewModel.updateAccentColor(it) }
                 )
@@ -362,30 +362,19 @@ fun SettingsScreen(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // V-Bucks Alerts
-                PreferenceSwitch(
-                    label = "V-Bucks Alerts",
-                    subtitle = "Check for StW V-Bucks missions daily",
-                    checked = settings?.vbucksAlertsEnabled ?: false,
-                    onCheckedChange = { enabled ->
-                        settingsViewModel.updateVBucksAlerts(enabled)
-                        com.dhyper.fncompanion.worker.VBucksAlertReceiver.scheduleNextAlarm(context, enabled)
-                    }
-                )
-                
-                if (settings?.vbucksAlertsEnabled == true || settings?.notificationsEnabled == true) {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Button(
-                        onClick = { timePicker.show() },
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.buttonColors(containerColor = SleekSurface),
-                        shape = RoundedCornerShape(12.dp),
-                        border = BorderStroke(1.dp, SleekSurfaceBorder)
-                    ) {
-                        Icon(Icons.Default.Alarm, null, tint = SleekCyan, modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.width(10.dp))
-                        Text("Alert Time: ${settings?.vbucksAlertTime}", color = SleekTextPrimary, fontWeight = FontWeight.Bold)
-                    }
+                // V-Bucks Alerts moved to STW Settings
+
+                Spacer(modifier = Modifier.height(8.dp))
+                Button(
+                    onClick = { timePicker.show() },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(containerColor = SleekSurface),
+                    shape = RoundedCornerShape(12.dp),
+                    border = BorderStroke(1.dp, SleekSurfaceBorder)
+                ) {
+                    Icon(Icons.Default.Alarm, null, tint = SleekCyan, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(10.dp))
+                    Text("Shop Refresh Time: ${settings?.shopRefreshTime}", color = SleekTextPrimary, fontWeight = FontWeight.Bold)
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
@@ -559,14 +548,14 @@ fun SettingsScreen(
         Spacer(modifier = Modifier.height(24.dp))
 
         Button(
-            onClick = onNavigateToDiagnostic,
+            onClick = onNavigateToAdvanced,
             modifier = Modifier.fillMaxWidth(),
             colors = ButtonDefaults.buttonColors(containerColor = SleekSurfaceVariant),
             shape = RoundedCornerShape(12.dp)
         ) {
-            Icon(Icons.Default.BugReport, null, tint = FortniteGold)
+            Icon(Icons.Default.Tune, null, tint = FortniteGold)
             Spacer(Modifier.width(10.dp))
-            Text("Auth Diagnostics", color = SleekTextPrimary, fontWeight = FontWeight.Bold)
+            Text("Advanced Options", color = SleekTextPrimary, fontWeight = FontWeight.Bold)
         }
 
 

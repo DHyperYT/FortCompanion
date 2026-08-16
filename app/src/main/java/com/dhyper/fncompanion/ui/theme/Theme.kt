@@ -34,6 +34,11 @@ fun FortniteCompanionTheme(
         "Primary" -> SleekPrimary
         "Emerald" -> SleekEmerald
         "Gold" -> FortniteGold
+        "Purple" -> FortnitePurple
+        "Orange" -> LegendaryColor
+        "Pink" -> SleekAccent
+        "Red" -> Color(0xFFEF4444)
+        "Blue" -> Color(0xFF3B82F6)
         else -> SleekCyan
     }
 

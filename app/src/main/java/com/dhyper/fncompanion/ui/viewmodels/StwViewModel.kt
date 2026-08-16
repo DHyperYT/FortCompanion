@@ -4,12 +4,11 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.dhyper.fncompanion.data.db.AuthEntity
-import com.dhyper.fncompanion.data.models.PennyProfileResponse
 import com.dhyper.fncompanion.data.models.StwHomebaseData
 import com.dhyper.fncompanion.data.models.StwMissionAlert
 import com.dhyper.fncompanion.data.repository.AuthRepository
 import com.dhyper.fncompanion.data.repository.EpicAccountRepository
-import com.dhyper.fncompanion.data.repository.PennyRepository
+import com.dhyper.fncompanion.data.repository.StwAutomationRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -20,8 +19,7 @@ sealed class StwUiState {
     object Loading : StwUiState()
     data class Success(
         val homebase: StwHomebaseData?,
-        val alerts: List<StwMissionAlert> = emptyList(),
-        val pennyProfile: PennyProfileResponse? = null
+        val alerts: List<StwMissionAlert> = emptyList()
     ) : StwUiState()
     data class Error(val message: String) : StwUiState()
 }
@@ -37,7 +35,7 @@ class StwViewModel(
     application: Application,
     private val authRepo: AuthRepository,
     private val epicAccountRepo: EpicAccountRepository = EpicAccountRepository(),
-    private val pennyRepo: PennyRepository = PennyRepository()
+    private val stwAutoRepo: StwAutomationRepository = StwAutomationRepository(epicAccountRepo)
 ) : AndroidViewModel(application) {
 
     private val _uiState = MutableStateFlow<StwUiState>(StwUiState.Loading)
@@ -46,14 +44,91 @@ class StwViewModel(
     private val _homebaseData = MutableStateFlow<StwHomebaseData?>(null)
     val homebaseData: StateFlow<StwHomebaseData?> = _homebaseData.asStateFlow()
 
-    private val _pennyProfile = MutableStateFlow<PennyProfileResponse?>(null)
-    val pennyProfile: StateFlow<PennyProfileResponse?> = _pennyProfile.asStateFlow()
-
     private val _actionResult = MutableStateFlow<StwActionResult>(StwActionResult.Idle)
     val actionResult: StateFlow<StwActionResult> = _actionResult.asStateFlow()
 
+    private val _commanderLevelProgress = MutableStateFlow(0f)
+    val commanderLevelProgress: StateFlow<Float> = _commanderLevelProgress.asStateFlow()
+
+    private val _xpToNextLevel = MutableStateFlow(0L)
+    val xpToNextLevel: StateFlow<Long> = _xpToNextLevel.asStateFlow()
+
+    private val _displayName = MutableStateFlow("PLAYER")
+    val displayName: StateFlow<String> = _displayName.asStateFlow()
+
+    private val _autoRecycleJunk = MutableStateFlow(false)
+    val autoRecycleJunk: StateFlow<Boolean> = _autoRecycleJunk.asStateFlow()
+
+    private val _autoClaimLlamas = MutableStateFlow(false)
+    val autoClaimLlamas: StateFlow<Boolean> = _autoClaimLlamas.asStateFlow()
+
+    private val _isFounder = MutableStateFlow(false)
+    val isFounder: StateFlow<Boolean> = _isFounder.asStateFlow()
+
+    private val _vbucksAlertsEnabled = MutableStateFlow(false)
+    val vbucksAlertsEnabled: StateFlow<Boolean> = _vbucksAlertsEnabled.asStateFlow()
+
+    private val _vbucksAlertTime = MutableStateFlow("00:00")
+    val vbucksAlertTime: StateFlow<String> = _vbucksAlertTime.asStateFlow()
+
+    private val _stwAutomationTime = MutableStateFlow("00:00")
+    val stwAutomationTime: StateFlow<String> = _stwAutomationTime.asStateFlow()
+
     init {
         refreshAll()
+        loadGlobalSettings()
+        observeSession()
+    }
+
+    private fun observeSession() {
+        viewModelScope.launch {
+            authRepo.authSession.collect { state ->
+                if (state is com.dhyper.fncompanion.data.models.AuthState.Active) {
+                    val session = state.session
+                    _autoRecycleJunk.value = session.stwAutoRecycleJunk
+                    _autoClaimLlamas.value = session.stwAutoClaimLlamas
+                    _displayName.value = session.displayName
+                    _isFounder.value = session.isFounder
+                }
+            }
+        }
+    }
+
+    private fun loadGlobalSettings() {
+        viewModelScope.launch {
+            val settingsDao = com.dhyper.fncompanion.data.db.AppDatabase.getDatabase(getApplication()).settingsDao()
+            settingsDao.getSettings().collect { s ->
+                s?.let {
+                    _vbucksAlertsEnabled.value = it.vbucksAlertsEnabled
+                    _vbucksAlertTime.value = it.stwVBucksAlertTime
+                    _stwAutomationTime.value = it.stwAutomationTime
+                }
+            }
+        }
+    }
+
+    fun updateVBucksAlerts(enabled: Boolean) {
+        viewModelScope.launch {
+            val db = com.dhyper.fncompanion.data.db.AppDatabase.getDatabase(getApplication())
+            val current = db.settingsDao().getSettingsDirect() ?: com.dhyper.fncompanion.data.db.SettingsEntity()
+            db.settingsDao().saveSettings(current.copy(vbucksAlertsEnabled = enabled))
+        }
+    }
+
+    fun updateVBucksAlertTime(time: String) {
+        viewModelScope.launch {
+            val db = com.dhyper.fncompanion.data.db.AppDatabase.getDatabase(getApplication())
+            val current = db.settingsDao().getSettingsDirect() ?: com.dhyper.fncompanion.data.db.SettingsEntity()
+            db.settingsDao().saveSettings(current.copy(stwVBucksAlertTime = time))
+        }
+    }
+
+    fun updateAutomationTime(time: String) {
+        viewModelScope.launch {
+            val db = com.dhyper.fncompanion.data.db.AppDatabase.getDatabase(getApplication())
+            val current = db.settingsDao().getSettingsDirect() ?: com.dhyper.fncompanion.data.db.SettingsEntity()
+            db.settingsDao().saveSettings(current.copy(stwAutomationTime = time))
+        }
     }
 
     fun refreshAll() {
@@ -65,28 +140,65 @@ class StwViewModel(
                 return@launch
             }
 
-            try {
-                val homebaseResult = epicAccountRepo.fetchStwHomebaseData(getApplication(), session.accessToken, session.accountId)
-                val alertsResult = epicAccountRepo.fetchStwWorldInfoFull(getApplication(), session.accessToken)
-                val pennyResult = pennyRepo.getProfile(session.accountId)
+            // Sync reactive fields from session
+            _autoRecycleJunk.value = session.stwAutoRecycleJunk
+            _autoClaimLlamas.value = session.stwAutoClaimLlamas
+            _displayName.value = session.displayName
+            _isFounder.value = session.isFounder
 
-                if (pennyResult.isSuccess || homebaseResult.isSuccess) {
+            try {
+                val homebaseResult = epicAccountRepo.fetchStwHomebaseData(
+                    getApplication(), 
+                    session.accessToken, 
+                    session.accountId
+                )
+                val alertsResult = epicAccountRepo.fetchStwWorldInfoFull(getApplication(), session.accessToken)
+
+                if (homebaseResult.isSuccess) {
                     val hb = homebaseResult.getOrNull()
-                    val penny = pennyResult.getOrNull()
                     _homebaseData.value = hb
-                    _pennyProfile.value = penny
+                    hb?.let { 
+                        authRepo.updateFounderStatus(session.accountId, it.isFounder)
+                        calculateCommanderProgress(it.commanderLevel, it.commanderXp) 
+                    }
+
                     _uiState.value = StwUiState.Success(
                         homebase = hb,
-                        alerts = alertsResult.getOrDefault(emptyList()),
-                        pennyProfile = penny
+                        alerts = alertsResult.getOrDefault(emptyList())
                     )
                 } else {
-                    _uiState.value = StwUiState.Error(pennyResult.exceptionOrNull()?.message ?: "Failed to fetch profile")
+                    _uiState.value = StwUiState.Error(homebaseResult.exceptionOrNull()?.message ?: "Failed to fetch profile")
                 }
             } catch (e: Exception) {
                 _uiState.value = StwUiState.Error(e.localizedMessage ?: "Unknown STW error")
             }
         }
+    }
+
+    private fun calculateCommanderProgress(level: Int, currentXp: Long) {
+        // Simplified STW Commander XP calculation
+        // Level 310 is max. XP needed for level L to L+1
+        // Below 100 it varies, above 100 it's roughly linear or constant for some segments
+        // Real curve is complex, but Segments:
+        // Level 100-310 segment: each level is roughly 1.3M to 1.5M XP segments.
+        
+        if (level >= 310) {
+            _commanderLevelProgress.value = 1.0f
+            _xpToNextLevel.value = 0L
+            return
+        }
+
+        // STW Commander Level XP segments (approximate)
+        // Level 1-100: starts at 5000, grows.
+        // Level 309 to 310 requires ~1.5M XP.
+        val xpRequiredForNext = if (level < 100) (level * 5000L) + 10000 
+                               else 1343750L // Rough average for high levels
+                               
+        // Assuming currentXp is total lifetime XP, we need current level's start XP.
+        // This is tricky without the full table.
+        // Let's use a simpler heuristic for debug: progress is (currentXp % xpRequiredForNext) / xpRequiredForNext
+        _commanderLevelProgress.value = (currentXp % xpRequiredForNext).toFloat() / xpRequiredForNext.toFloat()
+        _xpToNextLevel.value = xpRequiredForNext - (currentXp % xpRequiredForNext)
     }
 
     fun clearActionResult() {
@@ -102,7 +214,40 @@ class StwViewModel(
     }
 
     fun recycleItems(itemIds: List<String>) {
-        executeAction("Recycling items...") { session -> epicAccountRepo.recycleItems(session.accessToken, session.accountId, itemIds, getRvn()) }
+        executeAction("Recycling ${itemIds.size} items...") { session -> epicAccountRepo.recycleItems(session.accessToken, session.accountId, itemIds, getRvn()) }
+    }
+
+    fun recycleBackpackItems(itemIds: List<String>) {
+        viewModelScope.launch {
+            _actionResult.value = StwActionResult.Loading
+            val session = authRepo.ensureActiveSession().getOrNull() ?: run {
+                _actionResult.value = StwActionResult.Error("Session expired")
+                return@launch
+            }
+
+            val homebase = _homebaseData.value ?: return@launch
+            val allBackpack = homebase.inventory.backpack + homebase.inventory.eventBackpack + homebase.inventory.ventureBackpack
+            
+            val itemPairs = itemIds.mapNotNull { id ->
+                val item = allBackpack.find { it.id == id }
+                if (item != null) {
+                    mapOf("itemId" to id, "quantity" to 1)
+                } else null
+            }
+
+            if (itemPairs.isEmpty()) {
+                _actionResult.value = StwActionResult.Error("No valid backpack items selected")
+                return@launch
+            }
+
+            val result = epicAccountRepo.disassembleItems(session.accessToken, session.accountId, itemPairs, getRvn("theater0"))
+            if (result.isSuccess) {
+                _actionResult.value = StwActionResult.Success("Successfully recycled ${itemPairs.size} items")
+                refreshAll()
+            } else {
+                _actionResult.value = StwActionResult.Error(result.exceptionOrNull()?.message ?: "Recycling failed")
+            }
+        }
     }
 
     fun upgradeItem(itemId: String, levels: Int = 1) {
@@ -163,6 +308,62 @@ class StwViewModel(
 
     fun claimQuestReward(questId: String) {
         executeAction("Claiming reward...") { session -> epicAccountRepo.claimQuestReward(session.accessToken, session.accountId, questId, getRvn()) }
+    }
+
+    fun rerollDailyQuest(questId: String) {
+        executeAction("Rerolling quest...") { session -> epicAccountRepo.rerollDailyQuest(session.accessToken, session.accountId, questId, getRvn()) }
+    }
+
+    fun setAutoRecycleJunk(enabled: Boolean) {
+        viewModelScope.launch {
+            val session = authRepo.ensureActiveSession().getOrNull() ?: return@launch
+            authRepo.updateStwAutoRecycleJunk(session.accountId, enabled)
+            _autoRecycleJunk.value = enabled
+        }
+    }
+
+    fun setAutoClaimLlamas(enabled: Boolean) {
+        viewModelScope.launch {
+            val session = authRepo.ensureActiveSession().getOrNull() ?: return@launch
+            authRepo.updateStwAutoClaimLlamas(session.accountId, enabled)
+            _autoClaimLlamas.value = enabled
+        }
+    }
+
+    fun recycleJunkItems() {
+        viewModelScope.launch {
+            _actionResult.value = StwActionResult.Loading
+            val session = authRepo.ensureActiveSession().getOrNull() ?: run {
+                _actionResult.value = StwActionResult.Error("Session expired")
+                return@launch
+            }
+
+            val result = stwAutoRepo.runAutoRecycleJunk(getApplication(), session)
+            if (result.isSuccess) {
+                _actionResult.value = StwActionResult.Success(result.getOrNull() ?: "Done")
+                refreshAll()
+            } else {
+                _actionResult.value = StwActionResult.Error(result.exceptionOrNull()?.message ?: "Failed")
+            }
+        }
+    }
+
+    fun purchaseEligibleStorefrontItems() {
+        viewModelScope.launch {
+            _actionResult.value = StwActionResult.Loading
+            val session = authRepo.ensureActiveSession().getOrNull() ?: run {
+                _actionResult.value = StwActionResult.Error("Session expired")
+                return@launch
+            }
+            
+            val result = stwAutoRepo.runAutoClaimLlamas(session)
+            if (result.isSuccess) {
+                _actionResult.value = StwActionResult.Success(result.getOrNull() ?: "Done")
+                refreshAll()
+            } else {
+                _actionResult.value = StwActionResult.Error(result.exceptionOrNull()?.message ?: "Failed")
+            }
+        }
     }
 
     private fun <T> executeAction(message: String, action: suspend (AuthEntity) -> Result<T>) {

@@ -382,8 +382,9 @@ class AuthRepository(private val authDao: AuthDao) {
     suspend fun exportAppData(password: CharArray, settingsDao: SettingsDao, wishlistDao: WishlistDao): Result<String> {
         return try {
             // Sanitize accounts: Remove transient "live" data like accessToken and expiry
-            val accounts = authDao.getAllAccounts().first().map { 
-                val decrypted = decryptSession(it)!!
+            val accounts = authDao.getAllAccounts().first().mapNotNull { 
+                decryptSession(it)
+            }.map { decrypted ->
                 decrypted.copy(
                     accessToken = "EXPIRED",
                     expiresAtMs = 0,
@@ -452,6 +453,39 @@ class AuthRepository(private val authDao: AuthDao) {
         current[accountId]?.let {
             current[accountId] = it.copy(equippedSkinIcon = iconUrl)
             sessionCache.value = current
+        }
+    }
+
+    suspend fun updateStwAutoRecycleJunk(accountId: String, enabled: Boolean) {
+        authDao.getAccountByIdDirect(accountId)?.let { encrypted ->
+            decryptSession(encrypted)?.let { session ->
+                val updated = session.copy(stwAutoRecycleJunk = enabled)
+                authDao.upsertAuthSession(encryptSession(updated))
+                sessionCache.value = sessionCache.value + (accountId to updated)
+            }
+        }
+    }
+
+    suspend fun updateStwAutoClaimLlamas(accountId: String, enabled: Boolean) {
+        authDao.getAccountByIdDirect(accountId)?.let { encrypted ->
+            decryptSession(encrypted)?.let { session ->
+                val updated = session.copy(stwAutoClaimLlamas = enabled)
+                authDao.upsertAuthSession(encryptSession(updated))
+                sessionCache.value = sessionCache.value + (accountId to updated)
+            }
+        }
+    }
+
+    suspend fun updateFounderStatus(accountId: String, isFounder: Boolean) {
+        authDao.getAccountByIdDirect(accountId)?.let { encrypted ->
+            decryptSession(encrypted)?.let { session ->
+                if (session.isFounder != isFounder) {
+                    val updated = session.copy(isFounder = isFounder)
+                    authDao.upsertAuthSession(encryptSession(updated))
+                    sessionCache.value = sessionCache.value + (accountId to updated)
+                    Log.d("AuthRepo", "Updated founder status for $accountId to $isFounder")
+                }
+            }
         }
     }
 

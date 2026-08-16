@@ -60,6 +60,7 @@ fun AccountAuthScreen(
     viewModel: AuthViewModel,
     settingsViewModel: SettingsViewModel,
     lockerViewModel: PersonalLockerViewModel,
+    stwViewModel: com.dhyper.fncompanion.ui.viewmodels.StwViewModel,
     onNavigateToLocker: () -> Unit,
     onNavigateToCareer: () -> Unit,
     forceLogin: Boolean = false,
@@ -207,21 +208,38 @@ fun AccountAuthScreen(
                         Box(
                             modifier = Modifier
                                 .size(60.dp)
-                                .background(SleekSurface, CircleShape)
-                                .border(2.dp, SleekPrimary, CircleShape)
-                                .clip(CircleShape)
-                                .clickable { showIconPicker = true },
-                            contentAlignment = Alignment.Center
+                                .clickable { showIconPicker = true }
                         ) {
-                            if (session.equippedSkinIcon != null) {
-                                AsyncImage(
-                                    model = session.equippedSkinIcon,
-                                    contentDescription = null,
-                                    modifier = Modifier.fillMaxSize(),
-                                    contentScale = ContentScale.Crop
-                                )
-                            } else {
-                                Icon(Icons.Default.AddAPhoto, null, tint = SleekPrimary, modifier = Modifier.size(24.dp))
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(SleekSurface, CircleShape)
+                                    .border(2.dp, SleekPrimary, CircleShape)
+                                    .clip(CircleShape),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                if (session.equippedSkinIcon != null) {
+                                    AsyncImage(
+                                        model = session.equippedSkinIcon,
+                                        contentDescription = null,
+                                        modifier = Modifier.fillMaxSize(),
+                                        contentScale = ContentScale.Crop
+                                    )
+                                } else {
+                                    Icon(Icons.Default.AddAPhoto, null, tint = SleekPrimary, modifier = Modifier.size(24.dp))
+                                }
+                            }
+
+                            // Edit Icon at corner
+                            Box(
+                                modifier = Modifier
+                                    .align(Alignment.BottomEnd)
+                                    .size(20.dp)
+                                    .background(SleekPrimary, CircleShape)
+                                    .border(1.dp, SleekSurfaceVariant, CircleShape),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(Icons.Default.Edit, null, tint = Color.White, modifier = Modifier.size(12.dp))
                             }
                         }
                         Spacer(modifier = Modifier.width(16.dp))

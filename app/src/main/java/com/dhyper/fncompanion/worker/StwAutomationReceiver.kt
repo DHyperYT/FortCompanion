@@ -15,44 +15,37 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import java.util.Calendar
 
-class VBucksAlertReceiver : BroadcastReceiver() {
+class StwAutomationReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
-        if (intent.action == Intent.ACTION_BOOT_COMPLETED || intent.action == "com.dhyper.fncompanion.ACTION_VBUCKS_CHECK") {
-            val vbucksRequest = OneTimeWorkRequestBuilder<VBucksCheckWorker>().build()
-            WorkManager.getInstance(context).enqueue(vbucksRequest)
+        if (intent.action == Intent.ACTION_BOOT_COMPLETED || intent.action == "com.dhyper.fncompanion.ACTION_STW_AUTO") {
+            val request = OneTimeWorkRequestBuilder<StwAutomationWorker>().build()
+            WorkManager.getInstance(context).enqueue(request)
             
             scheduleNextAlarm(context)
         }
     }
 
     companion object {
-        fun scheduleNextAlarm(context: Context, forceEnabled: Boolean? = null) {
+        fun scheduleNextAlarm(context: Context) {
             val db = AppDatabase.getDatabase(context)
             val scope = CoroutineScope(Dispatchers.IO)
             
             scope.launch {
                 val settings = db.settingsDao().getSettingsDirect() ?: return@launch
-                val isEnabled = forceEnabled ?: settings.vbucksAlertsEnabled
 
                 val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-                val intent = Intent(context, VBucksAlertReceiver::class.java).apply {
-                    action = "com.dhyper.fncompanion.ACTION_VBUCKS_CHECK"
+                val intent = Intent(context, StwAutomationReceiver::class.java).apply {
+                    action = "com.dhyper.fncompanion.ACTION_STW_AUTO"
                 }
                 
                 val pendingIntent = PendingIntent.getBroadcast(
                     context,
-                    2001,
+                    3001,
                     intent,
                     PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
                 )
 
-                if (!isEnabled) {
-                    Log.d("VBucksAlertReceiver", "V-Bucks alerts disabled. Canceling alarm.")
-                    alarmManager.cancel(pendingIntent)
-                    return@launch
-                }
-
-                val timeParts = settings.stwVBucksAlertTime.split(":")
+                val timeParts = settings.stwAutomationTime.split(":")
                 val hour = timeParts.getOrNull(0)?.toIntOrNull() ?: 0
                 val min = timeParts.getOrNull(1)?.toIntOrNull() ?: 0
 
@@ -70,36 +63,20 @@ class VBucksAlertReceiver : BroadcastReceiver() {
                 }
 
                 val scheduledTime = java.text.SimpleDateFormat("HH:mm", java.util.Locale.US).format(calendar.time)
-                Log.i("VBucksAlertReceiver", "Next V-Bucks alert scheduled for: $scheduledTime")
+                Log.i("StwAutomationReceiver", "Next STW automation scheduled for: $scheduledTime")
 
                 try {
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                         if (alarmManager.canScheduleExactAlarms()) {
-                            alarmManager.setExactAndAllowWhileIdle(
-                                AlarmManager.RTC_WAKEUP,
-                                calendar.timeInMillis,
-                                pendingIntent
-                            )
+                            alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, calendar.timeInMillis, pendingIntent)
                         } else {
-                            alarmManager.setAndAllowWhileIdle(
-                                AlarmManager.RTC_WAKEUP,
-                                calendar.timeInMillis,
-                                pendingIntent
-                            )
+                            alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, calendar.timeInMillis, pendingIntent)
                         }
                     } else {
-                        alarmManager.setExactAndAllowWhileIdle(
-                            AlarmManager.RTC_WAKEUP,
-                            calendar.timeInMillis,
-                            pendingIntent
-                        )
+                        alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, calendar.timeInMillis, pendingIntent)
                     }
                 } catch (e: Exception) {
-                    alarmManager.setAndAllowWhileIdle(
-                        AlarmManager.RTC_WAKEUP,
-                        calendar.timeInMillis,
-                        pendingIntent
-                    )
+                    alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, calendar.timeInMillis, pendingIntent)
                 }
             }
         }

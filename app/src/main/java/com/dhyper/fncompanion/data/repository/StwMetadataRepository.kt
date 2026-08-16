@@ -10,8 +10,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import okhttp3.OkHttpClient
-import okhttp3.Request
 
 @JsonClass(generateAdapter = true)
 data class StwObjectiveMetadata(
@@ -21,24 +19,21 @@ data class StwObjectiveMetadata(
 
 @JsonClass(generateAdapter = true)
 data class StwItemMetadata(
-    val name: Map<String, String>? = null,
+    val name: Map<String, Any>? = null,
     val rarity: String? = null,
     val type: String? = null,
     val objectives: Map<String, StwObjectiveMetadata>? = null
 )
 
 data class StwStringList(
-    @Json(name = "Items") val Items: Map<String, StwItemMetadata>? = null,
-    @Json(name = "Item Types") val ItemTypes: Map<String, Map<String, String>>? = null,
-    @Json(name = "Item Rarities") val ItemRarities: Map<String, Map<String, String>>? = null,
-    @Json(name = "Llama tiers") val LlamaTiers: Map<String, Map<String, String>>? = null,
+    @Json(name = "Items") val items: Map<String, StwItemMetadata>? = null,
+    @Json(name = "Item Types") val itemTypes: Map<String, Map<String, String>>? = null,
+    @Json(name = "Item Rarities") val itemRarities: Map<String, Map<String, String>>? = null,
+    @Json(name = "Llama tiers") val llamaTiers: Map<String, Map<String, String>>? = null,
     val powerLevels: Map<String, Map<String, Int>>? = null
 )
-// Removed problematic Item Power Levels and Strings from the data class to ensure Moshi doesn't fail on heterogeneous types
 
 object StwMetadataRepository {
-    private val client = OkHttpClient()
-    private val heroMap = mutableMapOf<String, String>()
     private var stwData: StwStringList? = null
     private val itemItems = mutableMapOf<String, StwItemMetadata>()
     private val normalizedItems = mutableMapOf<String, StwItemMetadata>()
@@ -50,36 +45,6 @@ object StwMetadataRepository {
     private val moshi = Moshi.Builder()
         .add(KotlinJsonAdapterFactory())
         .build()
-    private val adapter = moshi.adapter(StwStringList::class.java)
-
-    private val HERO_URLS = listOf(
-        "https://raw.githubusercontent.com/pirica/stw_fortnite_ids/main/Hero_Constructors.txt",
-        "https://raw.githubusercontent.com/pirica/stw_fortnite_ids/main/Hero_Ninjas.txt",
-        "https://raw.githubusercontent.com/pirica/stw_fortnite_ids/main/Hero_Outlanders.txt",
-        "https://raw.githubusercontent.com/pirica/stw_fortnite_ids/main/Hero_Soldiers.txt"
-    )
-
-    private val itemMap = mapOf(
-        "peoplexp" to "People XP",
-        "schematicxp" to "Schematic XP",
-        "xray" to "X-Ray Tickets",
-        "xraytickets" to "X-Ray Tickets",
-        "mtx_currency" to "V-Bucks",
-        "mtxpurchasable" to "V-Bucks",
-        "pdor" to "Pure Drop of Rain",
-        "bottlelightning" to "Lightning in a Bottle",
-        "stormeye" to "Eye of the Storm",
-        "stormshard" to "Storm Shard",
-        "gold" to "Gold",
-        "minillama" to "Mini Reward Llama",
-        "vbucksvoucher" to "V-Bucks Voucher",
-        "trainingmanual" to "Training Manual",
-        "trapschematicmanual" to "Trap Design",
-        "weaponschematicmanual" to "Weapon Design",
-        "legendaryflux" to "Legendary Flux",
-        "epicflux" to "Epic Flux",
-        "rareflux" to "Rare Flux"
-    )
 
     suspend fun loadMetadata(context: Context) = withContext(Dispatchers.IO) {
         if (isLoaded && dailyQuests.isNotEmpty()) return@withContext
@@ -112,13 +77,13 @@ object StwMetadataRepository {
                 itemItems.clear()
                 normalizedItems.clear()
                 
-                val prefixSet = setOf("wid", "sid", "hid", "did", "worker", "quest", "managersoldier", "managerinventor", "managerengineer", "managerdoctor", "managerexplorer", "managermartialartist", "leadengineer", "leadexplorer", "leaddoctor", "schematic", "hero", "worker", "defender", "quest", "collectionbookpage", "page")
-                val variantSet = setOf("sr", "vr", "r", "uc", "c", "ur", "myth", "ore", "crystal")
+                val prefixSet = setOf("wid", "sid", "hid", "did", "tid", "uid", "qid", "worker", "quest", "managersoldier", "managerinventor", "managerengineer", "managerdoctor", "managerexplorer", "managermartialartist", "leadengineer", "leadexplorer", "leaddoctor", "schematic", "hero", "worker", "defender", "quest", "collectionbookpage", "page", "worlditem", "ingredient", "item", "ammo", "trap", "weapon", "cardpack", "consumable", "reagent", "token", "ingredient", "trap", "weapon")
+                val variantSet = setOf("sr", "vr", "r", "uc", "c", "ur", "myth", "ore", "crystal", "highperf", "highcapacity", "highvolt", "founders", "military", "halloween", "christmas", "winter", "vindertech", "steampunk", "medieval", "retroscifi", "artdeco", "t01", "t02", "t03", "t04", "t05", "t06", "t07")
 
                 itemsRaw?.forEach { (k, v) ->
                     val data = asMap(v) ?: return@forEach
                     val meta = StwItemMetadata(
-                        name = data["name"] as? Map<String, String>,
+                        name = data["name"] as? Map<String, Any>, // Use Any to avoid cast issues
                         rarity = data["rarity"] as? String,
                         type = data["type"] as? String
                     )
@@ -144,9 +109,9 @@ object StwMetadataRepository {
                 }
                 
                 stwData = StwStringList(
-                    ItemTypes = asNestedMap(root["Item Types"]),
-                    ItemRarities = asNestedMap(root["Item Rarities"]),
-                    LlamaTiers = asNestedMap(root["Llama tiers"]),
+                    itemTypes = asNestedMap(root["Item Types"]),
+                    itemRarities = asNestedMap(root["Item Rarities"]),
+                    llamaTiers = asNestedMap(root["Llama tiers"]),
                     powerLevels = (asMap(root["Item Power Levels"]))?.mapValues { outer ->
                         val inner = asMap(outer.value) ?: return@mapValues emptyMap<String, Int>()
                         inner.mapKeys { it.key.toDoubleOrNull()?.toInt()?.toString() ?: it.key }
@@ -188,14 +153,6 @@ object StwMetadataRepository {
                     Log.e("StwMetadata", "Failed to load daily_quests.json", e)
                 }
 
-                HERO_URLS.forEach { url ->
-                    try {
-                        val request = Request.Builder().url(url).build()
-                        client.newCall(request).execute().use { response ->
-                            if (response.isSuccessful) parseHeroLines(response.body?.string() ?: "")
-                        }
-                    } catch (e: Exception) { Log.e("StwMetadata", "GitHub load failed for $url") }
-                }
                 isLoaded = true
             } catch (e: Exception) {
                 Log.e("StwMetadata", "Critical metadata load failure", e)
@@ -204,7 +161,21 @@ object StwMetadataRepository {
     }
 
     private fun findMetadata(templateId: String): StwItemMetadata? {
-        val fullTid = templateId.lowercase().trim()
+        var fullTid = templateId.lowercase().trim()
+        
+        // 1. Normalize profile-specific prefixes to stringlist.json format
+        fullTid = when {
+            fullTid.startsWith("trap:tid_") -> fullTid.replace("trap:tid_", "schematic:sid_")
+            fullTid.startsWith("weapon:wid_") -> fullTid.replace("weapon:wid_", "schematic:sid_")
+            fullTid.startsWith("worlditem:ingredient_") -> fullTid.replace("worlditem:ingredient_", "ingredient:ingredient_")
+            else -> fullTid
+        }
+        
+        // 2. Normalize variants (crystal -> ore)
+        if (fullTid.contains("_crystal_")) {
+            fullTid = fullTid.replace("_crystal_", "_ore_")
+        }
+
         val strippedTid = if (fullTid.contains(":")) fullTid.substringAfter(":") else fullTid
         val idNoVersion = strippedTid.substringBefore(".")
 
@@ -216,61 +187,79 @@ object StwMetadataRepository {
             
             val questCore = idNoVersion.replace(Regex("_v\\d+$"), "")
             dailyQuests[questCore]?.let { return it }
-            
-            dailyQuests.entries.find { 
-                val keyOnly = it.key.substringAfter(":")
-                keyOnly.startsWith(questCore) || questCore.startsWith(keyOnly)
-            }?.value?.let { return it }
         }
         
-        // 1. Direct matches (Highest priority)
-        itemItems[fullTid]?.let { return it }
-        itemItems[strippedTid]?.let { return it }
-        itemItems[idNoVersion]?.let { return it }
+        // 3. Direct matches with potential tier fallback
+        fun tryMatch(id: String): StwItemMetadata? {
+            // Prefer T01 version if available to satisfy "get the t01 names for everyone"
+            if (id.contains(Regex("_t\\d+"))) {
+                val t01Id = id.replace(Regex("_t\\d+"), "_t01")
+                itemItems[t01Id]?.let { return it }
+            }
+            itemItems[id]?.let { return it }
+            return null
+        }
+
+        tryMatch(fullTid)?.let { return it }
+        tryMatch(strippedTid)?.let { return it }
+        tryMatch(idNoVersion)?.let { return it }
         
         dailyQuests[fullTid]?.let { return it }
         dailyQuests[strippedTid]?.let { return it }
         dailyQuests[idNoVersion]?.let { return it }
 
-        // 2. Safe normalization for lookup
-        val prefixSet = setOf("wid", "sid", "hid", "did", "worker", "quest", "managersoldier", "managerinventor", "managerengineer", "managerdoctor", "managerexplorer", "managermartialartist", "leadengineer", "leadexplorer", "leaddoctor", "schematic", "hero", "worker", "defender", "quest", "collectionbookpage", "page")
-        val variantSet = setOf("sr", "vr", "r", "uc", "c", "ur", "myth", "ore", "crystal")
+        // 4. Safe normalization for fuzzy lookup
+        val prefixSet = setOf("wid", "sid", "hid", "did", "tid", "uid", "qid", "worker", "quest", "managersoldier", "managerinventor", "managerengineer", "managerdoctor", "managerexplorer", "managermartialartist", "leadengineer", "leadexplorer", "leaddoctor", "schematic", "hero", "worker", "defender", "quest", "collectionbookpage", "page", "worlditem", "ingredient", "item", "ammo", "trap", "weapon", "cardpack", "consumable", "reagent", "token")
+        val variantSet = setOf("sr", "vr", "r", "uc", "c", "ur", "myth", "ore", "crystal", "highperf", "highcapacity", "highvolt", "founders", "military", "halloween", "christmas", "winter", "vindertech", "steampunk", "medieval", "retroscifi", "artdeco", "t01", "t02", "t03", "t04", "t05", "t06", "t07")
         
         val parts = fullTid.split(Regex("[:_]")).filter { part ->
             !prefixSet.contains(part) && !variantSet.contains(part) && !part.matches(Regex("t\\d+")) && !part.startsWith("page")
         }
         val coreId = parts.joinToString("_")
 
-        // 3. Fast fuzzy lookup using pre-indexed normalized keys
         normalizedItems[coreId]?.let { return it }
         
-        // 4. More aggressive fuzzy search
-        normalizedItems.entries.find { (k, _) ->
-            k.isNotEmpty() && (coreId.contains(k) || k.contains(coreId))
-        }?.value?.let { return it }
-
         return null
     }
 
     fun resolveName(templateId: String): String? {
+        if (!templateId.contains(":")) return null
+        
         val meta = findMetadata(templateId)
-        val name = meta?.name?.get(language) ?: meta?.name?.get("en")
+        val name = meta?.name?.get(language)?.toString() ?: meta?.name?.get("en")?.toString()
         
         Log.d("StwMetadata", "resolveName($templateId) -> meta found: ${meta != null}, name: $name")
         
-        if (name != null) return name
+        return name
+    }
 
-        // Fallbacks
-        val tid = templateId.lowercase()
-        val key = if (tid.contains(":")) tid.substringAfter(":").substringBefore(".") else tid
-        itemMap[key]?.let { return it }
-        itemMap[tid]?.let { return it }
-
-        heroMap[tid]?.let { return it }
-        heroMap[tid.substringAfter(":")]?.let { return it }
-        heroMap[tid.replace(Regex("(_sr|_vr|_r|_uc|_c|_ur)?(_t\\d+)?$"), "")]?.let { return it }
+    fun resolveEnglishName(templateId: String): String? {
+        val meta = findMetadata(templateId)
+        val name = meta?.name?.get("en")?.toString()
         
-        return null
+        Log.d("StwMetadata", "resolveEnglishName($templateId) -> meta found: ${meta != null}, name: $name")
+        
+        return name
+    }
+
+    fun resolveSlug(templateId: String): String? {
+        val meta = findMetadata(templateId)
+        val engName = meta?.name?.get("en")?.toString() ?: return null
+        return engName.trim().lowercase().replace(" ", "_").replace("\"", "").replace(".", "")
+    }
+
+    fun resolveDailyQuest(templateId: String): StwItemMetadata? {
+        val tid = templateId.lowercase().trim().substringAfter(":")
+        return dailyQuests[tid] ?: dailyQuests["quest:$tid"]
+    }
+
+    fun isInternalItem(templateId: String): Boolean {
+        val tid = templateId.lowercase()
+        return tid.contains("edittool") || 
+               tid.contains("buildingtool") || 
+               tid.contains("upgrade_visual") ||
+               tid.contains("commontest") ||
+               tid.contains("technical")
     }
 
     fun resolveDescription(templateId: String): String? {
@@ -286,10 +275,6 @@ object StwMetadataRepository {
         return null
     }
 
-    fun resolveQuestTarget(templateId: String): Int? {
-        return findMetadata(templateId)?.objectives?.values?.sumOf { it.count ?: 0 }
-    }
-
     fun resolveType(templateId: String): String? {
         val key = findMetadata(templateId)?.type?.lowercase() ?: return null
         return resolveLocalizedItemType(key)
@@ -302,8 +287,8 @@ object StwMetadataRepository {
 
     fun resolveLocalizedItemType(typeKey: String, plural: Boolean = false): String? {
         val key = typeKey.lowercase()
-        val base = stwData?.ItemTypes?.get(key)?.get(language)
-            ?: stwData?.ItemTypes?.entries?.find { it.key.equals(key, true) }?.value?.get(language)
+        val base = stwData?.itemTypes?.get(key)?.get(language)
+            ?: stwData?.itemTypes?.entries?.find { it.key.equals(key, true) }?.value?.get(language)
         
         val result = if (plural && base != null) {
             when {
@@ -319,14 +304,112 @@ object StwMetadataRepository {
 
     fun resolveLocalizedRarity(rarityKey: String): String? {
         val key = rarityKey.lowercase()
-        return stwData?.ItemRarities?.get(key)?.get(language)
-            ?: stwData?.ItemRarities?.get(key)?.get("en")
-            ?: stwData?.ItemRarities?.entries?.find { it.key.equals(key, true) }?.value?.get(language)
-            ?: stwData?.ItemRarities?.entries?.find { it.key.equals(key, true) }?.value?.get("en")
+        return stwData?.itemRarities?.get(key)?.get(language)
+            ?: stwData?.itemRarities?.get(key)?.get("en")
+            ?: stwData?.itemRarities?.entries?.find { it.key.equals(key, true) }?.value?.get(language)
+            ?: stwData?.itemRarities?.entries?.find { it.key.equals(key, true) }?.value?.get("en")
     }
 
-    fun resolveLlamaTier(tier: Int): String? {
-        return stwData?.LlamaTiers?.get(tier.toString())?.get(language)
+    fun resolveStwHeroIcon(templateId: String): String {
+        val slug = resolveSlug(templateId) ?: templateId.substringAfter(":").lowercase()
+        return "https://pennydb.plingindigo.org/images/heroes/$slug.png"
+    }
+
+    fun resolveStwSurvivorIcon(templateId: String, portrait: String?): String {
+        val engName = resolveEnglishName(templateId) ?: ""
+        
+        // 1. Generic Survivors (Named "Survivor")
+        if (engName.equals("Survivor", true) && portrait != null) {
+            val portraitId = portrait.substringAfterLast(":")
+            val parts = portraitId.lowercase().split("-")
+            val personalityIdx = parts.indexOf("workerportrait") + 1
+            if (personalityIdx > 0 && personalityIdx + 1 < parts.size) {
+                val personality = parts[personalityIdx]
+                val id = parts[personalityIdx + 1]
+                return "https://pennydb.plingindigo.org/images/survivors/t-icon-workers-portrait-worker-$personality-$id-l.png"
+            }
+        }
+        
+        // 2. Generic Lead Survivors (Name contains "Lead Survivor")
+        if (engName.contains("Lead Survivor", true) && portrait != null) {
+            val portraitId = portrait.substringAfterLast(":")
+            val parts = portraitId.lowercase().split("-")
+            val jobIdx = parts.indexOf("managerportrait") + 1
+            if (jobIdx > 0 && jobIdx + 1 < parts.size) {
+                var job = parts[jobIdx]
+                val id = parts[jobIdx + 1]
+                // Apply specific mappings requested/observed in JSON
+                job = when (job) {
+                    "engineer" -> "inventor"
+                    "soldier" -> "marksman"
+                    "trainer" -> "personaltrainer"
+                    else -> job
+                }
+                return "https://pennydb.plingindigo.org/images/survivors/t-icon-leaders-portrait-$job-$id-l.png"
+            }
+        }
+
+        // 3. Mythic and Unique Survivors (Karolina, Joel, Joe "Ramsie" Bo, etc.)
+        // Uses the same rule as heroes: slug based on name with quotes/dots removed.
+        val slug = resolveSlug(templateId) ?: templateId.substringAfter(":").lowercase()
+        return "https://pennydb.plingindigo.org/images/survivors/$slug.png"
+    }
+
+    fun resolveStwGadgetIcon(templateId: String): String {
+        val name = resolveEnglishName(templateId)
+        val slug = if (name != null) {
+            when {
+                name.contains("Supply Drop", true) -> "supply_drop"
+                name.contains("Adrenaline Rush", true) -> "adrenaline_rush"
+                name.contains("Airstrike", true) -> "airstrike"
+                name.contains("Banner", true) -> "banner"
+                name.contains("Stationary Hover Turret", true) -> "stationary_hover_turret"
+                name.contains("Proximity Mine", true) -> "proximity_mine"
+                name.contains("Slow Field", true) -> "slow_field"
+                name.contains("Teleporter", true) -> "teleporter"
+                else -> name.trim().lowercase().replace(" ", "_").replace(".", "").replace("\"", "")
+            }
+        } else templateId.substringAfter(":").lowercase()
+        return "https://pennydb.plingindigo.org/images/gadgets/$slug.png"
+    }
+
+    fun resolveStwTeamPerkIcon(templateId: String): String {
+        val name = resolveEnglishName(templateId) ?: ""
+        val slug = name.trim().lowercase().replace(" ", "_").replace(".", "").replace("\"", "")
+        return "https://pennydb.plingindigo.org/images/team_perks/$slug.png"
+    }
+
+    fun resolveStwResourceIcon(templateId: String): String {
+        val lower = templateId.lowercase()
+        return when {
+            lower.contains("vbucks") || lower.contains("mtx") -> "file:///android_asset/vbucks.png"
+            lower.contains("xraytickets") || lower.contains("currency_xrayllama") -> "file:///android_asset/xray.png"
+            lower.contains("gold") || lower.contains("eventcurrency_scaling") -> "https://pennydb.plingindigo.org/images/resources/gold.png"
+            lower.contains("peoplexp") || lower.contains("heroxp") -> "https://pennydb.plingindigo.org/images/resources/hero_xp.png"
+            lower.contains("schematicxp") -> "https://pennydb.plingindigo.org/images/resources/schematic_xp.png"
+            lower.contains("reagent_c_t01") -> "https://pennydb.plingindigo.org/images/resources/pure_drops_of_rain.png"
+            lower.contains("reagent_c_t02") -> "https://pennydb.plingindigo.org/images/resources/lightning_in_a_bottle.png"
+            lower.contains("reagent_c_t03") -> "https://pennydb.plingindigo.org/images/resources/eye_of_the_storm.png"
+            lower.contains("reagent_c_t04") -> "https://pennydb.plingindigo.org/images/resources/storm_shard.png"
+            else -> "https://pennydb.plingindigo.org/images/resources/v-bucks.png"
+        }
+    }
+
+    fun determineHeroClass(tid: String): String {
+        return when {
+            tid.contains("constructor", true) -> "constructor"
+            tid.contains("ninja", true) -> "ninja"
+            tid.contains("outlander", true) -> "outlander"
+            tid.contains("commando", true) || tid.contains("soldier", true) -> "commando"
+            else -> "commando"
+        }
+    }
+
+    fun isMelee(tid: String): Boolean {
+        val lower = tid.lowercase()
+        return lower.contains("edged") || lower.contains("blunt") || lower.contains("piercing") ||
+                lower.contains("sword") || lower.contains("axe") || lower.contains("hammer") ||
+                lower.contains("scythe") || lower.contains("spear") || lower.contains("club")
     }
 
     fun resolvePowerLevel(templateId: String, level: Int): Int? {
@@ -349,17 +432,5 @@ object StwMetadataRepository {
             else -> "_T01"
         }
         return stwData?.powerLevels?.get(rarity + tier)?.get(level.toString())
-    }
-
-    private fun parseHeroLines(content: String) {
-        content.lines().forEach { line ->
-            if (line.isBlank() || !line.contains("Hero:")) return@forEach
-            val parts = line.split(Regex("\\t+|\\s{2,}"))
-            if (parts.size >= 2) {
-                val tid = parts[0].trim().lowercase()
-                val name = parts[1].trim()
-                if (tid.isNotEmpty() && name.isNotEmpty()) heroMap[tid] = name
-            }
-        }
     }
 }

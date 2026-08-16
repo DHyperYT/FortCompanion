@@ -52,7 +52,7 @@ class ShopRefreshReceiver : BroadcastReceiver() {
                     return@launch
                 }
 
-                val timeParts = settings.vbucksAlertTime.split(":")
+                val timeParts = settings.shopRefreshTime.split(":")
                 val hour = timeParts.getOrNull(0)?.toIntOrNull() ?: 0
                 val min = timeParts.getOrNull(1)?.toIntOrNull() ?: 0
 

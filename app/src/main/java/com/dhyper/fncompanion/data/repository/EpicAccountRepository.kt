@@ -14,13 +14,8 @@ import java.util.UUID
 
 class EpicAccountRepository {
     private val api = ApiClient.epicApi
-    private val publicApi = ApiClient.publicApi
 
     private var cosmeticsCacheMap: Map<String, CosmeticItem>? = null
-
-    fun clearCache() {
-        cosmeticsCacheMap = null
-    }
 
     private suspend fun getCosmeticsMap(): Map<String, CosmeticItem> {
         cosmeticsCacheMap?.let { return it }
@@ -35,37 +30,6 @@ class EpicAccountRepository {
         )
     }
 
-    suspend fun fetchEquippedSkinIcon(accessToken: String, accountId: String): String? {
-        return try {
-            val response = api.queryMcpProfile(
-                bearerToken = "Bearer $accessToken",
-                accountId = accountId,
-                profileId = "athena"
-            )
-            val profile = response.profileChanges?.firstOrNull()?.profile
-            val items = profile?.items ?: emptyMap()
-            val stats = profile?.stats?.attributes ?: emptyMap()
-
-            // 1. Find the active loadout
-            val loadouts = items.filter { it.value.templateId.startsWith("AthenaCosmeticLoadout:", ignoreCase = true) }
-            val activeLoadoutId = stats["active_loadout_id"]?.toString() ?: loadouts.keys.firstOrNull()
-            
-            val loadout = items[activeLoadoutId]
-            val characterId = loadout?.attributes?.get("character_slot")?.toString() ?: ""
-            
-            val characterItem = items[characterId]
-            val templateId = characterItem?.templateId ?: "AthenaCharacter:CID_001_Athena_Character_Default"
-            
-            val cosmeticId = extractCosmeticId(templateId)
-            val apiMap = getCosmeticsMap()
-            val apiDetails = cosmeticId?.let { apiMap[it.lowercase()] }
-            
-            apiDetails?.images?.icon ?: apiDetails?.images?.smallIcon
-        } catch (e: Exception) {
-            null
-        }
-    }
-
     suspend fun fetchVBucksBalance(accessToken: String, accountId: String): Result<Long> {
         return try {
             val response = api.queryMcpProfile(
@@ -73,10 +37,11 @@ class EpicAccountRepository {
                 accountId = accountId,
                 profileId = "common_core"
             )
-            val items = response.profileChanges?.firstOrNull()?.profile?.items
+            val profile = response.profileChanges?.firstOrNull()?.profile
+            val items = profile?.items ?: emptyMap()
             var totalVbucks = 0L
 
-            items?.values?.forEach { item ->
+            items.values.forEach { item ->
                 if (item.templateId.startsWith("Currency:Mtx", ignoreCase = true)) {
                     totalVbucks += item.quantity
                 }
@@ -96,7 +61,6 @@ class EpicAccountRepository {
         accountId: String
     ): Result<List<ParsedLockerItem>> = coroutineScope {
         return@coroutineScope try {
-            // 1. Fetch from all relevant profiles in parallel
             val profiles = listOf("athena", "common_core", "delmar", "spark", "juno")
             val deferredResponses = profiles.map { profileId ->
                 async {
@@ -183,7 +147,7 @@ class EpicAccountRepository {
                         val beanIconUrl = apiDetails?.images?.bean?.large ?: 
                                          apiDetails?.images?.bean?.small
 
-                    val existing = groupedMap[itemData.templateId]
+                        val existing = groupedMap[itemData.templateId]
                         if (existing != null) {
                             groupedMap[itemData.templateId] = existing.copy(
                                 quantity = existing.quantity + itemData.quantity,
@@ -311,221 +275,6 @@ class EpicAccountRepository {
         }
     }
 
-    suspend fun fetchCareerSummary(
-        accessToken: String,
-        accountId: String
-    ): Result<Triple<Int, Int, Int>> { // Account Level, Seasonal Level, Lifetime Wins
-        return try {
-            val response = api.queryMcpProfile(
-                bearerToken = "Bearer $accessToken",
-                accountId = accountId,
-                profileId = "athena"
-            )
-            val profile = response.profileChanges?.firstOrNull()?.profile
-            val attributes = profile?.stats?.attributes ?: emptyMap()
-
-            val accountLevel = parseNumberAttr(attributes["accountLevel"]) ?: parseNumberAttr(attributes["account_level"]) ?: 0
-            val seasonalLevel = parseNumberAttr(attributes["level"]) ?: parseNumberAttr(attributes["season_level"]) ?: 0
-            val lifetimeWins = parseNumberAttr(attributes["lifetime_wins"]) ?: parseNumberAttr(attributes["wins_count"]) ?: 0
-
-            Result.success(Triple(accountLevel, seasonalLevel, lifetimeWins))
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
-    }
-
-    suspend fun fetchQuests(
-        accessToken: String,
-        accountId: String
-    ): Result<List<com.dhyper.fncompanion.data.models.FortniteQuest>> = coroutineScope {
-        return@coroutineScope try {
-            // 1. Fetch Global Challenge Mappings (Cached in FortniteRepository)
-            val mappingsResult = FortniteRepository().fetchChallenges()
-            val bundlesMap = mappingsResult.getOrDefault(emptyList())
-            val challengeLookup = mutableMapOf<String, com.dhyper.fncompanion.data.models.ChallengeDefinition>()
-            val bundleNameLookup = mutableMapOf<String, String>()
-
-            bundlesMap.forEach { bundle ->
-                bundleNameLookup[bundle.id.lowercase()] = bundle.name ?: "Unknown Bundle"
-                bundle.challenges?.forEach { challenge ->
-                    challengeLookup[challenge.id.lowercase()] = challenge
-                }
-            }
-
-            // 2. Fetch User Quests from MCP
-            val profiles = listOf("athena", "common_core")
-            val deferred = profiles.map { profileId ->
-                async {
-                    try {
-                        api.queryMcpProfile(
-                            bearerToken = "Bearer $accessToken",
-                            accountId = accountId,
-                            profileId = profileId
-                        )
-                    } catch (e: Exception) {
-                        null
-                    }
-                }
-            }
-
-            val responses = deferred.awaitAll()
-            val allQuests = mutableListOf<com.dhyper.fncompanion.data.models.FortniteQuest>()
-
-            responses.filterNotNull().forEach { response ->
-                val items = response.profileChanges?.firstOrNull()?.profile?.items ?: return@forEach
-
-                items.forEach { (id, data) ->
-                    val tid = data.templateId
-                    if (tid.startsWith("Quest:", ignoreCase = true) || 
-                        tid.startsWith("Challenge:", ignoreCase = true) ||
-                        tid.contains("_Quest_", ignoreCase = true)) {
-                        
-                        val attrs = data.attributes ?: emptyMap()
-                        val state = attrs["quest_state"]?.toString() ?: attrs["status"]?.toString() ?: "Active"
-                        if (state.equals("claimed", ignoreCase = true)) return@forEach
-
-                        val isCompleted = state.equals("completed", ignoreCase = true)
-                        
-                        // Normalized ID for lookup
-                        val rawId = tid.substringAfter(":")
-                        val normalizedTid = rawId.lowercase()
-                        
-                        // Priority search for the most accurate mapping
-                        val mapping = challengeLookup[normalizedTid] ?:
-                                     challengeLookup[normalizedTid.removePrefix("athena_")] ?:
-                                     challengeLookup[normalizedTid.replace("athena_", "")] ?:
-                                     challengeLookup["quest_" + normalizedTid.removePrefix("athena_")] ?:
-                                     challengeLookup["challenge_" + normalizedTid.removePrefix("athena_")]
-
-                        // Extract Objectives
-                        val objectives = mutableListOf<com.dhyper.fncompanion.data.models.QuestObjective>()
-                        var totalProgress = 0
-                        var totalTarget = mapping?.progressTarget ?: 1
-
-                        attrs.forEach { (key, value) ->
-                            if (key.startsWith("completion_") && key.endsWith("_count")) {
-                                val objId = key.substringAfter("completion_").substringBefore("_count")
-                                val current = parseNumberAttr(value) ?: 0
-                                
-                                val target = parseNumberAttr(attrs["target_$objId"]) 
-                                          ?: parseNumberAttr(attrs["obj_${objId}_target"])
-                                          ?: parseNumberAttr(attrs["obj_${objId}_count"])
-                                          ?: mapping?.progressTarget
-                                          ?: 1
-                                
-                                objectives.add(
-                                    com.dhyper.fncompanion.data.models.QuestObjective(
-                                        id = objId,
-                                        description = mapping?.title ?: cleanObjectiveName(objId, tid),
-                                        current = current,
-                                        target = target
-                                    )
-                                )
-                                totalProgress += current
-                                // If mapping had multiple objectives, we'd need to sum them, 
-                                // but usually, we just take the first one or use totalTarget
-                            }
-                        }
-
-                        if (objectives.isEmpty()) {
-                            val current = parseNumberAttr(attrs["completion_count"]) ?: (if (isCompleted) totalTarget else 0)
-                            totalProgress = current
-                            objectives.add(
-                                com.dhyper.fncompanion.data.models.QuestObjective(
-                                    id = "default",
-                                    description = mapping?.title ?: "Complete challenge",
-                                    current = current,
-                                    target = totalTarget
-                                )
-                            )
-                        }
-
-                        val name = mapping?.title ?: cleanQuestName(tid)
-                        val rawBucket = attrs["bucket"]?.toString() ?: attrs["challenge_bundle_id"]?.toString() ?: "General"
-                        val bundleName = bundleNameLookup[rawBucket.lowercase()] ?: formatQuestCategory(rawBucket)
-                        
-                        if (name.isNotBlank() && 
-                            !name.contains("Tbd", ignoreCase = true) && 
-                            !tid.contains("hidden", ignoreCase = true) &&
-                            !tid.contains("test", ignoreCase = true)) {
-                            
-                            allQuests.add(
-                                com.dhyper.fncompanion.data.models.FortniteQuest(
-                                    id = id,
-                                    templateId = tid,
-                                    name = name,
-                                    description = mapping?.description ?: attrs["challenge_bundle_id"]?.toString() ?: "Fortnite Quest",
-                                    category = bundleName,
-                                    progress = totalProgress,
-                                    target = totalTarget,
-                                    isCompleted = isCompleted,
-                                    objectives = objectives,
-                                    rewardXp = mapping?.xp ?: parseNumberAttr(attrs["xp_reward_scalar"])?.let { (it * 10000) } ?: 0
-                                )
-                            )
-                        }
-                    }
-                }
-            }
-
-            Result.success(allQuests.sortedWith(
-                compareBy<com.dhyper.fncompanion.data.models.FortniteQuest> { it.isCompleted }
-                    .thenBy { it.category }
-                    .thenBy { it.name }
-            ))
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
-    }
-
-    private fun cleanObjectiveName(objId: String, @Suppress("UNUSED_PARAMETER") tid: String): String {
-        // If it's a numeric index, try to get more context from tid
-        if (objId.all { it.isDigit() }) {
-            return "Stage ${objId.toInt() + 1}"
-        }
-        
-        return objId.replace("_", " ")
-            .replace(Regex("(?i)athena"), "")
-            .replace(Regex("(?i)quest"), "")
-            .trim()
-            .lowercase()
-            .replaceFirstChar { it.uppercase() }
-    }
-
-    private fun cleanQuestName(tid: String): String {
-        val raw = tid.substringAfter(":", tid)
-            .replace(Regex("(?i)^Athena_?"), "")
-            .replace(Regex("(?i)^Quest_?"), "")
-            .replace(Regex("(?i)^Challenge_?"), "")
-            .replace(Regex("(?i)^S\\d+_?"), "") // Remove Season tags like S32
-            .replace(Regex("(?i)_C\\d+S\\d+$"), "") // Remove Chapter/Season tags
-            .replace(Regex("(?i)_Quest$"), "")
-            .replace("_", " ")
-            .trim()
-        
-        if (raw.isBlank()) return tid
-        
-        return raw.split(" ").filter { it.isNotBlank() }.joinToString(" ") { word ->
-            word.lowercase().replaceFirstChar { it.uppercase() }
-        }
-    }
-
-    private fun formatQuestCategory(bucket: String): String {
-        return when {
-            bucket.contains("Weekly", ignoreCase = true) -> "Weekly Quests"
-            bucket.contains("Daily", ignoreCase = true) -> "Daily Quests"
-            bucket.contains("Milestone", ignoreCase = true) -> "Milestones"
-            bucket.contains("Story", ignoreCase = true) -> "Story"
-            bucket.contains("Event", ignoreCase = true) -> "Events"
-            bucket.contains("Survivor", ignoreCase = true) -> "Survivor"
-            else -> bucket.substringAfterLast("_")
-                .replace(Regex("([a-z])([A-Z])"), "$1 $2")
-                .trim()
-                .lowercase()
-                .replaceFirstChar { it.uppercase() }
-        }
-    }
-
     private fun determineLockerCategory(templateId: String): LockerCategory {
         val parts = templateId.split(":")
         val idPart = if (parts.size >= 2) parts[1] else templateId
@@ -645,7 +394,23 @@ class EpicAccountRepository {
         }
     }
 
-    private fun determineRarity(templateId: String, @Suppress("UNUSED_PARAMETER") attributes: Map<String, Any?>?): String {
+    private fun determineRarity(templateId: String, attributes: Map<String, Any?>?): String {
+        val attrRarity = attributes?.get("starting_rarity")?.toString() 
+            ?: attributes?.get("rarity")?.toString()
+        
+        if (!attrRarity.isNullOrBlank()) {
+            val r = attrRarity.lowercase()
+            return when {
+                r.contains("mythic") || r.contains("ur") -> "Mythic"
+                r.contains("legendary") || r.contains("sr") -> "Legendary"
+                r.contains("epic") || r.contains("vr") -> "Epic"
+                r.contains("rare") || r.contains("r") -> "Rare"
+                r.contains("uncommon") || r.contains("uc") -> "Uncommon"
+                r.contains("common") || r.contains("c") -> "Common"
+                else -> r.split(" ").joinToString(" ") { it.replaceFirstChar { c -> c.uppercase() } }
+            }
+        }
+
         val lower = templateId.lowercase()
         return when {
             // Special Series Prefixes/Keywords in IDs
@@ -718,8 +483,6 @@ class EpicAccountRepository {
         return parseNumberAttr(value)
     }
 
-    // --- SAVE THE WORLD (STW) LOGIC ---
-
     suspend fun fetchStwHomebaseData(
         context: Context,
         accessToken: String,
@@ -729,9 +492,7 @@ class EpicAccountRepository {
             StwMetadataRepository.loadMetadata(context)
 
             val profileIds = listOf(
-                "campaign", "metadata", "common_core",
-                "collection_book_people0", "collection_book_schematics0",
-                "theater0", "theater1", "theater2", "outpost0", "recycle_bin", "collections", "shop_storefront"
+                "campaign", "common_core", "theater0", "theater1", "theater2", "outpost0", "athena"
             )
 
             val deferredProfiles = profileIds.associateWith { pid ->
@@ -758,15 +519,19 @@ class EpicAccountRepository {
                 res?.profileRevision?.let { pid to it.toInt() }
             }.toMap()
 
-            // 1. Resources & Stats
-            val resources = items.filter { (id, item) -> 
+            val isFounder = responses["athena"]?.profileChanges?.firstOrNull()?.profile?.items?.values?.any { 
+                val tid = it.templateId.lowercase()
+                tid.contains("cid_095_athena_commando_m_founder") || tid.contains("cid_096_athena_commando_f_founder")
+            } ?: false
+            
+            val resources = items.filter { (_, item) -> 
                 val tid = item.templateId.lowercase()
-                tid.startsWith("currency") || tid.contains("xp") || tid.startsWith("reagent") || tid.startsWith("ingredient") || tid.contains("ticket") || tid.contains("voucher")
-            }.map { (id, item) ->
+                tid.contains("currency") || tid.contains("xp") || tid.startsWith("reagent") || tid.startsWith("ingredient") || tid.contains("ticket") || tid.contains("voucher")
+            }.map { (_, item) ->
                 val tid = item.templateId
                 StwResource(
                     templateId = tid,
-                    name = StwMetadataRepository.resolveName(tid) ?: cleanStwName(tid),
+                    name = StwMetadataRepository.resolveName(tid) ?: tid,
                     quantity = item.quantity.toLong(),
                     type = determineResourceType(tid),
                     rarity = determineRarity(tid, item.attributes),
@@ -774,11 +539,10 @@ class EpicAccountRepository {
                 )
             }.sortedWith(compareBy({ it.type }, { it.rarity }, { it.name }))
 
-            val gold = resources.find { it.templateId.contains("currency:gold", true) || it.templateId.contains("eventcurrency_scaling", true) }?.quantity ?: 0L
-            val xray = resources.find { it.templateId.contains("currency:xraytickets", true) }?.quantity ?: 0L
+            val gold = resources.find { it.templateId.contains("eventcurrency_scaling", true) || it.templateId.contains("currency:gold", true) }?.quantity ?: 0L
+            val xray = resources.find { it.templateId.contains("currency:xraytickets", true) || it.templateId.contains("currency_xrayllama", true) }?.quantity ?: 0L
             val vbucks = sumCurrency(responses["common_core"]?.profileChanges?.firstOrNull()?.profile?.items ?: emptyMap(), "currency:mtx")
 
-            // 2. Research
             val resStats = stats["research_levels"] as? Map<*, *>
             val research = StwResearch(
                 fortitude = parseNumberAttr(resStats?.get("fortitude")) ?: 0,
@@ -788,41 +552,52 @@ class EpicAccountRepository {
                 totalLevels = parseNumberAttr(stats["level"]) ?: 0
             )
 
-            // 3. Main Entities
             val allHeroes = items.filter { it.value.templateId.startsWith("Hero:", true) }.map { parseStwHero(it.key, it.value) }
-            val allSchematics = items.filter { it.value.templateId.startsWith("Schematic:", true) }.map { parseStwSchematic(it.key, it.value) }
+            val allSchematics = items.filter { 
+                it.value.templateId.startsWith("Schematic:", true) && 
+                !it.value.templateId.contains("ammo_", true) && 
+                !it.value.templateId.contains("ingredient_", true)
+            }.map { parseStwSchematic(it.key, it.value) }
             val allSurvivors = items.filter { it.value.templateId.startsWith("Worker:", true) }.map { parseStwSurvivor(it.key, it.value) }
             val allDefenders = items.filter { it.value.templateId.startsWith("Defender:", true) }.map { parseStwDefender(it.key, it.value) }
-            val dailyQuests = items.filter { it.value.templateId.contains("Quest:Daily", true) || it.value.templateId.contains("Quest:stonewoodquest", true) }.mapNotNull { parseStwQuest(it.key, it.value) }
+            
+            val allQuests = items.filter { it.value.templateId.startsWith("Quest:", true) || it.value.templateId.startsWith("Challenge:", true) }
+                .mapNotNull { parseStwQuest(it.key, it.value) }
+            
+            val dailyQuests = allQuests.filter { it.category == "Daily Quests" }
+            val storyQuests = allQuests.filter { it.category == "Main Quests" || it.category == "Storm Shield / Main" }
 
-            // 4. Loadouts
             val heroMap = allHeroes.associateBy { it.id }
+            val itemTemplateMap = items.mapValues { it.value.templateId }
             val loadouts = items.filter { it.value.templateId.startsWith("CampaignHeroLoadout:", true) }
-                .map { (id, item) -> parseHeroLoadout(id, item, heroMap, id == stats["selected_hero_loadout"]?.toString()) }
+                .map { (id, item) -> parseHeroLoadout(id, item, heroMap, itemTemplateMap, id == stats["selected_hero_loadout"]?.toString()) }
                 .sortedBy { it.index }
 
-            // 5. Squads
             val survivorMap = allSurvivors.associateBy { it.id }
-            val squads = parseSurvivorSquads(stats, survivorMap)
+            val squads = parseSurvivorSquads(survivorMap)
 
-            // 6. Outposts
+            val achievements = parseAchievements(items)
+
             val outposts = parseOutposts(responses["metadata"])
 
-            // 7. Inventory (Backpack & Storage)
-            val backpackItems = mutableListOf<StwInventoryItem>()
-            listOf("theater0", "theater1", "theater2").forEach { pid ->
-                responses[pid]?.profileChanges?.firstOrNull()?.profile?.items?.forEach { (id, item) ->
-                    backpackItems.add(parseToInventoryItem(id, item))
-                }
-            }
-            val storageItems = responses["outpost0"]?.profileChanges?.firstOrNull()?.profile?.items?.map { (id, item) ->
-                parseToInventoryItem(id, item)
-            } ?: emptyList()
+            val backpackItems = responses["theater0"]?.profileChanges?.firstOrNull()?.profile?.items
+                ?.filter { !it.value.templateId.contains("edittool", true) && !it.value.templateId.contains("buildingitemdata", true) }
+                ?.map { (id, item) -> parseToInventoryItem(id, item) } ?: emptyList()
 
-            // 8. Collection Book
+            val eventBackpackItems = responses["theater1"]?.profileChanges?.firstOrNull()?.profile?.items
+                ?.filter { !it.value.templateId.contains("edittool", true) && !it.value.templateId.contains("buildingitemdata", true) }
+                ?.map { (id, item) -> parseToInventoryItem(id, item) } ?: emptyList()
+
+            val ventureBackpackItems = responses["theater2"]?.profileChanges?.firstOrNull()?.profile?.items
+                ?.filter { !it.value.templateId.contains("edittool", true) && !it.value.templateId.contains("buildingitemdata", true) }
+                ?.map { (id, item) -> parseToInventoryItem(id, item) } ?: emptyList()
+
+            val storageItems = responses["outpost0"]?.profileChanges?.firstOrNull()?.profile?.items
+                ?.filter { !it.value.templateId.contains("edittool", true) && !it.value.templateId.contains("buildingitemdata", true) }
+                ?.map { (id, item) -> parseToInventoryItem(id, item) } ?: emptyList()
+
             val cbCategories = parseCollectionBook(responses)
 
-            // 9. Llamas
             val llamas = parseLlamas(responses["shop_storefront"])
 
             Result.success(StwHomebaseData(
@@ -833,9 +608,14 @@ class EpicAccountRepository {
                 gold = gold,
                 resources = resources,
                 research = research,
-                inventory = StwInventory(backpack = backpackItems.sortedBy { it.name }, storage = storageItems.sortedBy { it.name }),
+                inventory = StwInventory(
+                    backpack = backpackItems.sortedBy { it.name },
+                    eventBackpack = eventBackpackItems.sortedBy { it.name },
+                    ventureBackpack = ventureBackpackItems.sortedBy { it.name },
+                    storage = storageItems.sortedBy { it.name }
+                ),
                 collectionBook = StwCollectionBook(
-                    level = parseNumberAttr((responses["collections"]?.profileChanges?.firstOrNull()?.profile?.stats?.attributes?.get("collection_book_level"))) ?: 0,
+                    level = parseNumberAttr((stats["collection_book"] as? Map<*, *>)?.get("maxBookXpLevelAchieved")) ?: 0,
                     maxLevelAchieved = parseNumberAttr((stats["collection_book"] as? Map<*, *>)?.get("maxBookXpLevelAchieved")) ?: 0,
                     xp = parseNumberAttr((responses["collections"]?.profileChanges?.firstOrNull()?.profile?.stats?.attributes?.get("collection_book_xp"))) ?: 0,
                     categories = cbCategories
@@ -848,13 +628,18 @@ class EpicAccountRepository {
                 schematics = allSchematics.sortedByDescending { it.rating },
                 survivors = allSurvivors.sortedByDescending { it.rating },
                 defenders = allDefenders.sortedByDescending { it.rating },
+                quests = allQuests.sortedBy { it.isCompleted },
                 dailyQuests = dailyQuests.sortedBy { it.isCompleted },
+                storyQuests = storyQuests.sortedBy { it.isCompleted },
                 llamas = llamas,
                 totalDaysLoggedIn = (stats["daily_rewards"] as? Map<*, *>)?.get("totalDaysLoggedIn")?.let { parseNumberAttr(it) } ?: 0,
-                matchesPlayed = parseNumberAttr(stats["matches_played"]) ?: 0,
+                matchesPlayed = (stats["matches_played"] as? Number)?.toInt() ?: 0,
                 zonesCompleted = (stats["gameplay_stats"] as? List<*>)?.find { (it as? Map<*, *>)?.get("statName") == "zonescompleted" }?.let { parseNumberAttr((it as Map<*, *>)["statValue"]) } ?: 0,
+                achievements = achievements,
                 commanderXp = (stats["xp"] as? Number)?.toLong() ?: 0L,
                 packsGranted = parseNumberAttr(stats["packs_granted"]) ?: 0,
+                isFounder = isFounder,
+                profileLockExpiration = responses["theater0"]?.profileChanges?.firstOrNull()?.profile?.stats?.attributes?.get("profileLockExpiration")?.toString(),
                 profileRevisions = revisions
             ))
         } catch (e: Exception) { Result.failure(e) }
@@ -864,55 +649,121 @@ class EpicAccountRepository {
         return items.values.filter { item -> tids.any { tid -> item.templateId.contains(tid, true) } }.sumOf { it.quantity.toLong() }
     }
 
-    private fun parseHeroLoadout(id: String, item: McpItemData, heroMap: Map<String, StwHero>, isActive: Boolean): StwHeroLoadout {
+    private fun parseHeroLoadout(id: String, item: McpItemData, heroMap: Map<String, StwHero>, itemTemplateMap: Map<String, String>, isActive: Boolean): StwHeroLoadout {
         val attrs = item.attributes ?: emptyMap()
         val crew = attrs["crew_members"] as? Map<*, *>
         val gadgetsRaw = attrs["gadgets"] as? List<*>
         
         val commander = crew?.get("commanderslot")?.toString()?.let { heroMap[it] }
         val support = (1..5).map { i -> crew?.get("followerslot$i")?.toString()?.let { heroMap[it] } }
-        val gadgets = gadgetsRaw?.map { (it as? Map<*, *>)?.get("gadget")?.toString() } ?: emptyList()
-        val teamPerkId = attrs["team_perk"]?.toString()
+        val gadgets = gadgetsRaw?.mapNotNull { 
+            val gadgetId = (it as? Map<*, *>)?.get("gadget")?.toString()
+            if (gadgetId.isNullOrBlank()) null else gadgetId
+        } ?: emptyList()
+
+        val gadgetNames = gadgets.map { tid ->
+            StwMetadataRepository.resolveName(tid) ?: tid
+        }
+        val gadgetIcons = gadgets.map { tid ->
+            StwMetadataRepository.resolveStwGadgetIcon(tid)
+        }
+        
+        val teamPerkInstanceId = attrs["team_perk"]?.toString()
+        val teamPerkId = if (teamPerkInstanceId != null) itemTemplateMap[teamPerkInstanceId] ?: teamPerkInstanceId else null
+        val teamPerkName = teamPerkId?.let { StwMetadataRepository.resolveName(it) ?: it }
+        val teamPerkIcon = teamPerkId?.let { tid ->
+            StwMetadataRepository.resolveStwTeamPerkIcon(tid)
+        }
         
         return StwHeroLoadout(
             id = id,
-            name = attrs["loadout_name"]?.toString() ?: "Loadout ${parseNumberAttr(attrs["loadout_index"]) ?: 0}",
+            name = attrs["loadout_name"]?.toString() ?: "Loadout ${(parseNumberAttr(attrs["loadout_index"]) ?: 0) + 1}",
             commander = commander,
             teamPerkId = teamPerkId,
-            teamPerkName = teamPerkId?.let { StwMetadataRepository.resolveName(it) },
+            teamPerkName = teamPerkName,
+            teamPerkIcon = teamPerkIcon,
             support = support,
             gadgets = gadgets,
+            gadgetNames = gadgetNames,
+            gadgetIcons = gadgetIcons,
             isActive = isActive,
             index = parseNumberAttr(attrs["loadout_index"]) ?: 0
         )
     }
 
-    private fun parseSurvivorSquads(stats: Map<String, Any?>, survivorMap: Map<String, StwSurvivor>): List<StwSurvivorSquad> {
-        val squadsRaw = stats["squad_info"] as? Map<*, *> ?: return emptyList()
-        val assignments = stats["squad_assignments"] as? Map<*, *> ?: emptyMap<Any?, Any?>()
-        
-        return squadsRaw.mapNotNull { (squadId, squadData) ->
-            val sid = squadId.toString()
-            if (!sid.startsWith("squad_attribute_")) return@mapNotNull null
-            
-            val data = squadData as? Map<*, *>
-            val unlocked = parseNumberAttr(data?.get("slots_unlocked")) ?: 0
-            
-            val leadId = assignments.entries.find { it.key.toString() == "$sid:0" }?.value?.toString()
-            val lead = leadId?.let { survivorMap[it] }
-            
+    private fun parseSurvivorSquads(survivorMap: Map<String, StwSurvivor>): List<StwSurvivorSquad> {
+        val squadNames = mapOf(
+            "fireteamalpha" to "Fire Team Alpha",
+            "closeassaultsquad" to "Close Assault Squad",
+            "emtsquad" to "EMT Squad",
+            "trainingteam" to "Training Team",
+            "scoutingparty" to "Scouting Party",
+            "gadgeteers" to "Gadgeteers",
+            "thethinktank" to "The Think Tank",
+            "corpsofengineering" to "Corps of Engineering"
+        )
+
+        val squadIds = listOf(
+            "squad_attribute_arms_fireteamalpha",
+            "squad_attribute_arms_closeassaultsquad",
+            "squad_attribute_medicine_emtsquad",
+            "squad_attribute_medicine_trainingteam",
+            "squad_attribute_scavenging_scoutingparty",
+            "squad_attribute_scavenging_gadgeteers",
+            "squad_attribute_synthesis_thethinktank",
+            "squad_attribute_synthesis_corpsofengineering"
+        )
+
+        return squadIds.map { sid ->
+            val squadSurvivors = survivorMap.values.filter { it.squadId == sid }
+            val lead = squadSurvivors.find { it.squadSlotIdx == 0 }
             val members = (1..7).map { i ->
-                val mid = assignments.entries.find { it.key.toString() == "$sid:$i" }?.value?.toString()
-                mid?.let { survivorMap[it] }
+                squadSurvivors.find { it.squadSlotIdx == i }
             }
-            
+
+            val squadKey = sid.substringAfterLast("_")
             StwSurvivorSquad(
                 id = sid,
-                name = sid.substringAfterLast("_").replaceFirstChar { it.uppercase() },
+                name = squadNames[squadKey] ?: squadKey.replaceFirstChar { it.uppercase() },
                 leadSlot = lead,
                 memberSlots = members,
-                unlockedSlots = unlocked,
-                totalPowerContribution = 0
+                unlockedSlots = 8, // Standard
+                totalPowerContribution = squadSurvivors.sumOf { it.rating }
+            )
+        }
+    }
+
+    private fun parseAchievements(items: Map<String, McpItemData>): List<StwAchievement> {
+        val mapping = mapOf(
+            "quest:achievement_killmistmonsters" to Triple("Unspeakable Horrors", 20000L, "unspeakablehorrors"),
+            "quest:achievement_playwithothers" to Triple("Plays Well with Others", 1000L, "playswellwithothers"),
+            "quest:achievement_loottreasurechests" to Triple("Loot Legend", 1000L, "lootlegend"),
+            "quest:achievement_buildstructures" to Triple("Talented Builder", 500000L, "talentedbuilder"),
+            "quest:achievement_savesurvivors" to Triple("Guardian Angel", 10000L, "guardianangel"),
+            "quest:achievement_explorezones" to Triple("World Explorer", 1500L, "worldexplorer"),
+            "quest:achievement_destroygnomes" to Triple("Go Gnome!", 100L, "gognome")
+        )
+
+        return items.values.filter { it.templateId.lowercase() in mapping.keys }.map { item ->
+            val tid = item.templateId.lowercase()
+            val entry = mapping[tid]!!
+            val name = entry.first
+            val target = entry.second
+            val slug = entry.third
+            val attrs = item.attributes ?: emptyMap()
+            var current = 0L
+            attrs.forEach { (k, v) ->
+                if (k.startsWith("completion_")) {
+                    current = (parseNumberAttr(v) ?: 0).toLong()
+                }
+            }
+            StwAchievement(
+                id = tid,
+                templateId = tid,
+                name = name,
+                progress = current,
+                target = target,
+                iconUrl = "https://pennydb.plingindigo.org/images/banners/achievement$slug.png"
             )
         }
     }
@@ -924,6 +775,13 @@ class EpicAccountRepository {
                 val attrs = item.attributes ?: emptyMap()
                 val coreInfo = attrs["outpost_core_info"] as? Map<*, *>
                 val endurance = parseNumberAttr(coreInfo?.get("highestEnduranceWaveReached")) ?: 0
+                val amplifiers = (coreInfo?.get("placedBuildings") as? List<*>)?.mapNotNull { 
+                    val b = it as? Map<*, *>
+                    val bTag = b?.get("buildingTag")?.toString()
+                    val pTag = b?.get("placedTag")?.toString()
+                    if (bTag != null && pTag != null) StwAmplifier(bTag, pTag) else null
+                } ?: emptyList()
+                
                 val name = when {
                     item.templateId.endsWith("_01") -> "Stonewood"
                     item.templateId.endsWith("_02") -> "Plankerton"
@@ -931,7 +789,7 @@ class EpicAccountRepository {
                     item.templateId.endsWith("_04") -> "Twine Peaks"
                     else -> "Outpost"
                 }
-                outposts.add(StwOutpost(id = id, templateId = item.templateId, name = name, level = parseNumberAttr(attrs["level"]) ?: 0, enduranceWave = endurance))
+                outposts.add(StwOutpost(id = id, templateId = item.templateId, name = name, level = parseNumberAttr(attrs["level"]) ?: 0, enduranceWave = endurance, amplifiers = amplifiers))
             }
         }
         return outposts.sortedBy { it.templateId }
@@ -974,7 +832,7 @@ class EpicAccountRepository {
                 val attrs = data.attributes ?: emptyMap()
                 val price = parseNumberAttr(attrs["price"]) ?: 0
                 val currency = attrs["currency_type"]?.toString() ?: "X-Ray Tickets"
-                llamas.add(StwLlama(id = id, templateId = tid, name = StwMetadataRepository.resolveName(tid) ?: cleanStwName(tid), description = StwMetadataRepository.resolveLocalizedItemType("cardpack") ?: "Loot Llama", price = price, currency = currency))
+                llamas.add(StwLlama(id = id, templateId = tid, name = StwMetadataRepository.resolveName(tid) ?: tid, description = StwMetadataRepository.resolveLocalizedItemType("cardpack") ?: "Loot Llama", price = price, currency = currency, iconUrl = "/images/resources/llama.png"))
             }
         }
         return llamas
@@ -1034,10 +892,6 @@ class EpicAccountRepository {
         return executeStwAction(accessToken, accountId, "EvolveItem", rvn = rvn, body = mapOf("targetItemId" to itemId, "evolutionIndex" to evolutionIndex))
     }
 
-    suspend fun modifyItemAttribute(accessToken: String, accountId: String, itemId: String, attributeName: String, newValue: Any, rvn: Int): Result<McpQueryResponse> {
-        return executeStwAction(accessToken, accountId, "ModifyItemAttribute", rvn = rvn, body = mapOf("targetItemId" to itemId, "attributeName" to attributeName, "newValue" to newValue))
-    }
-
     suspend fun claimResearchPoints(accessToken: String, accountId: String, rvn: Int): Result<McpQueryResponse> {
         return executeStwAction(accessToken, accountId, "ClaimCollectedResources", rvn = rvn, body = mapOf("collectors" to listOf("research_node_default_page")))
     }
@@ -1078,8 +932,53 @@ class EpicAccountRepository {
         return executeStwAction(accessToken, accountId, "ClaimQuestReward", rvn = rvn, body = mapOf("questId" to questId))
     }
 
+    suspend fun rerollDailyQuest(accessToken: String, accountId: String, questId: String, rvn: Int): Result<McpQueryResponse> {
+        return executeStwAction(accessToken, accountId, "FortRerollDailyQuest", profileId = "campaign", rvn = rvn, body = mapOf("questId" to questId))
+    }
+
+    suspend fun disassembleItems(accessToken: String, accountId: String, itemPairs: List<Map<String, Any>>, rvn: Int): Result<McpQueryResponse> {
+        return executeStwAction(accessToken, accountId, "DisassembleWorldItems", profileId = "theater0", rvn = rvn, body = mapOf("targetItemIdAndQuantityPairs" to itemPairs))
+    }
+
+    suspend fun destroyItems(accessToken: String, accountId: String, itemIds: List<String>, rvn: Int): Result<McpQueryResponse> {
+        return executeStwAction(accessToken, accountId, "DestroyWorldItems", profileId = "theater0", rvn = rvn, body = mapOf("itemIds" to itemIds))
+    }
+
     suspend fun setActiveHeroLoadout(accessToken: String, accountId: String, loadoutId: String, rvn: Int): Result<McpQueryResponse> {
         return executeStwAction(accessToken, accountId, "SetActiveCampaignHeroLoadout", rvn = rvn, body = mapOf("selectedId" to loadoutId))
+    }
+
+    suspend fun purchaseCatalogEntry(
+        accessToken: String, 
+        accountId: String, 
+        offerId: String, 
+        purchaseQuantity: Int, 
+        currency: String, 
+        currencySubType: String, 
+        expectedTotalPrice: Int, 
+        rvn: Int
+    ): Result<McpQueryResponse> {
+        return executeStwAction(
+            accessToken, accountId, "PurchaseCatalogEntry", 
+            profileId = "common_core", rvn = rvn, 
+            body = mapOf(
+                "offerId" to offerId,
+                "purchaseQuantity" to purchaseQuantity,
+                "currency" to currency,
+                "currencySubType" to currencySubType,
+                "expectedTotalPrice" to expectedTotalPrice,
+                "gameContext" to "fn"
+            )
+        )
+    }
+
+    suspend fun fetchStorefront(accessToken: String): Result<Map<String, Any>> {
+        return try {
+            val response = api.getStwStorefront(bearerToken = "Bearer $accessToken")
+            Result.success(response)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
     }
 
     suspend fun fetchStwWorldInfoFull(context: Context, accessToken: String): Result<List<StwMissionAlert>> {
@@ -1127,7 +1026,7 @@ class EpicAccountRepository {
         val tid = data["itemType"] as? String ?: "Unknown"
         return StwReward(
             id = tid,
-            name = StwMetadataRepository.resolveName(tid) ?: cleanStwName(tid),
+            name = StwMetadataRepository.resolveName(tid) ?: tid,
             quantity = (data["quantity"] as? Number)?.toInt() ?: 1,
             rarity = StwMetadataRepository.resolveRarity(tid) ?: determineRarity(tid, null),
             iconUrl = getStwRewardIcon(tid)
@@ -1135,16 +1034,7 @@ class EpicAccountRepository {
     }
 
     private fun getStwRewardIcon(itemType: String): String? {
-        val lower = itemType.lowercase()
-        return when {
-            lower.contains("vbucks") || lower.contains("mtx") -> "https://fortnite-api.com/images/vbucks.png"
-            lower.contains("xraytickets") -> "https://static.wikia.nocookie.net/fortnite/images/0/07/X-Ray_Tickets_STW.png"
-            lower.contains("reagent_c_t01") -> "https://static.wikia.nocookie.net/fortnite/images/2/2c/Pure_Drops_of_Rain.png"
-            lower.contains("reagent_c_t02") -> "https://static.wikia.nocookie.net/fortnite/images/d/df/Lightning_in_a_Bottle.png"
-            lower.contains("reagent_c_t03") -> "https://static.wikia.nocookie.net/fortnite/images/2/25/Eye_of_the_Storm.png"
-            lower.contains("reagent_c_t04") -> "https://static.wikia.nocookie.net/fortnite/images/3/30/Storm_Shard.png"
-            else -> null
-        }
+        return StwMetadataRepository.resolveStwResourceIcon(itemType)
     }
 
     private fun parseStwHero(id: String, data: McpItemData): StwHero {
@@ -1152,9 +1042,9 @@ class EpicAccountRepository {
         val attrs = data.attributes ?: emptyMap()
         val level = parseNumberAttr(attrs["level"]) ?: 1
         val rating = StwMetadataRepository.resolvePowerLevel(tid, level) ?: parseNumberAttr(attrs["hero_rating"]) ?: 0
-        val name = StwMetadataRepository.resolveName(tid) ?: cleanStwName(tid)
+        val name = StwMetadataRepository.resolveName(tid) ?: tid
         val rarity = determineRarity(tid, attrs)
-        val type = StwMetadataRepository.resolveType(tid) ?: determineHeroClass(tid)
+        val type = StwMetadataRepository.determineHeroClass(tid)
         
         return StwHero(
             id = id,
@@ -1164,6 +1054,8 @@ class EpicAccountRepository {
             level = level,
             rating = rating,
             classType = type,
+            gender = attrs["gender"]?.toString(),
+            iconUrl = StwMetadataRepository.resolveStwHeroIcon(tid),
             description = StwMetadataRepository.resolveDescription(tid)
         )
     }
@@ -1179,11 +1071,11 @@ class EpicAccountRepository {
             val raw = it?.toString() ?: ""
             if (raw.contains("Alteration:")) {
                 val aid = raw.substringAfter("Alteration:")
-                StwPerk(id = aid, name = cleanPerkName(aid), rarity = determinePerkRarity(aid))
+                StwPerk(id = aid, name = aid, rarity = determinePerkRarity(aid))
             } else null
         } ?: emptyList()
         
-        val name = StwMetadataRepository.resolveName(tid) ?: cleanStwName(tid)
+        val name = StwMetadataRepository.resolveName(tid) ?: tid
         val rarity = determineRarity(tid, attrs)
         val type = StwMetadataRepository.resolveType(tid) ?: (if (tid.contains("trap", true)) "Trap" else "Weapon")
         
@@ -1195,14 +1087,12 @@ class EpicAccountRepository {
             level = level,
             rating = rating,
             type = type,
+            iconUrl = getStwSchematicIcon(tid),
             perks = perks,
-            durability = (attrs["durability"] as? Number)?.toFloat(),
+            alterations = alterationsRaw?.mapNotNull { it?.toString() } ?: emptyList(),
+            durability = (attrs["durability"] as? Number)?.toFloat() ?: (attrs["current_durability"] as? Number)?.toFloat(),
             isSlotted = attrs["collection_book_page_id"] != null
         )
-    }
-
-    private fun cleanPerkName(aid: String): String {
-        return aid.replace(Regex("(?i)^AID_ATT_|^AID_|^ATT_"), "").replace(Regex("(?i)(_SR|_VR|_R|_UC|_C|_UR|_MYTH)(?=_|$)"), "").replace(Regex("(?i)(_T\\d+|_ORE|_CRYSTAL)(?=_|$)"), "").replace("_", " ").trim().uppercase()
     }
 
     private fun determinePerkRarity(aid: String): String {
@@ -1221,7 +1111,7 @@ class EpicAccountRepository {
         val attrs = data.attributes ?: emptyMap()
         val level = parseNumberAttr(attrs["level"]) ?: 1
         val rating = StwMetadataRepository.resolvePowerLevel(tid, level) ?: parseNumberAttr(attrs["rating"]) ?: 0
-        val name = StwMetadataRepository.resolveName(tid) ?: cleanStwName(tid)
+        val name = StwMetadataRepository.resolveName(tid) ?: tid
         val rarity = determineRarity(tid, attrs)
         
         val rawPersonality = attrs["personality"]?.toString() ?: ""
@@ -1239,8 +1129,12 @@ class EpicAccountRepository {
             personality = personality,
             setBonus = setBonus,
             squadId = attrs["squad_id"]?.toString(),
+            squadSlotIdx = parseNumberAttr(attrs["squad_slot_idx"]) ?: -1,
+            gender = attrs["gender"]?.toString(),
+            portrait = attrs["portrait"]?.toString(),
             isLead = tid.contains("manager", true) || tid.contains("lead", true),
-            synergy = attrs["managerSynergy"]?.toString()?.substringAfterLast(".")?.replace("Is", "")
+            synergy = attrs["managerSynergy"]?.toString()?.substringAfterLast(".")?.replace("Is", ""),
+            iconUrl = StwMetadataRepository.resolveStwSurvivorIcon(tid, attrs["portrait"]?.toString())
         )
     }
 
@@ -1249,45 +1143,128 @@ class EpicAccountRepository {
         val attrs = data.attributes ?: emptyMap()
         val level = parseNumberAttr(attrs["level"]) ?: 1
         val rating = StwMetadataRepository.resolvePowerLevel(tid, level) ?: parseNumberAttr(attrs["rating"]) ?: 0
-        val name = StwMetadataRepository.resolveName(tid) ?: cleanStwName(tid)
+        val name = StwMetadataRepository.resolveName(tid) ?: tid
         val rarity = determineRarity(tid, attrs)
         
         val alterationsRaw = (attrs["alterations"] as? List<*>)
-        val perks = alterationsRaw?.mapNotNull { cleanPerkName(it.toString()) } ?: emptyList()
+        val perks = alterationsRaw?.mapNotNull { it.toString() } ?: emptyList()
 
-        return StwDefender(id = id, templateId = tid, name = name, rarity = rarity, type = StwMetadataRepository.resolveType(tid) ?: "Defender", level = level, rating = rating, perks = perks)
+        return StwDefender(
+            id = id, 
+            templateId = tid, 
+            name = name, 
+            rarity = rarity, 
+            type = StwMetadataRepository.resolveType(tid) ?: "Defender", 
+            level = level, 
+            rating = rating, 
+            iconUrl = getStwDefenderIcon(tid),
+            perks = perks
+        )
     }
 
     private fun parseStwQuest(id: String, data: McpItemData): FortniteQuest? {
-        val tid = data.templateId
+        val tid = data.templateId.lowercase()
+        if (!tid.startsWith("quest:daily_")) return null
+        
         val attrs = data.attributes ?: emptyMap()
         val state = attrs["quest_state"]?.toString() ?: ""
         if (state.equals("claimed", true)) return null
-        val resolvedName = StwMetadataRepository.resolveName(tid)
-        val resolvedDesc = StwMetadataRepository.resolveDescription(tid)
-        val target = StwMetadataRepository.resolveQuestTarget(tid) ?: 1
-        var current = 0
-        attrs.forEach { (k, v) -> if (k.startsWith("completion_", ignoreCase = true) || k.contains("_count", ignoreCase = true)) { val count = parseNumberAttr(v) ?: 0; if (count > current) current = count } }
-        if (current == 0 && state.equals("completed", true)) current = target
-        return FortniteQuest(id = id, templateId = tid, name = resolvedName ?: cleanStwName(tid), description = resolvedDesc ?: "Save the World Quest", category = if (tid.contains("daily", true)) "Daily Quests" else if (tid.contains("stonewood", true)) "Stonewood Quests" else "World Quests", progress = current, target = target, isCompleted = state.equals("completed", true), objectives = emptyList(), rewardXp = 0)
-    }
-
-    private fun determineHeroClass(tid: String): String {
-        return when {
-            tid.contains("constructor", true) -> "Constructor"
-            tid.contains("ninja", true) -> "Ninja"
-            tid.contains("outlander", true) -> "Outlander"
-            tid.contains("commando", true) || tid.contains("soldier", true) -> "Soldier"
-            else -> "Hero"
+        
+        val dailyMeta = StwMetadataRepository.resolveDailyQuest(tid)
+        val nameMap = dailyMeta?.name
+        val resolvedName = (nameMap?.get("en") as? String) ?: StwMetadataRepository.resolveName(tid) ?: tid
+        
+        val objectives = mutableListOf<QuestObjective>()
+        dailyMeta?.objectives?.forEach { (objKey, objMeta) ->
+            val target = objMeta.count ?: 1
+            var current = 0
+            
+            // Try to find matching completion attribute
+            attrs.forEach { (k, v) ->
+                if (k.startsWith("completion_")) {
+                    val attrKey = k.substringAfter("completion_").lowercase()
+                    // Match if attrKey contains key words from objKey or if tid contains attrKey
+                    if (attrKey.contains("kill_husk") || attrKey.contains("complete_primary") || tid.contains(attrKey)) {
+                        val count = parseNumberAttr(v) ?: 0
+                        if (count > current) current = count
+                    }
+                }
+            }
+            
+            // Heuristic for specific daily types
+            if (current == 0) {
+                if (tid.contains("huskextermination")) {
+                    current = parseNumberAttr(attrs.entries.find { it.key.contains("kill_husk") }?.value) ?: 0
+                } else if (tid.contains("mission_specialist")) {
+                    current = parseNumberAttr(attrs.entries.find { it.key.contains("complete_primary") || it.key.contains("complete_mission") }?.value) ?: 0
+                }
+            }
+            
+            if (state.equals("completed", true)) current = target
+            
+            objectives.add(QuestObjective(id = objKey, description = objKey, current = current, target = target))
         }
+
+        val totalProgress = objectives.firstOrNull()?.current ?: 0
+        val totalTarget = objectives.firstOrNull()?.target ?: 1
+
+        val reward = if (resolvedName.contains("Mission Veteran", true) || resolvedName.contains("All Together Now", true)) 150 else 100
+
+        return FortniteQuest(
+            id = id, 
+            templateId = tid, 
+            name = resolvedName, 
+            description = dailyMeta?.objectives?.keys?.firstOrNull() ?: "Daily Quest", 
+            category = "Daily Quests", 
+            progress = totalProgress, 
+            target = totalTarget, 
+            isCompleted = state.equals("completed", true), 
+            objectives = objectives, 
+            rewardXp = 0,
+            rewardMtx = reward
+        )
     }
 
-    private fun cleanStwName(raw: String): String {
-        val lower = raw.lowercase()
-        val staticMap = mapOf("reagent_c_t01" to "Pure Drop of Rain", "reagent_c_t02" to "Lightning in a Bottle", "reagent_c_t03" to "Eye of the Storm", "reagent_c_t04" to "Storm Shard", "currency:gold" to "Gold", "eventcurrency_scaling" to "Gold", "xraytickets" to "X-Ray Tickets")
-        staticMap.entries.find { lower.contains(it.key) }?.let { return it.value }
-        var clean = raw.substringAfter(":", raw).replace(Regex("(?i)^HID_|^SID_|^WID_|^DID_|^Worker_|^Defender_|^Schematic_|^Hero_|^CardPack_|^Quest_"), "").replace(Regex("(?i)^(managersoldier|managerinventor|managerengineer|managerdoctor|managerexplorer|managermartialartist|manager|lead|soldier|inventor|engineer|doctor|explorer|martialartist)"), "").replace(Regex("(?i)(_SR|_VR|_R|_UC|_C|_UR|_MYTH)(?=_|$)"), "").replace(Regex("(?i)(_ORE|_CRYSTAL|_T\\d+)(?=_|$)"), "").replace("_", " ").trim()
-        return if (clean.isEmpty()) raw else clean.split(" ").filter { it.isNotBlank() }.joinToString(" ") { it.lowercase().replaceFirstChar { c -> c.uppercase() } }
+    private fun getStwDefenderIcon(templateId: String): String {
+        val baseId = templateId.substringAfter(":").lowercase()
+            .replace("did_", "")
+            .replace(Regex("(_sr|_vr|_r|_uc|_c|_myth|_ur)$"), "")
+            .replace(Regex("_t\\d+$"), "")
+            .replace(Regex("(_sr|_vr|_r|_uc|_c|_myth|_ur)_t\\d+$"), "")
+            .replace(Regex("_(sr|vr|r|uc|c|myth|ur|t\\d+)$"), "")
+        
+        return "https://pennydb.plingindigo.org/images/defenders/$baseId.png"
+    }
+
+    private fun getStwSchematicIcon(templateId: String): String {
+        val slug = StwMetadataRepository.resolveSlug(templateId) 
+            ?: templateId.substringAfter(":").lowercase().replace(" ", "_").replace("\"", "").replace(".", "")
+        
+        val isTrap = templateId.contains("trap", true) || 
+                     templateId.contains("floor_", true) || 
+                     templateId.contains("wall_", true) || 
+                     templateId.contains("ceiling_", true) ||
+                     templateId.contains("sid_floor", true) ||
+                     templateId.contains("sid_wall", true) ||
+                     templateId.contains("sid_ceiling", true)
+                     
+        val folder = if (isTrap) "traps" else "weapons"
+        return "https://pennydb.plingindigo.org/images/$folder/$slug.png"
+    }
+
+    private fun getStwBackpackIconUrl(templateId: String, type: String): String {
+        // Preference 1: Try resolving English name from metadata (lowercase with underscores)
+        val slug = StwMetadataRepository.resolveSlug(templateId) 
+            ?: templateId.substringAfter(":").lowercase().replace(" ", "_").replace("\"", "").replace(".", "")
+        
+        val folder = when {
+            type == "Ranged" || type == "Melee" -> "weapons"
+            type == "Trap" -> "traps"
+            type == "Material" || templateId.contains("ingredient", ignoreCase = true) || templateId.contains("worlditem", ignoreCase = true) -> "ingredients"
+            else -> "resources"
+        }
+
+        return "https://pennydb.plingindigo.org/images/$folder/$slug.png"
     }
 
     private fun parseNumberAttr(value: Any?): Int? {
@@ -1298,20 +1275,39 @@ class EpicAccountRepository {
         }
     }
 
-    private fun parseCbPage(id: String, item: McpItemData, slotted: List<StwInventoryItem> = emptyList()): StwCollectionPage {
-        val tid = item.templateId
-        val attrs = item.attributes ?: emptyMap()
-        val state = attrs["state"]?.toString() ?: "Unknown"
-        val name = StwMetadataRepository.resolveName(tid) ?: cleanCbPageName(tid)
-        return StwCollectionPage(id = id, templateId = tid, name = name, state = state, slottedItems = slotted)
-    }
-
     private fun parseToInventoryItem(id: String, item: McpItemData): StwInventoryItem {
         val tid = item.templateId
         val attrs = item.attributes ?: emptyMap()
         val level = parseNumberAttr(attrs["level"]) ?: 1
-        val durability = (attrs["durability"] as? Number)?.toFloat()
-        return StwInventoryItem(id = id, templateId = tid, name = StwMetadataRepository.resolveName(tid) ?: cleanStwName(tid), quantity = item.quantity, level = level, rarity = determineRarity(tid, attrs), type = if (tid.startsWith("Ingredient")) "Material" else if (tid.startsWith("Ammo")) "Ammo" else if (tid.startsWith("Trap")) "Trap" else "Weapon", durability = durability)
+        val rating = StwMetadataRepository.resolvePowerLevel(tid, level) ?: 0
+        val durability = (attrs["durability"] as? Number)?.toFloat() ?: (attrs["current_durability"] as? Number)?.toFloat()
+        
+        val name = StwMetadataRepository.resolveName(tid) ?: tid
+
+        val rarity = determineRarity(tid, attrs)
+        
+        val type = when {
+            tid.startsWith("Ingredient", ignoreCase = true) || tid.startsWith("WorldItem", ignoreCase = true) -> "Material"
+            tid.startsWith("Ammo", ignoreCase = true) -> "Ammo"
+            tid.startsWith("Trap", ignoreCase = true) || tid.contains(":tid_", ignoreCase = true) -> "Trap"
+            tid.startsWith("Weapon", ignoreCase = true) || tid.contains(":wid_", ignoreCase = true) -> {
+                if (StwMetadataRepository.isMelee(tid)) "Melee" else "Ranged"
+            }
+            else -> "Item"
+        }
+
+        return StwInventoryItem(
+            id = id,
+            templateId = tid,
+            name = name ?: tid,
+            quantity = item.quantity,
+            level = level,
+            rating = rating,
+            rarity = rarity,
+            type = type,
+            durability = durability,
+            iconUrl = getStwBackpackIconUrl(tid, type)
+        )
     }
 
     private fun cleanCbPageName(tid: String): String {

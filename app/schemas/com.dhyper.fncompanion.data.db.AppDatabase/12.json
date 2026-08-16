@@ -1,12 +1,12 @@
 {
   "formatVersion": 1,
   "database": {
-    "version": 10,
-    "identityHash": "3261e9e3ddbdcf25568593596004a7e6",
+    "version": 12,
+    "identityHash": "c00f93cf4b00212fc5bfc51660a6ad1f",
     "entities": [
       {
         "tableName": "auth_session",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`accountId` TEXT NOT NULL, `displayName` TEXT NOT NULL, `accessToken` TEXT NOT NULL, `refreshToken` TEXT, `expiresAtMs` INTEGER NOT NULL, `deviceId` TEXT, `deviceSecret` TEXT, `loginTimeMs` INTEGER NOT NULL, `lastRefreshTimeMs` INTEGER NOT NULL, `isActive` INTEGER NOT NULL, `equippedSkinIcon` TEXT, `deviceAuthStatus` TEXT NOT NULL, `stwAutoRecycleJunk` INTEGER NOT NULL, `stwAutoClaimLlamas` INTEGER NOT NULL, PRIMARY KEY(`accountId`))",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`accountId` TEXT NOT NULL, `displayName` TEXT NOT NULL, `accessToken` TEXT NOT NULL, `refreshToken` TEXT, `expiresAtMs` INTEGER NOT NULL, `deviceId` TEXT, `deviceSecret` TEXT, `loginTimeMs` INTEGER NOT NULL, `lastRefreshTimeMs` INTEGER NOT NULL, `isActive` INTEGER NOT NULL, `equippedSkinIcon` TEXT, `deviceAuthStatus` TEXT NOT NULL, `stwAutoRecycleJunk` INTEGER NOT NULL, `stwAutoClaimLlamas` INTEGER NOT NULL, `isFounder` INTEGER NOT NULL, PRIMARY KEY(`accountId`))",
         "fields": [
           {
             "fieldPath": "accountId",
@@ -85,6 +85,12 @@
           {
             "fieldPath": "stwAutoClaimLlamas",
             "columnName": "stwAutoClaimLlamas",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "isFounder",
+            "columnName": "isFounder",
             "affinity": "INTEGER",
             "notNull": true
           }
@@ -176,7 +182,7 @@
       },
       {
         "tableName": "app_settings",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER NOT NULL, `fortniteApiKey` TEXT, `firstLaunchHandled` INTEGER NOT NULL, `useUniversalWishlist` INTEGER NOT NULL, `accentColor` TEXT NOT NULL, `notificationsEnabled` INTEGER NOT NULL, `vbucksAlertsEnabled` INTEGER NOT NULL, `vbucksAlertTime` TEXT NOT NULL, `lastVBucksMissionId` TEXT, `dataSaverMode` INTEGER NOT NULL, PRIMARY KEY(`id`))",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER NOT NULL, `fortniteApiKey` TEXT, `firstLaunchHandled` INTEGER NOT NULL, `useUniversalWishlist` INTEGER NOT NULL, `accentColor` TEXT NOT NULL, `notificationsEnabled` INTEGER NOT NULL, `vbucksAlertsEnabled` INTEGER NOT NULL, `shopRefreshTime` TEXT NOT NULL, `stwVBucksAlertTime` TEXT NOT NULL, `stwAutomationTime` TEXT NOT NULL, `lastVBucksMissionId` TEXT, `dataSaverMode` INTEGER NOT NULL, PRIMARY KEY(`id`))",
         "fields": [
           {
             "fieldPath": "id",
@@ -220,8 +226,20 @@
             "notNull": true
           },
           {
-            "fieldPath": "vbucksAlertTime",
-            "columnName": "vbucksAlertTime",
+            "fieldPath": "shopRefreshTime",
+            "columnName": "shopRefreshTime",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "stwVBucksAlertTime",
+            "columnName": "stwVBucksAlertTime",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "stwAutomationTime",
+            "columnName": "stwAutomationTime",
             "affinity": "TEXT",
             "notNull": true
           },
@@ -247,7 +265,7 @@
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '3261e9e3ddbdcf25568593596004a7e6')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'c00f93cf4b00212fc5bfc51660a6ad1f')"
     ]
   }
 }

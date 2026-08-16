@@ -249,6 +249,7 @@ data class FortniteQuest(
     val isCompleted: Boolean,
     val objectives: List<QuestObjective> = emptyList(),
     val rewardXp: Int = 0,
+    val rewardMtx: Int = 0,
     val expiry: String? = null
 )
 

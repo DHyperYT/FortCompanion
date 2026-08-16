@@ -8,6 +8,8 @@ import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import androidx.work.CoroutineWorker
+import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import com.dhyper.fncompanion.data.db.AppDatabase
 import com.dhyper.fncompanion.data.repository.FortniteRepository
@@ -98,6 +100,10 @@ class ShopCheckWorker(
                         }
                     }
                 }
+                
+                // Trigger STW Automation if enabled for any account
+                val stwAutoRequest = OneTimeWorkRequestBuilder<StwAutomationWorker>().build()
+                WorkManager.getInstance(applicationContext).enqueue(stwAutoRequest)
             },
             onFailure = {
                 if (isManualTest) sendNotification("Failed to check shop: ${it.localizedMessage}", 0)

@@ -44,7 +44,7 @@ class VBucksCheckWorker(
                     // If parsing failed but missions are there (fallback ID), we still notify.
                     if (currentMissionId != lastNotifiedId) {
                         Log.i("VBucksCheckWorker", "[$checkId] HAS_VBUCKS: New set detected ($currentMissionId). Notifying.")
-                        sendNotification("V-Bucks missions are active! Open FortniteDB to see them.")
+                        sendNotification("V-Bucks missions are active!")
                         settingsDao.saveSettings(settings.copy(lastVBucksMissionId = currentMissionId))
                     } else {
                         Log.i("VBucksCheckWorker", "[$checkId] HAS_VBUCKS: Already notified for this set ($currentMissionId).")

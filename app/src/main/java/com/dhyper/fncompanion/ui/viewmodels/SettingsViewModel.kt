@@ -196,7 +196,21 @@ class SettingsViewModel(
     fun updateVBucksAlertTime(time: String) {
         viewModelScope.launch {
             val current = settingsDao.getSettingsDirect() ?: SettingsEntity()
-            settingsDao.saveSettings(current.copy(vbucksAlertTime = time))
+            settingsDao.saveSettings(current.copy(shopRefreshTime = time))
+        }
+    }
+
+    fun updateStwVBucksAlertTime(time: String) {
+        viewModelScope.launch {
+            val current = settingsDao.getSettingsDirect() ?: SettingsEntity()
+            settingsDao.saveSettings(current.copy(stwVBucksAlertTime = time))
+        }
+    }
+
+    fun updateStwAutomationTime(time: String) {
+        viewModelScope.launch {
+            val current = settingsDao.getSettingsDirect() ?: SettingsEntity()
+            settingsDao.saveSettings(current.copy(stwAutomationTime = time))
         }
     }
 

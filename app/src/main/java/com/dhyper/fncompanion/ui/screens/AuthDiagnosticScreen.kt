@@ -62,7 +62,7 @@ fun AuthDiagnosticScreen(
             .padding(16.dp)
     ) {
         Text(
-            "AUTH DIAGNOSTICS",
+            "ADVANCED OPTIONS",
             style = MaterialTheme.typography.headlineSmall,
             fontWeight = FontWeight.Black,
             color = SleekTextPrimary

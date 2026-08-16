@@ -82,7 +82,7 @@ sealed class NavRoute(val route: String, val title: String, val icon: androidx.c
     object Aes : NavRoute("aes", "AES Keys", Icons.Default.VpnKey)
     object Career : NavRoute("career", "Career", Icons.Default.History)
     object AddAccount : NavRoute("add_account", "Add Account", Icons.Default.PersonAdd)
-    object AuthDiagnostic : NavRoute("auth_diagnostic", "Auth Diagnostic", Icons.Default.BugReport)
+    object AdvancedOptions : NavRoute("advanced_options", "Advanced Options", Icons.Default.Tune)
 }
 
 class MainActivity : FragmentActivity() {
@@ -104,6 +104,7 @@ class MainActivity : FragmentActivity() {
         
         ShopRefreshReceiver.scheduleNextAlarm(this)
         VBucksAlertReceiver.scheduleNextAlarm(this)
+        com.dhyper.fncompanion.worker.StwAutomationReceiver.scheduleNextAlarm(this)
         requestNotificationPermission()
         setContent {
             val currentSettings by db.settingsDao().getSettings().collectAsState(initial = null)
@@ -151,7 +152,7 @@ fun FortniteCompanionApp(settings: SettingsEntity?) {
         com.dhyper.fncompanion.data.api.ApiClient.init(authRepository, context)
     }
 
-    LaunchedEffect(settings?.vbucksAlertsEnabled, settings?.notificationsEnabled, settings?.vbucksAlertTime) {
+    LaunchedEffect(settings?.vbucksAlertsEnabled, settings?.notificationsEnabled, settings?.stwVBucksAlertTime, settings?.shopRefreshTime) {
         VBucksAlertReceiver.scheduleNextAlarm(context)
         ShopRefreshReceiver.scheduleNextAlarm(context)
     }
@@ -290,6 +291,7 @@ fun FortniteCompanionApp(settings: SettingsEntity?) {
                         viewModel = authViewModel, 
                         settingsViewModel = settingsViewModel,
                         lockerViewModel = lockerViewModel,
+                        stwViewModel = stwViewModel,
                         onNavigateToLocker = { navController.navigate(NavRoute.Locker.route) },
                         onNavigateToCareer = { navController.navigate(NavRoute.Career.route) }
                     ) 
@@ -310,7 +312,7 @@ fun FortniteCompanionApp(settings: SettingsEntity?) {
                         statsViewModel, 
                         settingsViewModel,
                         onAddAccount = { navController.navigate(NavRoute.AddAccount.route) },
-                        onNavigateToDiagnostic = { navController.navigate(NavRoute.AuthDiagnostic.route) }
+                        onNavigateToAdvanced = { navController.navigate(NavRoute.AdvancedOptions.route) }
                     ) 
                 }
                 composable(NavRoute.AddAccount.route) {
@@ -318,13 +320,14 @@ fun FortniteCompanionApp(settings: SettingsEntity?) {
                         viewModel = authViewModel,
                         settingsViewModel = settingsViewModel,
                         lockerViewModel = lockerViewModel,
+                        stwViewModel = stwViewModel,
                         onNavigateToLocker = { navController.popBackStack() },
                         onNavigateToCareer = { navController.popBackStack() },
                         forceLogin = true,
                         onLoginSuccess = { navController.popBackStack() }
                     )
                 }
-                composable(NavRoute.AuthDiagnostic.route) {
+                composable(NavRoute.AdvancedOptions.route) {
                     AuthDiagnosticScreen(authViewModel)
                 }
             }
