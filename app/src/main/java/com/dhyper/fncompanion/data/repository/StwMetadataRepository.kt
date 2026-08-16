@@ -344,7 +344,7 @@ object StwMetadataRepository {
                 name.contains("Airstrike", true) -> "airstrike"
                 name.contains("Banner", true) -> "banner"
                 name.contains("Stationary Hover Turret", true) -> "stationary_hover_turret"
-                name.contains("Proximity Mine", true) -> "proximity_mine"
+                name.contains("Proximity Mines", true) -> "proximity_mines"
                 name.contains("Slow Field", true) -> "slow_field"
                 name.contains("Teleporter", true) -> "teleporter"
                 else -> name.trim().lowercase().replace(" ", "_").replace(".", "").replace("\"", "")
