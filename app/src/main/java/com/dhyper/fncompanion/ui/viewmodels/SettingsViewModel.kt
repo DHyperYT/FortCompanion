@@ -173,6 +173,13 @@ class SettingsViewModel(
         }
     }
 
+    fun updateDataSaverMode(enabled: Boolean) {
+        viewModelScope.launch {
+            val current = settingsDao.getSettingsDirect() ?: SettingsEntity()
+            settingsDao.saveSettings(current.copy(dataSaverMode = enabled))
+        }
+    }
+
     fun updateVBucksAlerts(enabled: Boolean) {
         viewModelScope.launch {
             val current = settingsDao.getSettingsDirect() ?: SettingsEntity()
