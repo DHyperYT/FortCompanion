@@ -237,10 +237,8 @@ class CosmeticsViewModel(
                     _wishlistIds.value = emptySet()
 
                     if (accountId != null) {
-                        // 1. Force full reload to update "OWNED" status for the specific account
                         loadData()
                         
-                        // 2. Load account-specific or universal wishlist
                         val settings = settingsDao.getSettingsDirect()
                         if (settings?.useUniversalWishlist == true) {
                             wishlistDao.getUniversalWishlist().collect { list ->

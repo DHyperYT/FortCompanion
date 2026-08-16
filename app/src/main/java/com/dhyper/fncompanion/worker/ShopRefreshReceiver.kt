@@ -16,11 +16,9 @@ import java.util.Calendar
 class ShopRefreshReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action == Intent.ACTION_BOOT_COMPLETED || intent.action == "com.dhyper.fncompanion.ACTION_SHOP_REFRESH") {
-            // 1. Trigger the actual check
             val request = OneTimeWorkRequestBuilder<ShopCheckWorker>().build()
             WorkManager.getInstance(context).enqueue(request)
             
-            // 2. Schedule the next alarm
             scheduleNextAlarm(context)
         }
     }

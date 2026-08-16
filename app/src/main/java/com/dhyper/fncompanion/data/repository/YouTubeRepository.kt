@@ -19,12 +19,10 @@ class YouTubeRepository {
 
             val html = doc.html()
             
-            // 1. Try specific videoRenderer for standard results
             val videoRendererRegex = Regex(""""videoRenderer":\{"videoId":"([^"]+)"""")
             val match = videoRendererRegex.find(html)
             var videoId = match?.groupValues?.get(1)
             
-            // 2. Fallback to any videoId if the above fails
             if (videoId == null) {
                 val fallbackRegex = Regex(""""videoId":"([^"]+)"""")
                 videoId = fallbackRegex.find(html)?.groupValues?.get(1)

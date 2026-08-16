@@ -100,11 +100,9 @@ object LockerImageGenerator {
             
             val cardRect = RectF(left.toFloat(), top.toFloat(), right.toFloat(), bottom.toFloat())
             
-            // 1. Card Background
             val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = cardBgColor }
             canvas.drawRoundRect(cardRect, 24f * scale, 24f * scale, bgPaint)
             
-            // 2. Rarity Gradient (Matched to App Visuals)
             val rarityColor = getRarityColor(item.rarity)
             val gradientPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 shader = LinearGradient(
@@ -116,7 +114,6 @@ object LockerImageGenerator {
             }
             canvas.drawRoundRect(cardRect, 24f * scale, 24f * scale, gradientPaint)
             
-            // 3. Border (Matched to App 0.6f)
             val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 color = rarityColor.copy(alpha = 0.7f).toArgb() // Slightly more alpha for bitmap clarity
                 style = Paint.Style.STROKE
@@ -124,7 +121,6 @@ object LockerImageGenerator {
             }
             canvas.drawRoundRect(cardRect, 24f * scale, 24f * scale, borderPaint)
 
-            // 4. Icon (Maximized with robust fallback)
             if (!item.iconUrl.isNullOrEmpty()) {
                 val request = ImageRequest.Builder(context)
                     .data(item.iconUrl)
@@ -147,7 +143,6 @@ object LockerImageGenerator {
                 }
             }
 
-            // 5. Name Overlay
             val textBgPaint = Paint().apply {
                 color = Color.BLACK
                 alpha = 180

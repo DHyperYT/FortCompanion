@@ -174,7 +174,6 @@ class AuthRepository(private val authDao: AuthDao) {
                 return@withLock Result.success(reCheck)
             }
 
-            // 1. Try Refresh Token
             if (tryRefresh && !session.refreshToken.isNullOrBlank()) {
                 AuthDiagnosticsManager.logEvent(AuthEventType.AUTH_REQUEST_STARTED, session.accountId, "Grant: refresh_token")
                 try {
@@ -188,7 +187,6 @@ class AuthRepository(private val authDao: AuthDao) {
                 }
             }
 
-            // 2. Try Device Auth Fallback
             if (tryDeviceAuth && !session.deviceId.isNullOrBlank() && !session.deviceSecret.isNullOrBlank()) {
                 AuthDiagnosticsManager.logEvent(AuthEventType.AUTH_REQUEST_STARTED, session.accountId, "Grant: device_auth")
                 try {
@@ -236,22 +234,18 @@ class AuthRepository(private val authDao: AuthDao) {
             deviceAuthStatus = DeviceAuthStatus.VALID.name
         )
         
-        // 1. Atomic Persistence
         authDao.upsertAuthSession(encryptSession(updated))
         AuthDiagnosticsManager.logEvent(AuthEventType.AUTH_TOKEN_PERSISTED, updated.accountId)
         
-        // 2. Immediate Reload and Verification
         val reloadedEncrypted = authDao.getAccountByIdDirect(updated.accountId)
         val reloaded = decryptSession(reloadedEncrypted)
         
         if (reloaded != null && reloaded.expiresAtMs == updated.expiresAtMs) {
             AuthDiagnosticsManager.logEvent(AuthEventType.AUTH_STATE_RELOADED, updated.accountId, "Expiry: ${reloaded.expiresAtMs}")
             
-            // 3. Update In-Memory Cache (Source of truth for UI and Interceptor)
             sessionCache.value = sessionCache.value + (reloaded.accountId to reloaded)
             AuthDiagnosticsManager.logEvent(AuthEventType.AUTH_STATE_UPDATED, reloaded.accountId)
             
-            // 4. Force Ticker to update timer
             AuthDiagnosticsManager.logEvent(AuthEventType.AUTH_TIMER_UPDATED, reloaded.accountId)
             
             return reloaded

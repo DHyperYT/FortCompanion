@@ -156,7 +156,6 @@ object StwMetadataRepository {
     private fun findMetadata(templateId: String): StwItemMetadata? {
         var fullTid = templateId.lowercase().trim()
         
-        // 1. Normalize profile-specific prefixes to stringlist.json format
         fullTid = when {
             fullTid.startsWith("trap:tid_") -> fullTid.replace("trap:tid_", "schematic:sid_")
             fullTid.startsWith("weapon:wid_") -> fullTid.replace("weapon:wid_", "schematic:sid_")
@@ -164,7 +163,6 @@ object StwMetadataRepository {
             else -> fullTid
         }
         
-        // 2. Normalize variants (crystal -> ore)
         if (fullTid.contains("_crystal_")) {
             fullTid = fullTid.replace("_crystal_", "_ore_")
         }
@@ -182,7 +180,6 @@ object StwMetadataRepository {
             dailyQuests[questCore]?.let { return it }
         }
         
-        // 3. Direct matches with potential tier fallback
         fun tryMatch(id: String): StwItemMetadata? {
             // Prefer T01 version if available to satisfy "get the t01 names for everyone"
             if (id.contains(Regex("_t\\d+"))) {
@@ -201,7 +198,6 @@ object StwMetadataRepository {
         dailyQuests[strippedTid]?.let { return it }
         dailyQuests[idNoVersion]?.let { return it }
 
-        // 4. Safe normalization for fuzzy lookup
         val prefixSet = setOf("wid", "sid", "hid", "did", "tid", "uid", "qid", "worker", "quest", "managersoldier", "managerinventor", "managerengineer", "managerdoctor", "managerexplorer", "managermartialartist", "leadengineer", "leadexplorer", "leaddoctor", "schematic", "hero", "worker", "defender", "quest", "collectionbookpage", "page", "worlditem", "ingredient", "item", "ammo", "trap", "weapon", "cardpack", "consumable", "reagent", "token")
         val variantSet = setOf("sr", "vr", "r", "uc", "c", "ur", "myth", "ore", "crystal", "highperf", "highcapacity", "highvolt", "founders", "military", "halloween", "christmas", "winter", "vindertech", "steampunk", "medieval", "retroscifi", "artdeco", "t01", "t02", "t03", "t04", "t05", "t06", "t07")
         
@@ -306,7 +302,6 @@ object StwMetadataRepository {
     fun resolveStwSurvivorIcon(templateId: String, portrait: String?): String {
         val engName = resolveEnglishName(templateId) ?: ""
         
-        // 1. Generic Survivors (Named "Survivor")
         if (engName.equals("Survivor", true) && portrait != null) {
             val portraitId = portrait.substringAfterLast(":")
             val parts = portraitId.lowercase().split("-")
@@ -318,7 +313,6 @@ object StwMetadataRepository {
             }
         }
         
-        // 2. Generic Lead Survivors (Name contains "Lead Survivor")
         if (engName.contains("Lead Survivor", true) && portrait != null) {
             val portraitId = portrait.substringAfterLast(":")
             val parts = portraitId.lowercase().split("-")
@@ -337,8 +331,6 @@ object StwMetadataRepository {
             }
         }
 
-        // 3. Mythic and Unique Survivors (Karolina, Joel, Joe "Ramsie" Bo, etc.)
-        // Uses the same rule as heroes: slug based on name with quotes/dots removed.
         val slug = resolveSlug(templateId) ?: templateId.substringAfter(":").lowercase()
         return "https://pennydb.plingindigo.org/images/survivors/$slug.png"
     }

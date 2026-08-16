@@ -1,6 +1,9 @@
 package com.dhyper.fncompanion
 
+import android.content.Context
 import android.content.Intent
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -134,8 +137,50 @@ fun FortniteCompanionApp(settings: SettingsEntity?) {
     val lifecycleOwner = LocalLifecycleOwner.current
     val db = AppDatabase.getDatabase(context)
     val authRepository = remember { AuthRepository(db.authDao()) }
+
+    var isOnline by remember { mutableStateOf(true) }
+
+    fun checkConnectivity() {
+        val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        val network = cm.activeNetwork
+        val capabilities = cm.getNetworkCapabilities(network)
+        isOnline = capabilities?.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) == true
+    }
+
+    DisposableEffect(context) {
+        val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        val callback = object : ConnectivityManager.NetworkCallback() {
+            override fun onAvailable(network: android.net.Network) { isOnline = true }
+            override fun onLost(network: android.net.Network) { checkConnectivity() }
+        }
+        cm.registerDefaultNetworkCallback(callback)
+        checkConnectivity()
+        onDispose { cm.unregisterNetworkCallback(callback) }
+    }
     
-    // Proactive session check on startup and resume
+    if (!isOnline) {
+        AlertDialog(
+            onDismissRequest = { },
+            title = { Text("No Internet Connection", fontWeight = FontWeight.Black) },
+            text = { Text("No internet connection was detected. This app requires an active connection to function correctly.") },
+            confirmButton = {
+                Button(
+                    onClick = { checkConnectivity() },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                ) {
+                    Text("Retry")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { (context as? android.app.Activity)?.finish() }) {
+                    Text("Quit", color = SleekTextMuted)
+                }
+            },
+            containerColor = SleekSurface,
+            shape = RoundedCornerShape(16.dp)
+        )
+    }
+
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {

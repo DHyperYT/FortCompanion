@@ -269,12 +269,11 @@ class FortniteRepository {
 
             val doc = Jsoup.parse(body)
             val pageText = doc.text()
-            // 1. Direct check: If the "No V-Bucks" phrase is present in the visible text, there are no missions.
+
             if (pageText.contains("No V-Bucks Missions today", ignoreCase = true)) {
                 return@withContext Result.success(null)
             }
 
-            // 2. If the phrase is NOT there, missions are highly likely active.
             // We try to extract IDs to avoid duplicate alerts, but fallback to a date-hash if needed.
             val vbucksSection = doc.select("div.new_block_block").firstOrNull { element ->
                 element.select("h5, h4, div").text().contains("V-Bucks Missions", ignoreCase = true)

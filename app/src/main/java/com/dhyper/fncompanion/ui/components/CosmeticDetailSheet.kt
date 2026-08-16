@@ -206,7 +206,6 @@ fun CosmeticDetailSheet(
         val showcaseVideo = item.showcaseVideo
         if (showcaseVideo != null || ((isTrack || isMusicPack) && item.id.startsWith("CID_", ignoreCase = true) == false && !item.id.startsWith("JBSID_", ignoreCase = true))) {
             
-            // 1. Prioritize 30s Official Preview (for tracks)
             if (isTrack) {
                 item.previewUrl?.let { url ->
                     Spacer(modifier = Modifier.height(12.dp))
@@ -215,7 +214,6 @@ fun CosmeticDetailSheet(
                 }
             }
             
-            // 2. Direct Link to Showcase or Search
             val artist = item.artist ?: ""
             val query = when {
                 isTrack && artist.contains("Epic Games", ignoreCase = true) -> 
@@ -257,7 +255,6 @@ fun CosmeticDetailSheet(
             )
             Spacer(modifier = Modifier.height(8.dp))
 
-            // 1. Show Special Mode Styles (LEGO/Bean)
             if (legoIcon != null || beanIcon != null) {
                 LazyRow(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -276,7 +273,6 @@ fun CosmeticDetailSheet(
                 }
             }
 
-            // 2. Show Standard Variants
             item.variants?.forEach { variant ->
                 if (!variant.options.isNullOrEmpty()) {
                     Text(

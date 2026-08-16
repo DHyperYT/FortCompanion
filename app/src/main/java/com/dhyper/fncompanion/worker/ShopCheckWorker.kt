@@ -28,15 +28,12 @@ class ShopCheckWorker(
         val authDao = db.authDao()
         val settingsDao = db.settingsDao()
 
-        // 1. Get all logged-in accounts
         val accounts = authDao.getAllAccounts().first()
         if (accounts.isEmpty()) return Result.success()
 
-        // 2. Check universal wishlist setting
         val settings = settingsDao.getSettingsDirect()
         val isUniversal = settings?.useUniversalWishlist == true
 
-        // 3. Fetch the shop once
         val shopResult = repository.fetchItemShop()
         shopResult.fold(
             onSuccess = { shopData ->
@@ -82,7 +79,6 @@ class ShopCheckWorker(
                         sendNotification("Universal Wishlist: ${foundItems.joinToString { it.name }}", 999)
                     }
                 } else {
-                    // 4. Check wishlist for each account
                     accounts.forEachIndexed { index, account ->
                         val wishlist = wishlistDao.getAllWishlistedItems(account.accountId).first()
                         val foundItems = wishlist.filter { wishItem ->

@@ -472,24 +472,18 @@ fun getShopEntryTitle(entry: ShopEntry): String {
 }
 
 private fun getShopEntryImage(entry: ShopEntry, allItemsForDerivation: List<com.dhyper.fncompanion.data.models.CosmeticItem> = emptyList()): String? {
-    // 1. Prioritize Bundle Image (for bundles)
     if (!entry.bundle?.image.isNullOrBlank()) return entry.bundle?.image
 
-    // 2. Prioritize Modern Asset References (NewDisplayAsset)
-    // 2a. Check for direct render images list
     val renderImageUrl = entry.newDisplayAsset?.renderImages?.firstOrNull()?.image
     if (!renderImageUrl.isNullOrBlank()) return renderImageUrl
     
-    // 2b. Check for material instance images (Legacy fallback)
     val materialImg = entry.newDisplayAsset?.materialInstances?.firstOrNull()?.images?.get("OfferImage") ?:
                       entry.newDisplayAsset?.materialInstances?.firstOrNull()?.images?.get("Background")
     if (!materialImg.isNullOrBlank()) return materialImg
 
-    // 3. Specialized Jam Track Art (if no bundle image)
     val trackAlbumArt = entry.tracks?.firstOrNull()?.albumArt
     if (!trackAlbumArt.isNullOrBlank()) return trackAlbumArt
 
-    // 4. Resolve by specific Cosmetic ID if referenced in NewDisplayAsset
     val allItems = getItemsForEntry(entry, allItemsForDerivation)
     val referencedCosmeticId = entry.newDisplayAsset?.cosmeticId
     if (!referencedCosmeticId.isNullOrBlank()) {
@@ -500,7 +494,6 @@ private fun getShopEntryImage(entry: ShopEntry, allItemsForDerivation: List<com.
         }
     }
 
-    // 5. Fallback to the first item's resolved image
     val firstItem = allItems.firstOrNull()
     if (firstItem != null) {
         val resolved = resolveCosmeticIcon(firstItem)
@@ -702,7 +695,6 @@ fun ShopItemCard(
         var discountValue = 0
         val handledItemIds = mutableSetOf<String>()
 
-        // 1. Process Skin Sets first
         allItems.forEach { item ->
             val itemId = item.id.lowercase()
             if (ownedIds.contains(itemId) && setPrices.containsKey(itemId)) {
@@ -712,7 +704,6 @@ fun ShopItemCard(
             }
         }
 
-        // 2. Process remaining owned items
         allItems.forEach { item ->
             val itemId = item.id.lowercase()
             if (ownedIds.contains(itemId) && !handledItemIds.contains(itemId)) {

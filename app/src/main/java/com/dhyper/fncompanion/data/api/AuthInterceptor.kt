@@ -28,7 +28,6 @@ class AuthInterceptor(private val authRepository: AuthRepository) : Interceptor 
 
         val startTime = System.currentTimeMillis()
         
-        // 1. Proactive check: Ensure session is valid before proceeding
         val sessionResult = runBlocking {
             authRepository.ensureActiveSession()
         }
@@ -46,7 +45,6 @@ class AuthInterceptor(private val authRepository: AuthRepository) : Interceptor 
 
         var response = chain.proceed(newRequest)
 
-        // 2. Reactive check: Handle 401 Unauthorized
         if (response.code == 401) {
             AuthDiagnosticsManager.logEvent(
                 AuthEventType.AUTH_REQUEST_401,

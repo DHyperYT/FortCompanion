@@ -60,7 +60,6 @@ class PersonalLockerViewModel(
         viewModelScope.launch {
             _uiState.value = LockerUiState.Loading
             
-            // 1. Ensure we have a fresh token using Device Auth refresh
             val sessionResult = authRepository.ensureActiveSession()
             val validSession = sessionResult.getOrNull()
             

@@ -230,12 +230,10 @@ class ShopViewModel(
         viewModelScope.launch {
             _uiState.value = ShopUiState.Loading
             
-            // 0. Fetch all cosmetics for derivation logic
             launch {
                 repository.fetchAllCosmetics().onSuccess { _allCosmetics.value = it }
             }
             
-            // 1. Fetch owned items in parallel
             launch {
                 val sessionResult = authRepo.ensureActiveSession()
                 sessionResult.onSuccess { session ->
@@ -246,7 +244,6 @@ class ShopViewModel(
                 }
             }
 
-            // 2. Fetch the shop
             val result = repository.fetchItemShop()
             result.fold(
                 onSuccess = { data ->
@@ -421,12 +418,10 @@ class ShopViewModel(
 
         val result = mutableListOf<ShopEntry>()
         
-        // 1. Add Normal/Mixed sections in their original order
         normalSectionOrder.forEach { sid ->
             result.addAll(sectionsMap[sid]!!)
         }
         
-        // 2. Add Combined Vehicles section
         if (vehicleOnlyEntries.isNotEmpty()) {
             val vehicleSection = com.dhyper.fncompanion.data.models.ShopSectionMetadata(
                 id = "combined_vehicles", name = "Vehicles", index = null, landingPriority = null
@@ -434,7 +429,6 @@ class ShopViewModel(
             result.addAll(vehicleOnlyEntries.map { it.copy(section = vehicleSection) })
         }
         
-        // 3. Add Combined Special Offers section (above Jam Tracks)
         if (specialOfferEntries.isNotEmpty()) {
             val specialSection = com.dhyper.fncompanion.data.models.ShopSectionMetadata(
                 id = "combined_special_offers", name = "Special Offers", index = null, landingPriority = null
@@ -442,7 +436,6 @@ class ShopViewModel(
             result.addAll(specialOfferEntries.map { it.copy(section = specialSection) })
         }
         
-        // 4. Add Combined Jam Tracks section (at the very bottom)
         if (jamTrackEntries.isNotEmpty()) {
             val jamTrackSection = com.dhyper.fncompanion.data.models.ShopSectionMetadata(
                 id = "combined_jam_tracks", name = "Jam Tracks", index = null, landingPriority = null
