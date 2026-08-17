@@ -69,6 +69,9 @@ import coil.compose.AsyncImage
 import androidx.compose.ui.draw.clip
 import kotlinx.coroutines.launch
 
+import com.dhyper.fncompanion.util.UpdateManager
+import com.dhyper.fncompanion.util.NetworkManager
+
 sealed class NavRoute(val route: String, val title: String, val icon: androidx.compose.ui.graphics.vector.ImageVector) {
     object BrHub : NavRoute("br_hub", "BR", Icons.Default.MonetizationOn)
     object Stw : NavRoute("stw", "STW", Icons.Default.Home)
@@ -133,12 +136,11 @@ class MainActivity : FragmentActivity() {
 @Composable
 fun FortniteCompanionApp(settings: SettingsEntity?) {
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-    val lifecycleOwner = LocalLifecycleOwner.current
     val db = AppDatabase.getDatabase(context)
     val authRepository = remember { AuthRepository(db.authDao()) }
 
     var isOnline by remember { mutableStateOf(true) }
+    var updateInfo by remember { mutableStateOf<UpdateManager.UpdateInfo?>(null) }
 
     fun checkConnectivity() {
         val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
@@ -157,29 +159,36 @@ fun FortniteCompanionApp(settings: SettingsEntity?) {
         checkConnectivity()
         onDispose { cm.unregisterNetworkCallback(callback) }
     }
-    
-    if (!isOnline) {
-        AlertDialog(
-            onDismissRequest = { },
-            title = { Text("No Internet Connection", fontWeight = FontWeight.Black) },
-            text = { Text("No internet connection was detected. This app requires an active connection to function correctly.") },
-            confirmButton = {
-                Button(
-                    onClick = { checkConnectivity() },
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
-                ) {
-                    Text("Retry")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { (context as? android.app.Activity)?.finish() }) {
-                    Text("Quit", color = SleekTextMuted)
-                }
-            },
-            containerColor = SleekSurface,
-            shape = RoundedCornerShape(16.dp)
-        )
+
+    LaunchedEffect(isOnline) {
+        if (isOnline) {
+            val result = UpdateManager.checkForUpdate()
+            updateInfo = result.getOrNull()
+        }
     }
+    
+    val currentUpdate = updateInfo
+    if (!isOnline) {
+        OfflineScreen(
+            onRetry = { checkConnectivity() },
+            onQuit = { (context as? android.app.Activity)?.finish() }
+        )
+    } else if (currentUpdate != null && currentUpdate.isUpdateAvailable) {
+        ForceUpdateScreen(
+            latestVersion = currentUpdate.latestVersion,
+            downloadUrl = currentUpdate.downloadUrl
+        )
+    } else {
+        AppContent(settings, authRepository, db)
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun AppContent(settings: SettingsEntity?, authRepository: AuthRepository, db: AppDatabase) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val lifecycleOwner = LocalLifecycleOwner.current
 
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->

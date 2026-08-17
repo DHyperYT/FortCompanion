@@ -244,33 +244,29 @@ fun SettingsScreen(
         Spacer(modifier = Modifier.height(8.dp))
 
         allAccounts.forEach { account ->
-            val authState by authViewModel.authSession.collectAsState()
-            val isActive = when (val state = authState) {
-                is AuthState.Active -> state.session.accountId == account.accountId
-                is AuthState.TokenRefreshing -> state.session.accountId == account.accountId
-                is AuthState.TokenExpired -> state.session.accountId == account.accountId
-                is AuthState.ReauthRequired -> state.session.accountId == account.accountId
-                is AuthState.DecryptionError -> state.session.accountId == account.accountId
-                is AuthState.NetworkError -> state.session.accountId == account.accountId
-                else -> false
-            }
+            val isSelected = account.accountId == activeAccountId
             
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(bottom = 8.dp)
-                    .border(1.dp, if(isActive) SleekPrimary else SleekSurfaceBorder, RoundedCornerShape(12.dp)),
+                    .border(
+                        width = 1.dp, 
+                        color = if (isSelected) SleekPrimary else SleekSurfaceBorder, 
+                        shape = RoundedCornerShape(12.dp)
+                    ),
                 colors = CardDefaults.cardColors(containerColor = SleekSurface)
             ) {
-                val isActive = account.accountId == activeAccountId
                 Row(
-                    modifier = Modifier.padding(12.dp).clickable { settingsViewModel.switchAccount(context, account) },
+                    modifier = Modifier
+                        .padding(12.dp)
+                        .clickable { settingsViewModel.switchAccount(context, account) },
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Box(
                         modifier = Modifier
                             .size(40.dp)
-                            .background(if(isActive) SleekPrimary else SleekSurfaceVariant, CircleShape)
+                            .background(if(isSelected) SleekPrimary else SleekSurfaceVariant, CircleShape)
                             .clip(CircleShape), 
                         contentAlignment = Alignment.Center
                     ) {
@@ -288,9 +284,9 @@ fun SettingsScreen(
                     Spacer(Modifier.width(12.dp))
                     Column(modifier = Modifier.weight(1f)) {
                         Text(account.displayName, fontWeight = FontWeight.Bold, color = SleekTextPrimary)
-                        Text(if(isActive) "Active Session" else "Stored Auth", fontSize = 11.sp, color = if(isActive) SleekEmerald else SleekTextMuted)
+                        Text(if(isSelected) "Active Session" else "Stored Auth", fontSize = 11.sp, color = if(isSelected) SleekEmerald else SleekTextMuted)
                     }
-                    if (!isActive) {
+                    if (!isSelected) {
                         IconButton(onClick = { settingsViewModel.switchAccount(context, account) }) {
                             Icon(Icons.Default.SwapHoriz, null, tint = MaterialTheme.colorScheme.primary)
                         }

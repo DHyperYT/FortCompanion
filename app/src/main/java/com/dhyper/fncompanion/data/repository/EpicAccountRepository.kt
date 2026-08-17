@@ -735,7 +735,7 @@ class EpicAccountRepository {
         val mapping = mapOf(
             "quest:achievement_killmistmonsters" to Triple("Unspeakable Horrors", 20000L, "unspeakablehorrors"),
             "quest:achievement_playwithothers" to Triple("Plays Well with Others", 1000L, "playswellwithothers"),
-            "quest:achievement_loottreasurechests" to Triple("Loot Legend", 1000L, "lootlegend"),
+            "quest:achievement_loottreasurechests" to Triple("Loot Legend", 300L, "lootlegend"),
             "quest:achievement_buildstructures" to Triple("Talented Builder", 500000L, "talentedbuilder"),
             "quest:achievement_savesurvivors" to Triple("Guardian Angel", 10000L, "guardianangel"),
             "quest:achievement_explorezones" to Triple("World Explorer", 1500L, "worldexplorer"),

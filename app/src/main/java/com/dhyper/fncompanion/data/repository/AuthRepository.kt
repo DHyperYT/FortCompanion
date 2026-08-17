@@ -71,53 +71,65 @@ class AuthRepository(private val authDao: AuthDao) {
 
     private fun encryptSession(session: AuthEntity): AuthEntity {
         return session.copy(
-            deviceId = SecurityManager.encrypt(session.deviceId),
-            deviceSecret = SecurityManager.encrypt(session.deviceSecret)
+            accessToken = SecurityManager.encrypt(session.accessToken) ?: session.accessToken,
+            refreshToken = SecurityManager.encrypt(session.refreshToken) ?: session.refreshToken,
+            deviceId = SecurityManager.encrypt(session.deviceId) ?: session.deviceId,
+            deviceSecret = SecurityManager.encrypt(session.deviceSecret) ?: session.deviceSecret
         )
     }
 
     private fun decryptSession(session: AuthEntity?): AuthEntity? {
         if (session == null) return null
+        
+        // MIGRATION FALLBACK: Try to decrypt. If it fails, assume it's a plain-text token from a previous version.
+        // SecurityManager.decrypt returns null if the input is not a valid encrypted Base64 string.
+        val decryptedAccessToken = SecurityManager.decrypt(session.accessToken)
+        val decryptedRefreshToken = SecurityManager.decrypt(session.refreshToken)
+        val decryptedDeviceId = SecurityManager.decrypt(session.deviceId)
+        val decryptedDeviceSecret = SecurityManager.decrypt(session.deviceSecret)
+        
         return session.copy(
-            deviceId = SecurityManager.decrypt(session.deviceId),
-            deviceSecret = SecurityManager.decrypt(session.deviceSecret)
+            accessToken = decryptedAccessToken ?: session.accessToken,
+            refreshToken = decryptedRefreshToken ?: session.refreshToken,
+            deviceId = decryptedDeviceId ?: session.deviceId,
+            deviceSecret = decryptedDeviceSecret ?: session.deviceSecret
         )
     }
 
     suspend fun ensureActiveSession(accountId: String? = null): Result<AuthEntity> {
-        val encrypted = if (accountId != null) {
-            authDao.getAccountByIdDirect(accountId)
-        } else {
-            authDao.getAuthSessionDirect()
-        } ?: return Result.failure(Exception("No active account"))
-        
-        val session = try {
-            decryptSession(encrypted) ?: return Result.failure(Exception("Failed to load session"))
-        } catch (e: Exception) {
-            return Result.failure(e)
-        }
-        
-        val now = System.currentTimeMillis()
-        
-        // Load from memory cache if available, otherwise use the session from DB
-        val current = sessionCache.value[session.accountId] ?: session
-        
-        // Only refresh if token is missing from cache OR expiring in less than 5 minutes
-        if (now < (current.expiresAtMs - 300000)) {
-            // Update cache if it was empty but the DB token is still valid
-            if (sessionCache.value[session.accountId] == null) {
-                sessionCache.value = sessionCache.value + (session.accountId to session)
+        return try {
+            val encrypted = if (accountId != null) {
+                authDao.getAccountByIdDirect(accountId)
+            } else {
+                authDao.getAuthSessionDirect()
+            } ?: return Result.failure(Exception("No active account"))
+            
+            val session = decryptSession(encrypted) ?: return Result.failure(Exception("Failed to load session"))
+            
+            val now = System.currentTimeMillis()
+            
+            // Load from memory cache if available, otherwise use the session from DB
+            val current = sessionCache.value[session.accountId] ?: session
+            
+            // Only refresh if token is missing from cache OR expiring in less than 5 minutes
+            if (now < (current.expiresAtMs - 300000)) {
+                // Update cache if it was empty but the DB token is still valid
+                if (sessionCache.value[session.accountId] == null) {
+                    sessionCache.value = sessionCache.value + (session.accountId to session)
+                }
+                AuthDiagnosticsManager.logEvent(AuthEventType.TOKEN_VALID, session.accountId)
+                return Result.success(current)
             }
-            AuthDiagnosticsManager.logEvent(AuthEventType.TOKEN_VALID, session.accountId)
-            return Result.success(current)
+
+            AuthDiagnosticsManager.logEvent(
+                if (now < current.expiresAtMs) AuthEventType.TOKEN_EXPIRING_SOON else AuthEventType.TOKEN_CHECK,
+                session.accountId
+            )
+
+            performTokenRenewal(session)
+        } catch (e: Exception) {
+            Result.failure(e)
         }
-
-        AuthDiagnosticsManager.logEvent(
-            if (now < current.expiresAtMs) AuthEventType.TOKEN_EXPIRING_SOON else AuthEventType.TOKEN_CHECK,
-            session.accountId
-        )
-
-        return performTokenRenewal(session)
     }
 
     suspend fun forceTokenRefresh(accountId: String? = null): Result<AuthEntity> {
@@ -416,7 +428,11 @@ class AuthRepository(private val authDao: AuthDao) {
             } ?: return Result.failure(Exception("Failed to parse backup data"))
 
             // Restore accounts (Tokens will be refreshed on first use via deviceAuth/refreshToken)
-            backup.accounts.forEach { authDao.upsertAuthSession(encryptSession(it)) }
+            val currentActive = authDao.getAuthSessionDirect()
+            backup.accounts.forEachIndexed { index, it ->
+                val toSave = if (currentActive == null && index == 0) it.copy(isActive = true) else it
+                authDao.upsertAuthSession(encryptSession(toSave))
+            }
             
             // Restore settings (API key etc), but preserve existing live state if any
             backup.settings?.let { newSettings ->

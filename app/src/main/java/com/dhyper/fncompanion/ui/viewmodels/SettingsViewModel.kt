@@ -96,41 +96,19 @@ class SettingsViewModel(
     fun checkForUpdates(currentVersion: String, context: Context) {
         viewModelScope.launch {
             _updateState.value = UpdateState.Checking
-            try {
-                val client = okhttp3.OkHttpClient()
-                val request = okhttp3.Request.Builder()
-                    .url("https://api.github.com/repos/DHyperYT/FortCompanion/releases/latest")
-                    .build()
-                
-                client.newCall(request).enqueue(object : okhttp3.Callback {
-                    override fun onFailure(call: okhttp3.Call, e: java.io.IOException) {
-                        _updateState.value = UpdateState.Error("Check failed")
+            val result = com.dhyper.fncompanion.util.UpdateManager.checkForUpdate()
+            result.fold(
+                onSuccess = { info ->
+                    if (info.isUpdateAvailable) {
+                        _updateState.value = UpdateState.NewUpdate
+                    } else {
+                        _updateState.value = UpdateState.NoUpdate
                     }
-
-                    override fun onResponse(call: okhttp3.Call, response: okhttp3.Response) {
-                        response.use {
-                            if (!response.isSuccessful) {
-                                _updateState.value = UpdateState.Error("Check failed")
-                                return
-                            }
-                            val body = response.body?.string() ?: ""
-                            val json = org.json.JSONObject(body)
-                            val latestTag = json.getString("tag_name").replace("v", "")
-                            
-                            if (latestTag != currentVersion.replace("v", "")) {
-                                _updateState.value = UpdateState.NewUpdate
-                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/DHyperYT/FortCompanion/releases/latest"))
-                                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                                context.startActivity(intent)
-                            } else {
-                                _updateState.value = UpdateState.NoUpdate
-                            }
-                        }
-                    }
-                })
-            } catch (e: Exception) {
-                _updateState.value = UpdateState.Error("Offline or check failed.")
-            }
+                },
+                onFailure = {
+                    _updateState.value = UpdateState.Error("Check failed")
+                }
+            )
         }
     }
 
@@ -232,10 +210,12 @@ class SettingsViewModel(
     fun switchAccount(context: Context, account: AuthEntity) {
         viewModelScope.launch {
             authDao.saveAuthSession(account)
+            
             // Full process restart to ensure all states (Locker, Quests, Wishlist) are clean
             val intent = context.packageManager.getLaunchIntentForPackage(context.packageName)
             intent?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
             context.startActivity(intent)
+            
             Runtime.getRuntime().exit(0)
         }
     }

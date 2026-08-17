@@ -49,27 +49,31 @@ object SecurityManager {
 
     // --- LOCAL KEYSTORE ENCRYPTION ---
     fun encrypt(plaintext: String?): String? {
-        if (plaintext == null) return null
-        val cipher = Cipher.getInstance(AES_GCM)
-        cipher.init(Cipher.ENCRYPT_MODE, getKeystoreKey())
-        val iv = cipher.iv
-        val encrypted = cipher.doFinal(plaintext.toByteArray())
-        val combined = iv + encrypted
-        return Base64.encodeToString(combined, Base64.DEFAULT)
+        if (plaintext.isNullOrBlank()) return plaintext
+        return try {
+            val cipher = Cipher.getInstance(AES_GCM)
+            cipher.init(Cipher.ENCRYPT_MODE, getKeystoreKey())
+            val iv = cipher.iv // GCM IV is 12 bytes
+            val encrypted = cipher.doFinal(plaintext.toByteArray(Charsets.UTF_8))
+            val combined = iv + encrypted
+            Base64.encodeToString(combined, Base64.NO_WRAP)
+        } catch (e: Exception) {
+            null
+        }
     }
 
     fun decrypt(ciphertext: String?): String? {
-        if (ciphertext == null) return null
-        try {
-            val combined = Base64.decode(ciphertext, Base64.DEFAULT)
-            if (combined.size < 12) throw Exception("Invalid ciphertext length")
+        if (ciphertext.isNullOrBlank()) return ciphertext
+        return try {
+            val combined = Base64.decode(ciphertext, Base64.NO_WRAP)
+            if (combined.size < 12) return null
             val iv = combined.sliceArray(0 until 12)
             val encrypted = combined.sliceArray(12 until combined.size)
             val cipher = Cipher.getInstance(AES_GCM)
             cipher.init(Cipher.DECRYPT_MODE, getKeystoreKey(), GCMParameterSpec(128, iv))
-            return String(cipher.doFinal(encrypted))
+            String(cipher.doFinal(encrypted), Charsets.UTF_8)
         } catch (e: Exception) {
-            throw e // Propagate to repository to handle DECRYPTION_ERROR state
+            null
         }
     }
 
@@ -80,16 +84,18 @@ object SecurityManager {
         
         val cipher = Cipher.getInstance(EXPORT_ALGO)
         cipher.init(Cipher.ENCRYPT_MODE, secretKey)
-        val iv = cipher.iv
-        val encrypted = cipher.doFinal(plaintext.toByteArray())
+        val iv = cipher.iv // CBC IV is 16 bytes
+        val encrypted = cipher.doFinal(plaintext.toByteArray(Charsets.UTF_8))
         
         val combined = salt + iv + encrypted
-        return Base64.encodeToString(combined, Base64.DEFAULT)
+        return Base64.encodeToString(combined, Base64.NO_WRAP)
     }
 
     fun decryptWithPassword(ciphertext: String, password: CharArray): String? {
-        try {
-            val combined = Base64.decode(ciphertext, Base64.DEFAULT)
+        return try {
+            val combined = Base64.decode(ciphertext, Base64.NO_WRAP)
+            if (combined.size < SALT_SIZE + IV_SIZE) return null
+            
             val salt = combined.sliceArray(0 until SALT_SIZE)
             val iv = combined.sliceArray(SALT_SIZE until SALT_SIZE + IV_SIZE)
             val encrypted = combined.sliceArray(SALT_SIZE + IV_SIZE until combined.size)
@@ -97,15 +103,16 @@ object SecurityManager {
             val secretKey = deriveKey(password, salt)
             val cipher = Cipher.getInstance(EXPORT_ALGO)
             cipher.init(Cipher.DECRYPT_MODE, secretKey, IvParameterSpec(iv))
-            return String(cipher.doFinal(encrypted))
+            String(cipher.doFinal(encrypted), Charsets.UTF_8)
         } catch (e: Exception) {
-            return null
+            null
         }
     }
 
     private fun deriveKey(password: CharArray, salt: ByteArray): SecretKey {
         val factory = javax.crypto.SecretKeyFactory.getInstance(PBKDF2_ALGO)
-        val spec = PBEKeySpec(password, salt, 65536, 256)
+        // Increased iterations to 200,000 for better brute-force resistance
+        val spec = PBEKeySpec(password, salt, 200000, 256)
         val tmp = factory.generateSecret(spec)
         return SecretKeySpec(tmp.encoded, "AES")
     }
