@@ -43,5 +43,3 @@ API Key is acquired from https://fortnite-api.com
 Some images are used from PennyDB, and V-Bucks alerts use FortniteDB please support them!
 
 Join my discord server here: https://discord.gg/PDFG7TU5TY
-
-(AI Assisted Code, i will revamp this fully when i manage to code shit like that completely on my own)
