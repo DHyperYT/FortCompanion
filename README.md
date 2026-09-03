@@ -1,6 +1,11 @@
 # Fortnite Companion
 
 Fortnite Companion is a feature-rich companion app for Fortnite that lets you authenticate and manage your Epic Games accounts, switch between multiple accounts, maintain persistent sessions, and securely import/export your account credentials. View your Battle Royale locker, item shop, player stats, maps, STW info, AES keys, and all cosmetics in the game. Create per-account or universal wishlists, receive shop and wishlist notifications, generate exchange codes for quick Epic Games or Fortnite Mobile sign-ins, generate images of your BR locker, listen to Jam Tracks and Music Packs directly through YouTube, and dump your account's profiles.,
+<img width="1280" height="2772" alt="141857" src="https://github.com/user-attachments/assets/c095b55a-830b-456b-9982-541214027164" />
+<img width="1280" height="2772" alt="141894" src="https://github.com/user-attachments/assets/7cf409a1-cdff-40a2-b916-a3eceff7a93d" />
+<img width="1280" height="2772" alt="141899" src="https://github.com/user-attachments/assets/4d773a00-8c14-4eb2-ac13-592511710b07" />
+<img width="1280" height="2772" alt="141901" src="https://github.com/user-attachments/assets/3f41529a-977e-4da8-8f6e-dd17f99f3c41" />
+<img width="1280" height="2772" alt="141900" src="https://github.com/user-attachments/assets/99a4b46e-cdba-429f-baee-eb8e3d8b6f4d" />
 
 ## Save the World
 
