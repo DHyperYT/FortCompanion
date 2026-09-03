@@ -6,6 +6,8 @@ Fortnite Companion is a feature-rich companion app for Fortnite that lets you au
 <img width="1280" height="2772" alt="141899" src="https://github.com/user-attachments/assets/4d773a00-8c14-4eb2-ac13-592511710b07" />
 <img width="1280" height="2772" alt="141901" src="https://github.com/user-attachments/assets/3f41529a-977e-4da8-8f6e-dd17f99f3c41" />
 <img width="1280" height="2772" alt="141900" src="https://github.com/user-attachments/assets/99a4b46e-cdba-429f-baee-eb8e3d8b6f4d" />
+<img width="1280" height="2772" alt="142317" src="https://github.com/user-attachments/assets/0413b14a-c0f0-40cf-8e7b-b8c84d0a71eb" />
+
 
 ## Save the World
 
@@ -42,6 +44,9 @@ Your account credentials remain under your control. If you uninstall the app or 
 2. Select **Open** and choose the directory containing this project
 3. Allow Android Studio to fix any incompatibilities as it imports the project.
 4. Run the app.
+
+## How to install without building 
+Download the latest apk from releases
 
 API Key is acquired from https://fortnite-api.com
 
